@@ -1,4 +1,8 @@
-from .foreground import LcForeground, FOREGROUND_ENTITY_TYPES
+from .lcforeground import LcForeground, FOREGROUND_ENTITY_TYPES
+from .v1_client import AntelopeV1Client
+
+PROVIDERS = ['AntelopeV1Client', 'LcForeground']
+
 
 def init_fcn(source, ref=None, **kwargs):
     """
