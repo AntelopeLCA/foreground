@@ -1,14 +1,16 @@
 import json
 from collections import defaultdict
-from antelope import CatalogRef
+from antelope import CatalogRef, BasicQuery
 
 from lcatools.archives import BasicArchive, LC_ENTITY_TYPES
 # from lcatools.fragment_flows import FragmentFlow
 
 from ..lcforeground import FOREGROUND_ENTITY_TYPES
+from ...interfaces.iforeground import AntelopeForegroundInterface
+from ...refs.fragment_ref import FragmentRef
 from ...fragment_flows import FragmentFlow
 
-from .exchange import AntelopeExchangeImplementation
+from .foreground import AntelopeV1ForegroundImplementation
 from .quantity import AntelopeQuantityImplementation
 from .index import AntelopeIndexImplementation
 from .exceptions import AntelopeV1Error
@@ -34,6 +36,10 @@ def remote_ref(url):
         if len(k) > 0:
             ref = '.'.join([ref, k])
     return ref
+
+
+class AntelopeV1Query(BasicQuery, AntelopeForegroundInterface):
+    pass
 
 
 class DeferredProcessComment(object):
@@ -93,17 +99,23 @@ class AntelopeV1Client(BasicArchive):
             self._parse_and_save_entity(fp)
         self._fetched_all['flowproperty'] = True
 
+    @property
+    def query(self):
+        return AntelopeV1Query(self)
+
     def make_interface(self, iface):
         if iface == 'index':
             return AntelopeIndexImplementation(self)
-        elif iface == 'exchange':
-            return AntelopeExchangeImplementation(self)
         elif iface == 'quantity':
             return AntelopeQuantityImplementation(self)
+        elif iface == 'foreground':
+            return AntelopeV1ForegroundImplementation(self)
         else:
             return super(AntelopeV1Client, self).make_interface(iface)
 
     def _make_ref(self, external_ref, entity_type, reference_entity, **kwargs):
+        if entity_type == 'fragment':
+            return FragmentRef(external_ref, self.query, reference_entity, **kwargs)
         return CatalogRef.from_query(external_ref, self.query, entity_type, reference_entity, **kwargs)
 
     def entities_by_type(self, entity_type):

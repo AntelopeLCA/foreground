@@ -11,7 +11,7 @@ cat.new_resource(ref, 'http://www.antelope-lca.net/uo-lca/api/', 'AntelopeV1Clie
                  store=False, interfaces=['index', 'inventory', 'quantity'], quiet=True)
 
 
-@unittest.skip('"No Access to Entity" needs debugged')
+# @unittest.skip('"No Access to Entity" needs debugged')
 class AntelopeV1Client(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -20,10 +20,10 @@ class AntelopeV1Client(unittest.TestCase):
         self.assertEqual(len(self.ar.get_endpoint('stages')), 87)
 
     def test_stagename(self):
-        inv = self.ar.make_interface('inventory')
-        self.assertEqual(inv.get_stage_name('42'), 'Natural Gas')
-        self.assertEqual(inv.get_stage_name('47'), 'Natural Gas Supply')
-        self.assertEqual(inv.get_stage_name('81'), 'WWTP')
+        # inv = self.ar.make_interface('inventory')
+        self.assertEqual(self.ar.get_stage_name('42'), 'Natural Gas')
+        self.assertEqual(self.ar.get_stage_name('47'), 'Natural Gas Supply')
+        self.assertEqual(self.ar.get_stage_name('81'), 'WWTP')
 
     def test_impactcategory(self):
         self.assertEqual(self.ar._get_impact_category(6), 'Cancer human health effects')

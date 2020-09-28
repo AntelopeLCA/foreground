@@ -1,8 +1,8 @@
 
-from lcatools.implementations import ExchangeImplementation
+from ...implementations import AntelopeForegroundImplementation
 
 
-class AntelopeExchangeImplementation(ExchangeImplementation):
+class AntelopeV1ForegroundImplementation(AntelopeForegroundImplementation):
     """
     Overrides the default implementation to handle the AntelopeV1 case
     """

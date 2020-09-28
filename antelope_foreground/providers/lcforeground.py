@@ -7,10 +7,9 @@ import re
 
 from collections import defaultdict
 
-from antelope_catalog.catalog_query import UnknownOrigin
-from ..implementations import ForegroundImplementation
+from ..implementations import AntelopeForegroundImplementation as ForegroundImplementation
 
-from antelope import PropertyExists, CatalogRef
+from antelope import PropertyExists
 from lcatools.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES
 from ..entities.fragments import LcFragment
 
@@ -169,10 +168,8 @@ class LcForeground(BasicArchive):
             c = e.pop('characterizations')
             ref_qty_uu = next(cf['quantity'] for cf in c if 'isReference' in cf and cf['isReference'] is True)
         ref_qty = self[ref_qty_uu]
-        try:
-            q = self._catalog.query(origin)
-            ref = CatalogRef.from_query(external_ref, q, 'flow', ref_qty, **e)
-        except UnknownOrigin:
+        ref = self._catalog.catalog_ref(origin, external_ref, entity_type='flow')
+        if not ref.resolved:  # not found
             name = e.pop('Name', None) or 'unnamed flow %s' % origin
             ref = self.make_interface('foreground').add_or_retrieve(external_ref, ref_qty, name, **e)
         return ref

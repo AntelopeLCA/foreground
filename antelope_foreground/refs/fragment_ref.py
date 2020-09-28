@@ -1,4 +1,4 @@
-from .base import EntityRef
+from antelope.refs.base import EntityRef
 # from ..fragment_flows import group_ios
 """
 Not sure what to do about Fragment Refs, whether they belong in the main interface. I'd like to think no, but

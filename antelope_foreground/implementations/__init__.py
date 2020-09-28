@@ -1,1 +1,1 @@
-from .foreground import ForegroundImplementation  # requires foreground editor-- this should live elsewhere
+from .foreground import AntelopeForegroundImplementation  # requires foreground editor-- this should live elsewhere

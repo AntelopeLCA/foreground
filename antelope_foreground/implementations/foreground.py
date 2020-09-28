@@ -1,5 +1,5 @@
 from antelope import CONTEXT_STATUS_, EntityNotFound, comp_dir  # , BackgroundRequired
-from ..interfaces.iforeground import ForegroundInterface
+from ..interfaces.iforeground import AntelopeForegroundInterface
 from lcatools.implementations import BasicImplementation
 
 from lcatools.entities.quantities import new_quantity
@@ -16,7 +16,7 @@ class UnknownRefQuantity(Exception):
     pass
 
 
-class ForegroundImplementation(BasicImplementation, ForegroundInterface):
+class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundInterface):
     """
     A foreground manager allows a user to build foregrounds.  This should work with catalog references, rather
     than actual entities.
@@ -56,7 +56,7 @@ class ForegroundImplementation(BasicImplementation, ForegroundInterface):
     #_recursion_check = None
 
     def __init__(self, *args, **kwargs):
-        super(ForegroundImplementation, self).__init__(*args, **kwargs)
+        super(AntelopeForegroundImplementation, self).__init__(*args, **kwargs)
         self._observations = []
 
     '''
@@ -367,6 +367,10 @@ class ForegroundImplementation(BasicImplementation, ForegroundInterface):
     def save(self, **kwargs):
         self._archive.save(**kwargs)
         return True
+
+    def traverse(self, fragment, scenario=None, **kwargs):
+        frag = self._archive.retrieve_or_fetch_entity(fragment)
+        return frag.traverse(scenario, observed=True)
 
     def clear_unit_scores(self, lcia_method=None):
         self._archive.clear_unit_scores(lcia_method)
