@@ -1,11 +1,9 @@
 from antelope import comp_dir
 
 from .terminations import FlowTermination, SubFragmentAggregation
-from lcatools.characterizations import DuplicateCharacterizationError
 from lcatools.lcia_results import LciaResult, DetailedLciaResult, SummaryLciaResult
 
 from collections import defaultdict
-from math import isclose
 
 class CumulatingFlows(Exception):
     """
@@ -62,50 +60,6 @@ class FragmentFlow(object):
         :param query: an antelope v1 catalog query
         :return:
         """
-        fpms = j['flowPropertyMagnitudes']
-        ref_mag = fpms[0]
-        magnitude = ref_mag['magnitude']
-        flow = query.get('flows/%s' % j['flowID'])
-        for fpm in fpms[1:]:
-            mag_qty = query.get('flowproperties/%s' % fpm['flowPropertyID'])
-            if fpm['magnitude'] == 0:
-                val = 0
-            else:
-                val = fpm['magnitude'] / magnitude
-            try:
-                flow.characterize(mag_qty, value=val)
-            except DuplicateCharacterizationError:
-                if not isclose(mag_qty.cf(flow), val):
-                    raise ValueError('Characterizations do not match: %g vs %g' % (mag_qty.cf(flow), val))
-
-        dirn = j['direction']
-
-        if 'parentFragmentFlowID' in j:
-            parent = 'fragments/%s/fragmentflows/%s' % (j['fragmentID'], j['parentFragmentFlowID'])
-            frag = GhostFragment(parent, flow, dirn)  # distinctly not reference
-
-        else:
-            frag = query.get('fragments/%s' % j['fragmentID'])
-
-        node_type = j['nodeType']
-        nw = j['nodeWeight']
-        if magnitude == 0:
-            inbound_ev = 0
-        else:
-            inbound_ev = magnitude / nw
-
-        if node_type == 'Process':
-            term_node = query.get('processes/%s' % j['processID'])
-            term = FlowTermination(frag, term_node, term_flow=flow, inbound_ev=inbound_ev)
-        elif node_type == 'Fragment':
-            term_node = query.get('fragments/%s' % j['subFragmentID'])
-            term = FlowTermination(frag, term_node, term_flow=flow, inbound_ev=inbound_ev)
-        else:
-            term = FlowTermination.null(frag)
-        if 'isConserved' in j:
-            conserved = j['isConserved']
-        else:
-            conserved = False
         return cls(frag, magnitude, nw, term, conserved)
 
     '''
@@ -414,6 +368,10 @@ class GhostFragment(object):
         self._parent = parent
         self.flow = flow
         self.direction = direction
+
+    @property
+    def origin(self):
+        return self._parent.origin
 
     @property
     def uuid(self):

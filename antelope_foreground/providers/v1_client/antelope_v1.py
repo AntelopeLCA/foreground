@@ -1,6 +1,6 @@
 import json
 from collections import defaultdict
-from antelope import CatalogRef, BasicQuery
+from antelope import CatalogRef, BasicQuery, comp_dir
 
 from lcatools.archives import BasicArchive, LC_ENTITY_TYPES
 # from lcatools.fragment_flows import FragmentFlow
@@ -8,7 +8,11 @@ from lcatools.archives import BasicArchive, LC_ENTITY_TYPES
 from ..lcforeground import FOREGROUND_ENTITY_TYPES
 from ...interfaces.iforeground import AntelopeForegroundInterface
 from ...refs.fragment_ref import FragmentRef
-from ...fragment_flows import FragmentFlow
+from ...fragment_flows import FragmentFlow, GhostFragment
+
+from ...terminations import FlowTermination
+from lcatools.characterizations import DuplicateCharacterizationError
+from math import isclose
 
 from .foreground import AntelopeV1ForegroundImplementation
 from .quantity import AntelopeQuantityImplementation
@@ -95,8 +99,10 @@ class AntelopeV1Client(BasicArchive):
             'lciamethod': False,
             'fragment': False
         }
+        # print('Fetching all flow properties')  ## this makes the difference between a 20 sec test and a 55-sec test
         for fp in self.get_endpoint('flowproperties', cache=False):
             self._parse_and_save_entity(fp)
+        #print('done') ## super slow DiscountASP gotta get away
         self._fetched_all['flowproperty'] = True
 
     @property
@@ -113,10 +119,11 @@ class AntelopeV1Client(BasicArchive):
         else:
             return super(AntelopeV1Client, self).make_interface(iface)
 
-    def _make_ref(self, external_ref, entity_type, reference_entity, **kwargs):
+    def _make_ref(self, external_ref, entity_type, **kwargs):
         if entity_type == 'fragment':
-            return FragmentRef(external_ref, self.query, reference_entity, **kwargs)
-        return CatalogRef.from_query(external_ref, self.query, entity_type, reference_entity, **kwargs)
+            return FragmentRef(external_ref, self.query, **kwargs)
+        r = CatalogRef.from_query(external_ref, self.query, entity_type, **kwargs)
+        return r
 
     def entities_by_type(self, entity_type):
         if entity_type == 'process':
@@ -169,7 +176,9 @@ class AntelopeV1Client(BasicArchive):
 
         self._print('Fetching %s from remote server' % endpoint)
         url = urljoin(self.source, endpoint)
+        print('loading URL %s' % url)
         j = json.loads(self._s.get(url).content)
+        print('done')
 
         if cache:
             self._endpoints[endpoint] = j
@@ -214,11 +223,98 @@ class AntelopeV1Client(BasicArchive):
 
     def make_fragment_flow(self, ff):
         """
+            A fragment traversal generates an array of FragmentFlow objects.
+
+    X    "fragmentID": 8, - added by antelope
+    X    "fragmentStageID": 80,
+
+    f    "fragmentFlowID": 167,
+    f    "name": "UO Local Collection",
+    f    "shortName": "Scenario",
+    f    "flowID": 371,
+    f    "direction": "Output",
+    f    "parentFragmentFlowID": 168,
+    f    "isBackground": false,
+
+    w    "nodeWeight": 1.0,
+
+    t    "nodeType": "Process",
+    t    "processID": 62,
+
+    *    "isConserved": true,
+    *    "flowPropertyMagnitudes": [
+      {
+        "flowPropertyID": 23,
+        "unit": "kg",
+        "magnitude": 1.0
+      }
+    ]
+
+        Need to:
+         * create a termination
+         * create a fragment ref
+         * extract node weight
+         * extract magnitude
+         * extract is_conserved
+
+        :param ff: .from_antelope_v1(ff, self.query)
+         JSON-formatted fragmentflow, from a v1 .NET antelope instance.  Must be modified to include StageName
+         instead of fragmentStageID
+        :return:
+        """
+        """
         This needs to be in-house because it uses the query mechanism
         :param ff:
         :return:
         """
-        return FragmentFlow.from_antelope_v1(ff, self.query)
+        fpms = ff['flowPropertyMagnitudes']
+        ref_mag = fpms[0]
+        magnitude = ref_mag['magnitude']
+        flow = self.query.get('flows/%s' % ff['flowID'])
+        for fpm in fpms[1:]:
+            mag_qty = self.query.get('flowproperties/%s' % fpm['flowPropertyID'])
+            if fpm['magnitude'] == 0:
+                val = 0
+            else:
+                val = fpm['magnitude'] / magnitude
+            try:
+                flow.characterize(mag_qty, value=val)
+            except DuplicateCharacterizationError:
+                if not isclose(mag_qty.cf(flow), val):
+                    raise ValueError('Characterizations do not match: %g vs %g' % (mag_qty.cf(flow), val))
+
+        dirn = ff['direction']
+
+        if 'parentFragmentFlowID' in ff:
+            parent = 'fragments/%s/fragmentflows/%s' % (ff['fragmentID'], ff['parentFragmentFlowID'])
+            frag = GhostFragment(parent, flow, dirn)  # distinctly not reference
+
+        else:
+            frag = self.query.get('fragments/%s' % ff['fragmentID'])
+
+        node_type = ff['nodeType']
+        nw = ff['nodeWeight']
+        if magnitude == 0:
+            inbound_ev = 0
+        else:
+            inbound_ev = magnitude / nw
+
+        if node_type == 'Process':
+            term_node = self.query.get('processes/%s' % ff['processID'])
+            term = FlowTermination(frag, term_node, term_flow=flow, inbound_ev=inbound_ev,
+                                   _direction=comp_dir(dirn))  # antelope v1 processes do not have reference flows!
+        elif node_type == 'Fragment':
+            term_node = self.query.get('fragments/%s' % ff['subFragmentID'])
+            term = FlowTermination(frag, term_node, term_flow=flow, inbound_ev=inbound_ev)
+        else:
+            term = FlowTermination.null(frag)
+        if 'isConserved' in ff:
+            conserved = ff['isConserved']
+        else:
+            conserved = False
+
+
+        return FragmentFlow(frag, magnitude, nw, term, conserved)
 
     '''
     Entity handling
@@ -270,7 +366,7 @@ class AntelopeV1Client(BasicArchive):
         j['SpatialScope'] = j.pop('geography')
         j['TemporalScope'] = j.pop('referenceYear')
         j['Comment'] = DeferredProcessComment(self._get_comment, process_id)
-        ref = self._make_ref(ext_ref, 'process', [], **j)
+        ref = self._make_ref(ext_ref, 'process', **j)
         self._cached['processes'][process_id] = ref
         return ref
 
@@ -281,7 +377,7 @@ class AntelopeV1Client(BasicArchive):
         j['CasNumber'] = j.pop('casNumber', '')
         j['Compartment'] = [j.pop('category')]
         ref_qty = self.retrieve_or_fetch_entity('flowproperties/%s' % j.pop('referenceFlowPropertyID'))
-        ref = self._make_ref(ext_ref, 'flow', ref_qty, **j)
+        ref = self._make_ref(ext_ref, 'flow', reference_entity=ref_qty, **j)
         self._cached['flows'][flow_id] = ref
         return ref
 
@@ -295,7 +391,7 @@ class AntelopeV1Client(BasicArchive):
         j.pop('referenceFlowPropertyID')
         j['Indicator'] = rfp['name']
         j['Category'] = self._get_impact_category(j.pop('impactCategoryID'))
-        ref = self._make_ref(ext_ref, 'quantity', ref_unit, **j)
+        ref = self._make_ref(ext_ref, 'quantity', reference_entity=ref_unit, **j)
         self._cached['lciamethods'][lm_id] = ref
         return ref
 
@@ -304,7 +400,7 @@ class AntelopeV1Client(BasicArchive):
         ext_ref = 'flowproperties/%s' % fp_id
         j['Name'] = j.pop('name')
         ref_unit = j.pop('referenceUnit')
-        ref = self._make_ref(ext_ref, 'quantity', ref_unit, **j)
+        ref = self._make_ref(ext_ref, 'quantity', reference_entity=ref_unit, **j)
         self._cached['flowproperties'][fp_id] = ref
         return ref
 
@@ -314,7 +410,7 @@ class AntelopeV1Client(BasicArchive):
         j['Name'] = j.pop('name')
         dirn = j.pop('direction')
         flow = self.retrieve_or_fetch_entity('flows/%s' % j.pop('termFlowID'))
-        ref = self._make_ref(ext_ref, 'fragment', None, **j)
+        ref = self._make_ref(ext_ref, 'fragment', **j)
         ref.set_config(flow, dirn)
         self._cached['fragments'][frag_id] = ref
         return ref
