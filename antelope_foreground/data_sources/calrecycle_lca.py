@@ -32,9 +32,9 @@ from collections import namedtuple
 from antelope import comp_dir
 
 from ..entities.fragment_editor import create_fragment, set_child_exchanges
-from antelope_catalog.catalog.lc_resolver import ResourceNotFound
+from antelope_core.catalog.lc_resolver import ResourceNotFound
 
-from antelope_catalog.data_sources.data_source import DataSource, DataCollection
+from antelope_core.data_sources.data_source import DataSource, DataCollection
 from ..entities.fragments import BalanceAlreadySet
 
 

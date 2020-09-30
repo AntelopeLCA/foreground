@@ -8,9 +8,9 @@ import time
 
 from math import floor
 
-from antelope_catalog import LcCatalog
+from antelope_core import LcCatalog
 
-from antelope_catalog.data_sources.local import CATALOG_ROOT, RESOURCES_CONFIG, check_enabled
+from antelope_core.data_sources.local import CATALOG_ROOT, RESOURCES_CONFIG, check_enabled
 from ..calrecycle_lca import CalRecycleConfig
 from requests import ConnectionError as requestsConnectionError
 

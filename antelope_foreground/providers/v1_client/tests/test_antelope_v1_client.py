@@ -1,7 +1,7 @@
 import unittest
 from antelope import IndexRequired
 
-from antelope_catalog import LcCatalog
+from antelope_core import LcCatalog
 
 
 cat = LcCatalog.make_tester()

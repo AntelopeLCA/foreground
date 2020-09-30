@@ -10,7 +10,7 @@ from collections import defaultdict
 from ..implementations import AntelopeForegroundImplementation as ForegroundImplementation
 
 from antelope import PropertyExists
-from lcatools.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES
+from antelope_core.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES
 from ..entities.fragments import LcFragment
 
 

@@ -1,7 +1,7 @@
 from antelope import comp_dir
 
 from .terminations import FlowTermination, SubFragmentAggregation
-from lcatools.lcia_results import LciaResult, DetailedLciaResult, SummaryLciaResult
+from antelope_core.lcia_results import LciaResult, DetailedLciaResult, SummaryLciaResult
 
 from collections import defaultdict
 

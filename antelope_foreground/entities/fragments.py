@@ -9,9 +9,9 @@ import uuid
 from antelope import comp_dir, check_direction, PropertyExists, CatalogRef, NoCatalog
 
 from ..fragment_flows import group_ios, FragmentFlow, frag_flow_lcia
-from lcatools.entities import LcEntity, LcFlow
-from lcatools.exchanges import ExchangeValue
-from lcatools.interact import ifinput, parse_math
+from antelope_core.entities import LcEntity, LcFlow
+from antelope_core.exchanges import ExchangeValue
+# from lcatools.interact import ifinput, parse_math
 from ..terminations import FlowTermination
 
 
@@ -546,11 +546,12 @@ class LcFragment(LcEntity):
 
     def _observe(self, scenario=None, value=None, units=None):
         """
-        interactive observe engine
+        no reason to have an interactive observe engine in an entity definition
         :param scenario:
         :return:
         """
         if value is None:
+            '''
             if scenario is None:
                 prompt = 'Observed value'
             else:
@@ -572,6 +573,8 @@ class LcFragment(LcEntity):
                     value = self.cached_ev
                 else:
                     value = parse_math(val)
+            '''
+            raise ValueError('%.5s: Either supply an observed value or accept_all=True' % self.uuid)
 
         if scenario is None:
             self.set_exchange_value(1, value, units=units)

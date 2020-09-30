@@ -50,8 +50,8 @@ import unittest
 # from math import floor
 
 from ..fragment_editor import create_fragment
-from lcatools.entities import LcFlow
-from lcatools.archives import Qdb
+from antelope_core.entities import LcFlow
+from antelope_core.archives import Qdb
 from antelope import CONTEXT_STATUS_
 
 origin = 'test.origin'

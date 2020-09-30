@@ -1,7 +1,7 @@
 import unittest
 
 from antelope import comp_dir
-from lcatools.entities.tests import BasicEntityTest
+from antelope_core.entities.tests import BasicEntityTest
 from ..entities.fragment_editor import create_fragment
 from ..terminations import FlowTermination
 

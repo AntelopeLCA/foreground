@@ -1,9 +1,9 @@
 from antelope import CONTEXT_STATUS_, EntityNotFound, comp_dir  # , BackgroundRequired
 from ..interfaces.iforeground import AntelopeForegroundInterface
-from lcatools.implementations import BasicImplementation
+from antelope_core.implementations import BasicImplementation
 
-from lcatools.entities.quantities import new_quantity
-from lcatools.entities.flows import new_flow
+from antelope_core.entities.quantities import new_quantity
+from antelope_core.entities.flows import new_flow
 from ..entities.fragments import InvalidParentChild
 from ..entities.fragment_editor import create_fragment, clone_fragment, _fork_fragment  # interpose,
 

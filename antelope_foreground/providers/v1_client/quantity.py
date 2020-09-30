@@ -1,11 +1,11 @@
-from lcatools.implementations import QuantityImplementation
-from lcatools.lcia_results import LciaResult
+from antelope_core.implementations import QuantityImplementation
+from antelope_core.lcia_results import LciaResult
 
 from math import isclose
 from antelope import EntityNotFound
 
-from lcatools.exchanges import ExchangeValue
-from lcatools.characterizations import QRResult
+from antelope_core.exchanges import ExchangeValue
+from antelope_core.characterizations import QRResult
 
 from .exceptions import AntelopeV1Error
 

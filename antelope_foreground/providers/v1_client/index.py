@@ -1,4 +1,4 @@
-from lcatools.implementations import IndexImplementation
+from antelope_core.implementations import IndexImplementation
 
 
 class AntelopeIndexImplementation(IndexImplementation):

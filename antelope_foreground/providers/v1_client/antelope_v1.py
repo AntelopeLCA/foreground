@@ -2,7 +2,7 @@ import json
 from collections import defaultdict
 from antelope import CatalogRef, BasicQuery, comp_dir
 
-from lcatools.archives import BasicArchive, LC_ENTITY_TYPES
+from antelope_core.archives import BasicArchive, LC_ENTITY_TYPES
 # from lcatools.fragment_flows import FragmentFlow
 
 from ..lcforeground import FOREGROUND_ENTITY_TYPES
@@ -11,7 +11,7 @@ from ...refs.fragment_ref import FragmentRef
 from ...fragment_flows import FragmentFlow, GhostFragment
 
 from ...terminations import FlowTermination
-from lcatools.characterizations import DuplicateCharacterizationError
+from antelope_core.characterizations import DuplicateCharacterizationError
 from math import isclose
 
 from .foreground import AntelopeV1ForegroundImplementation

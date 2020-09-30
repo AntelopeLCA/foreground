@@ -1,6 +1,7 @@
 from setuptools import setup
 
 requires = [
+    'antelope_core'
 #    'antelope_catalog',
 #    'lcatools'
 ]
