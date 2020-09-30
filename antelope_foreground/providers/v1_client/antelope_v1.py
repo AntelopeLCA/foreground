@@ -1,5 +1,6 @@
 import json
 from collections import defaultdict
+from time import time
 from antelope import CatalogRef, BasicQuery, comp_dir
 
 from antelope_core.archives import BasicArchive, LC_ENTITY_TYPES
@@ -177,8 +178,10 @@ class AntelopeV1Client(BasicArchive):
         self._print('Fetching %s from remote server' % endpoint)
         url = urljoin(self.source, endpoint)
         print('loading URL %s' % url)
+        t = time()
         j = json.loads(self._s.get(url).content)
-        print('done')
+        el = time() - t
+        print('done [%.2f sec]' % el)
 
         if cache:
             self._endpoints[endpoint] = j

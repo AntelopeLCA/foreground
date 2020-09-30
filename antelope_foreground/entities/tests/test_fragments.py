@@ -44,6 +44,7 @@ Not yet implemented:
    locales; then traverse each instance differently as specified in the termination
  = stochastic exchange values
  = private subfragments can force nondescend?
+  + privacy is enforced by providing a fragment ref, which can elect/neglect to implement traverse
 """
 
 import unittest

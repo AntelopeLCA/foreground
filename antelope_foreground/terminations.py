@@ -9,7 +9,8 @@ other.
 from antelope import PrivateArchive, check_direction, comp_dir, NoFactorsFound, QuantityRequired
 
 from antelope_core.exchanges import ExchangeValue
-from antelope_core.lcia_results import LciaResult, LciaResults
+from antelope_core.lcia_results import LciaResult
+from .lcia_dict import LciaResults
 
 
 # from lcatools.catalog_ref import NoCatalog
