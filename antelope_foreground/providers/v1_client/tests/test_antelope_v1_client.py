@@ -32,7 +32,7 @@ class AntelopeV1Client(unittest.TestCase):
 
     def test_nonimpl(self):
         with self.assertRaises(IndexRequired):
-            next(cat.query(ref).terminate('flows/87'))
+            next(cat.query(ref).targets('flows/87'))
 
     def test_traversal(self):
         ffs = cat.query(ref).get('fragments/47').traverse()

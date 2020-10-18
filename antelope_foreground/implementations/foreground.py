@@ -106,6 +106,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         else:
             raise NotForeground('The resource does not contain fragments: %s' % self._archive.ref)
 
+    '''
     def context(self, item):
         return self._archive.tm[item]
 
@@ -116,7 +117,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :return:
         """
         return self._archive.frag(string, **kwargs)
-
+    '''
     '''
     Create and modify fragments
     '''
@@ -248,8 +249,11 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             self.observe(frag, name=external_ref)
         return frag
 
+    '''
+    This is officially deprecated. let it break.
     def name_fragment(self, fragment, name, auto=None, force=None, **kwargs):
         return self._archive.name_fragment(fragment, name, auto=auto, force=force)
+    '''
 
     def observe(self, fragment, exchange_value=None, name=None, scenario=None, units=None, auto=None, force=None,
                 accept_all=None, **kwargs):

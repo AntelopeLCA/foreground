@@ -20,10 +20,11 @@ class FgImplementationTest(unittest.TestCase):
         self.assertIs(ar[f.external_ref], f)
         self.assertEqual(self.fg.get(f.external_ref), f)
 
+    @unittest.skip('Disabled frag method for now as inside baseball')
     def test_frag(self):
         f = self.fg.new_flow('a silly flow', 'number of items')
         frag = self.fg.new_fragment(f, 'Output')
-        self.assertIs(self.fg.frag(frag.uuid[:3]), frag)
+        self.assertIs(self.fg.frag(frag.uuid[:3]), frag)  ##
 
     def test_named_frag(self):
         f = self.fg.new_flow('a reference flow')

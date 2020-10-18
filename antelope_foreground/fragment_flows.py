@@ -46,6 +46,7 @@ class FragmentFlow(object):
     ]
 
     """
+    '''
     @classmethod
     def from_antelope_v1(cls, j, query):
         """
@@ -62,7 +63,6 @@ class FragmentFlow(object):
         """
         return cls(frag, magnitude, nw, term, conserved)
 
-    '''
     @classmethod
     def ref_flow(cls, parent, use_ev):
         """
