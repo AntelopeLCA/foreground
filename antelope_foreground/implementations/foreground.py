@@ -538,3 +538,43 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             self.observe(c)  # use cached implicitly via fg interface
 
         return parent
+
+    def make_fragment_trees(self, exchanges):
+        """
+        Take in a list of exchanges [that are properly connected] and build fragment trees from them. Return all roots.
+
+        If an exchange's process has been encountered, it will be used as the parent.  Exchanges with null terminations
+        become cutoff flows.
+
+        If an exchange's process has not been encountered, AND its termination is null, it will become a reference
+        fragment and be terminated to the process.
+
+        Non-null-terminated exchanges whose processes have not been encountered cause an error.
+
+        This function will only generate new fragments and will not affect any existing fragments.
+        :param exchanges:
+        :return:
+        """
+        roots = []
+        parents = dict()
+        for x in exchanges:
+            if x.process.external_ref in parents:
+                parent = parents[x.process.external_ref]
+                frag = self.new_fragment(x.flow, x.direction, parent=parent, **x.args)
+                term = self.find_term(x.termination, origin=x.process.origin)
+                if term is not None:
+                    frag.terminate(term)
+            else:
+                # unmatched flows become roots
+                if x.termination is not None:
+                    raise InvalidParentChild('Reference flow may not be terminated')
+                frag = self.new_fragment(x.flow, x.direction, **x.args)
+                roots.append(frag)
+                frag.terminate(x.process)
+
+            self.observe(frag, exchange_value=x.value)
+            if frag.term.is_process:
+                parents[frag.term.term_ref] = frag
+
+        for r in roots:
+            yield r

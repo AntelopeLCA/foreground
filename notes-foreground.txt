@@ -1,0 +1,103 @@
+# Antelope Foreground and foreground interface
+
+==========
+    Sat Oct 17 21:28:29 -0700 2020
+
+How DO we want to define the new fragment interface? it's critical (really all there is) to the EPA model
+
+and where else do we use it?
+the google spreadsheet read was always a hack-- what did it use?
+
+	_grab_model_flows
+	_process_flow_properties
+	_grab_model_frags
+    _terminate_model_frags
+	
+and that was all `new_fragment` and `find_term` (and the fragment interface itself). 
+
+the problem is identifying the parent- and that's not hard, it's just the process. so you need to make a fragment for each process, and terminate it to the process- so you need to assign its external ref
+which is done by observing it.
+
+unless `new_fragment` supports external ref assignment, which it must
+
+yes it does
+
+so we can't name it the same as the process external_ref- it has to be frag-extref
+
+fine. ok, which frags do we build?  we enumerate consumers of a process, how about 'models' which are processes with no consumers.
+
+easy enough to do on the back end
+
+What else do we have on the fg implementation?
+
+```
+// catalog access
+get_local
+find_term
+save
+
+// reimplement locally
+count
+flows
+get_canonical
+#context?
+
+// create entities
+new_quantity
+new_flow
+add_or_retrieve(ext_ref, reference, name, ...)
+
+// create fragments
+new_fragment
+create_process_model
+fragment_from_exchanges
+clone_fragment
+
+// modify fragments
+observe
+-extend_process
+split_subfragmeent
+
+// retrieve foreground content
+fragments
+observed_flows
+fragments_with_flow
+traverse
+
+// fragment management
+delete_fragment
+clear_unit_scores
+clear_scenarios
+```
+
+Really, there are post, put, patch, and delete situations here
+
+the fragment itself is an entity with a parent.  I should not be putting, only posting and patching. because user's past changes would otherwise be lost.
+
+AAaaanyway, there is the important question about creating new fragments versus revising existing ones.  
+
+Revisions should be unitary.  each operation is separate and independent, even if they are received in one PATCH request.
+
+changing exchange values is `observe`, everything else is setting properties, which is POST.
+
+Google: 
+ - sets flow if external refs differ
+ - updates PARENT
+ - sets balance
+ - updates Name, StageName, Comment
+
+ - observes the flow
+ - sets the termination --- which should maybe ALSO be an observation?
+
+
+`frag.terminate` is different from `flow.terminate`
+
+`flow.terminate` should be abandoned.  It should instead be `targets`, as it is in the paper I think.
+
+ugh, the paper.
+
+get amaru done rn, fuck.
+
+ok, the summary of this is that everything is FINE.  What google's doing is what an implementation should do- this is just interpreting a POST, in the form of dicts read from excel sheets- effectively JSON
+
+

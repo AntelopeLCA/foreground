@@ -141,6 +141,9 @@ class LcForeground(BasicArchive):
         self.load_all()
         self.check_counter('fragment')
 
+    def catalog_ref(self, origin, external_ref, **kwargs):
+        return self._catalog.catalog_ref(origin, external_ref, **kwargs)
+
     def _fetch(self, entity, **kwargs):
         return self.__getitem__(entity)
 
@@ -168,7 +171,7 @@ class LcForeground(BasicArchive):
             c = e.pop('characterizations')
             ref_qty_uu = next(cf['quantity'] for cf in c if 'isReference' in cf and cf['isReference'] is True)
         ref_qty = self[ref_qty_uu]
-        ref = self._catalog.catalog_ref(origin, external_ref, entity_type='flow')
+        ref = self.catalog_ref(origin, external_ref, entity_type='flow')
         if not ref.resolved:  # not found
             name = e.pop('Name', None) or 'unnamed flow %s' % origin
             ref = self.make_interface('foreground').add_or_retrieve(external_ref, ref_qty, name, **e)
@@ -179,7 +182,7 @@ class LcForeground(BasicArchive):
             if etype == 'flow':
                 return self._flow_ref_from_json(e, ext_ref)
             elif etype == 'quantity':
-                return self._catalog.catalog_ref(e.pop('origin'), ext_ref, entity_type='quantity', **e)
+                return self.catalog_ref(e.pop('origin'), ext_ref, entity_type='quantity', **e)
         return super(LcForeground, self)._make_entity(e, etype, ext_ref)
 
     def add(self, entity):
@@ -193,7 +196,7 @@ class LcForeground(BasicArchive):
             entity.origin = self.ref  # have to do this now in order to have the link properly defined
         elif entity.is_entity and entity.origin != self.ref:
             # TODO: Alert! entity properties are not preserved in the local ref
-            entity = self._catalog.catalog_ref(entity.origin, entity.external_ref, entity_type=entity.entity_type)
+            entity = self.catalog_ref(entity.origin, entity.external_ref, entity_type=entity.entity_type)
             # for p in entity.properties:
             #     enew[p] = entity[p]  ...
         try:

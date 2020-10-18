@@ -1204,6 +1204,9 @@ class LcFragment(LcEntity):
                     cos.extend([FragmentFlow.cutoff(ff.fragment, i.flow, i.direction, i.value * ff.node_weight)
                                 for i in ref.lci(ref_flow=ff.term.term_flow.external_ref)
                                 if i.type in ('cutoff', 'context')])
+                elif ff.term.is_process:
+                    # TODO: add in cutoffs from unobserved exchanges
+                    pass
 
         if aggregate:
             cos, _ = group_ios(self, cos, include_ref_flow=False)
