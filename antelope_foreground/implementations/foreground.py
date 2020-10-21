@@ -98,10 +98,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     '''
     fg implementation begins here
     '''
-    def fragments(self, show_all=False, **kwargs):
+    def fragments(self, *args, show_all=False, **kwargs):
         if hasattr(self._archive, 'fragments'):
             # we only want reference fragments by default
-            for f in self._archive.fragments(show_all=show_all, **kwargs):
+            for f in self._archive.fragments(*args, show_all=show_all, **kwargs):
                 yield f
         else:
             raise NotForeground('The resource does not contain fragments: %s' % self._archive.ref)
@@ -560,10 +560,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for x in exchanges:
             if x.process.external_ref in parents:
                 parent = parents[x.process.external_ref]
+                parent.unset_background()
                 frag = self.new_fragment(x.flow, x.direction, parent=parent, **x.args)
                 term = self.find_term(x.termination, origin=x.process.origin)
                 if term is not None:
                     frag.terminate(term)
+                    frag.set_background()
             else:
                 # unmatched flows become roots
                 if x.termination is not None:

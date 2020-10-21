@@ -182,19 +182,17 @@ class FragmentFlow(object):
     def __hash__(self):
         return hash(self.fragment)
 
-    def to_antelope(self, fragmentID, stageID):
-        pass
-
     @property
     def ref_unit(self):
-        return self.fragment.flow.unit()
+        return self.fragment.flow.unit
 
 
 def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.33):
     """
     Utility function for dealing with a traversal result (list of FragmentFlows)
     Creates a list of cutoff flows from the inputs and outputs from a fragment traversal.
-    ios is a list of FragmentFlows.
+
+    Returns two lists of FragmentFlows: external (inputs+outputs) and internal to the traversal.
 
     Pass-Thru Flows and Autoconsumption
 
