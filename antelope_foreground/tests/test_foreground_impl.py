@@ -12,7 +12,7 @@ class FgImplementationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.cat = ForegroundCatalog(WORKING_DIR)
-        cls.fg = cls.cat.foreground('fg', ref=test_ref)
+        cls.fg = cls.cat.foreground(ref=test_ref)
 
     def test_new_flow(self):
         f = self.fg.new_flow('Test flow', 'mass')
