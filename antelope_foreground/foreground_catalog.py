@@ -15,7 +15,17 @@ class ForegroundCatalog(LcCatalog):
     ForegroundCatalog
     '''
 
-    def foreground(self, path, ref=None, quiet=True, reset=False, delete=False):
+    def foreground(self, ref, path=None, quiet=True, reset=False, delete=False):
+        """
+        Creates or activates a foreground resource and returns an interface to that resource.
+        By default creates in a subdirectory of the catalog root with the ref as the folder
+        :param ref:
+        :param path:
+        :param quiet:
+        :param reset:
+        :param delete:
+        :return:
+        """
         """
         Creates or activates a foreground as a sub-folder within the catalog's root directory.  Returns a
         Foreground interface.
@@ -27,25 +37,30 @@ class ForegroundCatalog(LcCatalog):
         the directory to whatever-DELETED; but if this gets overwritten, there's no going back.  Overrides reset.
         :return:
         """
-        if not os.path.isabs(path):
-            path = os.path.join(self._rootdir, path)
+        if path is None:
+            path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
+            localpath = ref
+        else:
+            if os.path.isabs(path):
+                localpath = None
+            else:
+                localpath = path
+                path = os.path.join(self._rootdir, path)
+
 
         abs_path = os.path.abspath(path)
         local_path = self._localize_source(abs_path)
-        _fg_path = re.sub('^\$CAT_ROOT', '', local_path)
 
         if delete:
-            if os.path.exists(abs_path):
-                del_path = abs_path + '-DELETED'
-                if os.path.exists(del_path):
-                    rmtree(del_path)
-                os.rename(abs_path, del_path)
-            dels = [k for k in self._resolver.resources_with_source(local_path)]
+            if localpath:
+                if os.path.exists(localpath):
+                    del_path = localpath + '-DELETED'
+                    if os.path.exists(del_path):
+                        rmtree(del_path)
+                    os.rename(abs_path, del_path)
+            dels = [k for k in self._resolver.resolve(ref, interfaces='foreground')]
             for k in dels:
                 self.delete_resource(k, delete_source=True, delete_cache=True)
-
-        if ref is None:
-            ref = local_ref(_fg_path, prefix='foreground')
 
         try:
             res = next(self._resolver.resources_with_source(local_path))

@@ -317,7 +317,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         self._archive.add_entity_and_children(clone)
         return clone
 
-    def split_subfragment(self, fragment, replacement=None, **kwargs):
+    def split_subfragment(self, fragment, replacement=None, descend=False, **kwargs):
         """
         Given a non-reference fragment, split it off into a new reference fragment, and create a surrogate child
         that terminates to it.
@@ -332,6 +332,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         :param fragment:
         :param replacement: [None] if non-None, the surrogate is terminated to the replacement instead of the fork.
+        :param descend: [False] on new term
         :return:
         """
         if fragment.reference_entity is None:
@@ -345,9 +346,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         fragment.unset_parent()
         if replacement is None:
-            surrogate.terminate(fragment)
+            surrogate.terminate(fragment, descend=descend)
         else:
-            surrogate.terminate(replacement)
+            surrogate.terminate(replacement, descend=descend)
 
         return fragment
 

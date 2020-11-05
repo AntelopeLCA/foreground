@@ -10,7 +10,9 @@ from math import floor
 
 from antelope_core import LcCatalog
 
-from antelope_core.data_sources.local import CATALOG_ROOT, RESOURCES_CONFIG, check_enabled
+from antelope_core.data_sources.local import RESOURCES_CONFIG, check_enabled
+from antelope_core.catalog.catalog_root import CATALOG_ROOT
+
 from ..calrecycle_lca import CalRecycleConfig
 from requests import ConnectionError as requestsConnectionError
 
