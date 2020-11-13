@@ -56,6 +56,8 @@ def _create_fragment(flow, direction, uuid=None, parent=None, name=None, comment
     else:
         if parent.term.is_null:
             parent.to_foreground()
+        else:
+            parent.unset_background()
         if balance or parent.term.is_subfrag:
             # exchange value set during traversal
             value = None

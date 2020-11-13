@@ -76,7 +76,7 @@ class FlowTermination(object):
         # handle term flow
         tf_ref = j.pop('termFlow', None)
         if tf_ref is None:
-            term_flow = fragment.flow
+            term_flow = None  # if it is unspecified, let the best value be determined
         elif isinstance(tf_ref, dict):
             term_flow = fg.catalog_ref(tf_ref['origin'], tf_ref['externalId'], entity_type='flow')
         else:
@@ -162,6 +162,13 @@ class FlowTermination(object):
 
     @property
     def term_flow(self):
+        if self._term_flow is None:
+            if self.is_process:
+                raise AttributeError('[%s] term_flow was not specified for process term!' % self._parent.external_ref)
+            if self.is_frag:
+                return self.term_node.flow
+            else:
+                return self._parent.flow
         return self._term_flow
 
     @term_flow.setter
@@ -175,7 +182,7 @@ class FlowTermination(object):
             if self.is_process:
                 self._term_flow = self._term.reference().flow
             elif self.is_frag:
-                self._term_flow = self.term_node.flow
+                self._term_flow = None  # leave unspecified to plug into term's ref flow
             else:
                 self._term_flow = self._parent.flow
         else:
@@ -587,6 +594,15 @@ class FlowTermination(object):
             q = fg.catalog_ref(i['quantity']['origin'], i['quantity']['externalId'], entity_type='quantity')
             self.add_lcia_score(q, i['score'], scenario=scenario)
 
+    def _term_flow_block(self):
+        if self.term_flow.origin == self.term_node.origin:
+            return self.term_flow.external_ref
+        else:
+            return {
+                'origin': self.term_flow.origin,
+                'externalId': self.term_flow.external_ref
+            }
+
     def serialize(self, save_unit_scores=False):
         if self.is_null:
             return {}
@@ -600,14 +616,13 @@ class FlowTermination(object):
                 'origin': self._term.origin,
                 'externalId': self._term.external_ref
             }
-        if self.term_flow != self._parent.flow:
-            if self.term_flow.origin == self.term_node.origin:
-                j['termFlow'] = self.term_flow.external_ref
-            else:
-                j['termFlow'] = {
-                    'origin': self.term_flow.origin,
-                    'externalId': self.term_flow.external_ref
-                }
+        # saving term_flow: for subfragments, we save it only it it's specified
+        if self.is_frag:
+            if self._term_flow is not None:
+                j['termFlow'] = self._term_flow_block()
+        elif self.term_flow != self._parent.flow:
+            j['termFlow'] = self._term_flow_block()
+
         if self.direction != comp_dir(self._parent.direction):
             j['direction'] = self.direction
         if self._descend is False:
