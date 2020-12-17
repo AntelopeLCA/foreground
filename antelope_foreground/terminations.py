@@ -6,7 +6,7 @@ as a ProductFlow in lca-matrix, plus features to compute LCIA.  It should be eas
 other.
 """
 
-from antelope import PrivateArchive, check_direction, comp_dir, NoFactorsFound, QuantityRequired
+from antelope import PrivateArchive, check_direction, comp_dir, NoFactorsFound, QuantityRequired, MultipleReferences
 
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
@@ -35,6 +35,13 @@ class NonConfigurableInboundEV(Exception):
 class UnCachedScore(Exception):
     """
     means that we have an LCIA-only node whose score has not been set for the requested LCIA method
+    """
+    pass
+
+
+class TerminationFromJson(Exception):
+    """
+    Something failed in deserialization
     """
     pass
 
@@ -100,7 +107,10 @@ class FlowTermination(object):
 
         direction = j.pop('direction', None)
         descend = j.pop('descend', True)
-        term = cls(fragment, term_node, _direction=direction, term_flow=term_flow, descend=descend)
+        try:
+            term = cls(fragment, term_node, _direction=direction, term_flow=term_flow, descend=descend)
+        except MultipleReferences:
+            raise TerminationFromJson('term_flow missing and ambiguous: %s (%s)' % (fragment.link, scenario))
         if 'scoreCache' in j.keys():
             term._deserialize_score_cache(fg, j['scoreCache'], scenario)
         return term

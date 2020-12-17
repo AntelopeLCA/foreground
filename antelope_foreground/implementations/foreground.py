@@ -106,10 +106,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         else:
             raise NotForeground('The resource does not contain fragments: %s' % self._archive.ref)
 
-    '''
     def context(self, item):
         return self._archive.tm[item]
 
+    '''
     def frag(self, string, **kwargs):
         """
         :param string:
