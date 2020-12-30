@@ -1,7 +1,7 @@
 # Antelope Foreground and foreground interface
 
 ==========
-    Sat Oct 17 21:28:29 -0700 2020
+Sat Oct 17 21:28:29 -0700 2020
 
 How DO we want to define the new fragment interface? it's critical (really all there is) to the EPA model
 
@@ -15,8 +15,8 @@ the google spreadsheet read was always a hack-- what did it use?
 	
 and that was all `new_fragment` and `find_term` (and the fragment interface itself). 
 
-the problem is identifying the parent- and that's not hard, it's just the process. so you need to make a fragment for each process, and terminate it to the process- so you need to assign its external ref
-which is done by observing it.
+the problem is identifying the parent- and that's not hard, it's just the process. so you need to make a fragment for
+each process, and terminate it to the process- so you need to assign its external ref - which is done by observing it.
 
 unless `new_fragment` supports external ref assignment, which it must
 
@@ -24,7 +24,8 @@ yes it does
 
 so we can't name it the same as the process external_ref- it has to be frag-extref
 
-fine. ok, which frags do we build?  we enumerate consumers of a process, how about 'models' which are processes with no consumers.
+fine. ok, which frags do we build?  we enumerate consumers of a process, how about 'models' which are processes with no
+consumers.
 
 easy enough to do on the back end
 
@@ -72,7 +73,8 @@ clear_scenarios
 
 Really, there are post, put, patch, and delete situations here
 
-the fragment itself is an entity with a parent.  I should not be putting, only posting and patching. because user's past changes would otherwise be lost.
+the fragment itself is an entity with a parent.  I should not be putting, only posting and patching. because user's past
+changes would otherwise be lost.
 
 AAaaanyway, there is the important question about creating new fragments versus revising existing ones.  
 
@@ -94,10 +96,57 @@ Google:
 
 `flow.terminate` should be abandoned.  It should instead be `targets`, as it is in the paper I think.
 
-ugh, the paper.
-
-get amaru done rn, fuck.
-
-ok, the summary of this is that everything is FINE.  What google's doing is what an implementation should do- this is just interpreting a POST, in the form of dicts read from excel sheets- effectively JSON
+ok, the summary of this is that everything is FINE.  What google's doing is what an implementation should do- this is
+just interpreting a POST, in the form of dicts read from excel sheets- effectively JSON
 
 
+==========
+Sun Dec 27 12:41:39 -0800 2020
+
+Here is the issue for terminations: eliminate the notion of background terminations altogether, and assume it by
+default.  Change the way cutoffs are handled to maintain consistency.  and develop TESTS.
+
+Motivation: the background / foreground distinction (which is fundamental to antelope) relies on fragments being
+identically the foreground, and processes the background. This was belied by implementation decisions, such as the
+idea of having bulk-replaceable background terminations by making them reference fragments, all the way back to
+CalRecycle.  There a fragment whose only node is a background-terminated process gets interpreted as a directly-
+connected background fragment, just as a shortcut (fragments.py where term_is_bg is referenced).  And this is a nice
+summarization, I suppose-- although this could be achieved by other means-- but the point is that it is a true
+foreground term (being terminated to a fragment) being treated like a background term.
+
+In other cases, foreground terminations (i.e. to fragment) are treated as foreground-- forwarding out their cutoffs
+and internalizing their interior nodes via descend or non-descend-- and process terminations are unevenly treated.
+is_background is only used in sorting / displaying / selecting fragments- and during traversal, only to arrest
+traversal (but that should be implicit with the child flows!)
+
+When we get to non-cutoff non-"background" fragments, there are only two possibilities: traverse_fg_node and
+traverse_subfragment.  I argue the is_background case is null, and that's in fact a fg node.
+
+there we've got some problems with auto-consumption (for which the solution is to model as a sub-fragment where it's
+already handled) but other than that it's pretty straightforward.  It ignores process exchanges and computes node
+balances, but only for explicit flows.
+
+The point is, when a node terminated to a process is traversed, the process's inventory is ignored ANYWAY.  The only
+call to the process inventory is from the termination, to compute unit scores, using unobserved exchanges.  THIS
+SHOULD BE A BACKGROUND PROCESS.
+
+The gaps are: the aforementioned balance computation for incompletely represented processes, and the forwarding of
+cutoff flows.  Both of which were afterthoughts already.
+
+The CORRECT way forward is to treat all processes as background processes, EXCEPT for flows explicitly observed in the
+foreground. In other words, to universalize the unobserved_exchanges operation.  Balance values should not be computed
+(and should even raise an error) if attempted on nodes with background terminations-- and correctly naming ALL process
+terminations to be background terminations highlights the incoherence in the present approach.  Any processes that are
+to be treated as foreground processes should simply have all their flows represented as child fragments, i.e.
+"observed."
+
+If a particular process doesn't HAVE a background implementation------ then if it has an inventory and index
+implementation the catalog will compute one- and if not, then the lcia should be done in the foreground with
+intermediate flows logged as cutoffs in the LciaResult.  And LciaResults need a way to group + list all their
+cutoffs.
+
+Anyhow, this is a major rewrite.  The tests alone will take a week of dedicated work, and that will have to come after
+this other stuff is wrapped.  And we should get CalRecycle tested first, to ensure the rewrite doesn't break existing
+stuff.
+
+But thereafter the termination no longer needs to distinguish between background and foreground!
