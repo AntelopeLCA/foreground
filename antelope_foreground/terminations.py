@@ -6,7 +6,7 @@ as a ProductFlow in lca-matrix, plus features to compute LCIA.  It should be eas
 other.
 """
 
-from antelope import PrivateArchive, check_direction, comp_dir, NoFactorsFound, QuantityRequired, MultipleReferences
+from antelope import BackgroundRequired, check_direction, comp_dir, NoFactorsFound, QuantityRequired, MultipleReferences
 
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
@@ -461,22 +461,19 @@ class FlowTermination(object):
             for x in []:
                 yield x
         else:
-            children = set()
-            children.add((self.term_flow.external_ref, self.direction, None))
-            for c in self._parent.child_flows:
-                children.add((c.flow.external_ref, c.direction))
-            if self.is_bg:
-                iterable = self.term_node.lci(self.term_flow)
-            else:
-                iterable = self.term_node.inventory(ref_flow=self.term_flow)
-            for x in iterable:
-                if (x.flow.external_ref, x.direction) not in children:
-                    yield x
+            try:
+                for x in self.term_node.unobserved_lci(self._parent.child_flows, ref_flow=self.term_flow):
+                    yield x  # this should forward out any cutoff exchanges
+            except (BackgroundRequired, NotImplementedError):
+                child_flows = set((k.flow.external_ref, k.direction) for k in self._parent.child_flows)
+                for x in self.term_node.inventory(ref_flow=self.term_flow):
+                    if (x.flow.external_ref, x.direction) not in child_flows:
+                        yield x  # this should forward out any cutoff exchanges
 
     def compute_unit_score(self, quantity_ref, **kwargs):
         """
         four different ways to do this.
-        0- we are a subfragment-- throw exception: use subfragment traversal results contained in the FragmentFlow
+        0- we are a subfragment-- no direct impacts unless non-descend, which is caught earlier
         1- parent is bg: ask catalog to give us bg_lcia (process or fragment)
         2- get fg lcia for unobserved exchanges
 
@@ -485,32 +482,6 @@ class FlowTermination(object):
         :return:
         """
         if self.is_frag:
-            '''
-            if self.is_subfrag:
-                if not self.descend:
-                    raise SubFragmentAggregation  # to be caught
-
-            #
-
-            # either is_fg (no impact) or is_bg or term_is_bg (both equiv)
-
-            elif self.is_bg:
-                # need bg_lcia method for FragmentRefs
-                # this is probably not currently supported
-                # return self.term_node.bg_lcia(lcia_qty=quantity_ref, ref_flow=self.term_flow.external_ref, **kwargs)
-                # instead- just do fragment_lcia
-                print('Warning: ignoring spurious background setting for subfrag:\n%s\n%s' % (self._parent, self.term_node))
-                return LciaResult(quantity_ref)
-
-            else:
-                assert self.is_fg
-
-                # in the current pre-ContextRefactor world, this is how we are handling
-                # cached-LCIA-score nodes
-                # in the post-Context-Refactor world, foreground frags have no impact
-                #raise UnCachedScore('fragment: %s\nquantity: %s' % (self._parent, quantity_ref))
-                return LciaResult(quantity_ref)
-            '''
             return LciaResult(quantity_ref)
 
         try:
@@ -520,15 +491,8 @@ class FlowTermination(object):
                 locale = self.term_node['SpatialScope']
         except KeyError:
             locale = 'GLO'
-        try:
-            res = quantity_ref.do_lcia(self._unobserved_exchanges(), locale=locale, **kwargs)
-        except PrivateArchive:
-            if self.is_bg:
-                print('terminations.compute_unit_score UNTESTED for private bg archives!')
-                res = self.term_node.bg_lcia(lcia_qty=quantity_ref, ref_flow=self.term_flow.external_ref, **kwargs)
-            else:
-                res = self.term_node.fg_lcia(quantity_ref, ref_flow=self.term_flow.external_ref, **kwargs)
-                print('terminations.compute_unit_score UNTESTED for private fg archives!')
+        # just go ahead and fail if we ever encounter a PrivateArchive
+        res = quantity_ref.do_lcia(self._unobserved_exchanges(), locale=locale, **kwargs)
 
         res.scale_result(self.inbound_exchange_value)
         return res
