@@ -185,7 +185,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             ref_q = self.get_canonical(ref_quantity)
         except EntityNotFound:
             raise UnknownRefQuantity(ref_quantity)
-        f = new_flow(name, ref_q, **kwargs)
+        f = new_flow(name, ref_q, context=context, **kwargs)
         self._archive.add_entity_and_children(f)
         return self.get(f.link)
 
@@ -487,10 +487,13 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 if flow is None:
                     print('Skipping unknown flow %s' % y.flow)
                     continue
-            if hasattr(y.process, 'origin'):
-                term = self.find_term(y.termination, origin=y.process.origin)
-            else:
-                term = self.find_term(y.termination)
+            try:
+                if hasattr(y.process, 'origin'):
+                    term = self.find_term(y.termination, origin=y.process.origin)
+                else:
+                    term = self.find_term(y.termination)
+            except EntityNotFound:
+                term = None
             if term is not None and term.entity_type == 'context' and include_context is False:
                 continue
             if term == y.process:
