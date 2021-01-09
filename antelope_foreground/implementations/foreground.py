@@ -4,6 +4,7 @@ from antelope_core.implementations import BasicImplementation
 
 from antelope_core.entities.quantities import new_quantity
 from antelope_core.entities.flows import new_flow
+from antelope_core.contexts import NullContext
 from ..entities.fragments import InvalidParentChild
 from ..entities.fragment_editor import create_fragment, clone_fragment, _fork_fragment  # interpose,
 
@@ -204,7 +205,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         else:
             # first context
             cx = self._archive.tm[term_ref]
-            if cx is not None:
+            if cx not in (None, NullContext):
                 found_ref = cx
             else:
                 found_ref = self.get_local('/'.join(filter(None, (origin, term_ref))))
