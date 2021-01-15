@@ -63,21 +63,23 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     '''
     Add some useful functions from other interfaces to the foreground
     '''
-    def get_local(self, external_ref, **kwargs):
+    def get_local(self, external_ref, origin=None, **kwargs):
         """
         The special characteristic of a foreground is its access to the catalog-- so-- use it
         lookup locally; fallback to catalog query- should make origin a kwarg
         :param external_ref:
+        :param origin: optional; if not provided, attempts to split the ref, then uses first
         :param kwargs:
         :return:
         """
-        e = self._fetch(external_ref, **kwargs)
+        e = self._fetch(external_ref, **kwargs)  # not sure what this does exactly
         if e is not None:
             return e
-        try:
-            origin, external_ref = external_ref.split('/', maxsplit=1)
-        except ValueError:
-            origin = 'foreground'
+        if origin is None:
+            try:
+                origin, external_ref = external_ref.split('/', maxsplit=1)
+            except ValueError:
+                origin = self.origin.split('.')[0]
         return self._archive.catalog_ref(origin, external_ref)
 
     def count(self, entity_type):
@@ -95,6 +97,31 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :return:
         """
         return self._archive.tm.get_canonical(quantity)
+
+    def _grounded_ref(self, ref, check_etype=None):
+        """
+        Accept either a string, an unresolved catalog ref, a resolved catalog ref, or an entity
+        Return an entity or grounded ref
+        :param ref:
+        :param check_etype:
+        :return:
+        """
+        if hasattr(ref, 'entity_type'):
+            if (not ref.is_entity) and (not ref.resolved):  # unresolved catalog ref
+                try:
+                    ent = self.get(ref.external_ref)
+                except EntityNotFound:
+                    ent = self._archive.catalog_ref(ref.origin, ref.external_ref)
+            else:  # entity or resolved catalog ref
+                ent = ref
+        else:  # stringable
+            try:
+                ent = self.get(ref)
+            except EntityNotFound:
+                ent = self.get_local(ref)
+        if check_etype is not None and ent.entity_type != check_etype:
+            raise TypeError('%s: Not a %s' % (ref, check_etype))
+        return ent
 
     '''
     fg implementation begins here
@@ -236,14 +263,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
           **kwargs passed to LcFragment
         :return:
         """
-        if isinstance(flow, str):
-            try:
-                f = self.get(flow)
-            except EntityNotFound:
-                f = self.get_local(flow)
-            if f.entity_type != 'flow':
-                raise TypeError('%s is not a flow' % flow)
-            flow = f
+        flow = self._grounded_ref(flow, check_etype='flow')
         frag = create_fragment(flow, direction, origin=self.origin, **kwargs)
         self._archive.add_entity_and_children(frag)
         if external_ref is not None:
@@ -482,7 +502,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         for y in _xg:
             if hasattr(y.flow, 'entity_type') and y.flow.entity_type == 'flow':
-                flow = y.flow
+                if (not y.flow.is_entity) and (not y.flow.resolved):
+                    flow = self._archive.catalog_ref(y.flow.origin, y.flow.external_ref)
+                else:
+                    flow = y.flow
             else:
                 flow = self[y.flow]
                 if flow is None:

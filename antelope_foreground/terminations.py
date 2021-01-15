@@ -462,8 +462,13 @@ class FlowTermination(object):
                 yield x
         else:
             try:
-                for x in self.term_node.unobserved_lci(self._parent.child_flows, ref_flow=self.term_flow):
-                    yield x  # this should forward out any cutoff exchanges
+                if self.is_bg or len(list(self._parent.child_flows)) == 0:
+                    # ok we're bringing it back but only because it is efficient to cache lci
+                    for x in self.term_node.lci(ref_flow=self.term_flow):
+                        yield x
+                else:
+                    for x in self.term_node.unobserved_lci(self._parent.child_flows, ref_flow=self.term_flow):
+                        yield x  # this should forward out any cutoff exchanges
             except (BackgroundRequired, NotImplementedError):
                 child_flows = set((k.flow.external_ref, k.direction) for k in self._parent.child_flows)
                 for x in self.term_node.inventory(ref_flow=self.term_flow):
