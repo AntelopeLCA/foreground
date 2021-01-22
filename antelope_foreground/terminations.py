@@ -508,8 +508,7 @@ class FlowTermination(object):
 
         :param quantity:
         :param ignore_uncached:
-        :param refresh: If True, re-compute unit score even if it is already present in the cache. This fails on
-        multi-instance fragments by causing the
+        :param refresh: If True, re-compute unit score even if it is already present in the cache.
         :param kwargs:
         :return:
         """
@@ -521,12 +520,22 @@ class FlowTermination(object):
                 if not self.descend:
                     raise SubFragmentAggregation  # to be caught- subfrag needs to be queried w/scenario
             return LciaResult(quantity)  # otherwise, subfragment terminations have no impacts
+        if refresh:
+            self._score_cache.pop(quantity, None)
 
-        if quantity in self._score_cache and refresh is False:
+        if quantity in self._score_cache:
             return self._score_cache[quantity]
         else:
             try:
-                res = self.compute_unit_score(quantity, **kwargs)
+                '''
+                # This refresh situation is a problem.  On the one hand, if we don't pass refresh on to do_lcia,
+                then there's no way to clear "seen cfs" on flow refs.  On the other hand, passing it through recursively
+                from frag_flow_lcia means we will continually "see" and then "refresh" seen cfs on every flow, for every
+                fragment we traverse. This is just an efficiency bomb.  We need to find a better way to refresh scores
+                that won't suffer from this problem- but unfortunately I can't think of anyway to track that state 
+                mid-traversal. 
+                '''
+                res = self.compute_unit_score(quantity, refresh=refresh, **kwargs)
             except UnCachedScore:
                 if ignore_uncached:
                     res = LciaResult(quantity)

@@ -550,6 +550,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                             c_up.clear_termination(scenario)
                             if term.entity_type == 'fragment':
                                 c_up.terminate(term, scenario=scenario)
+                            else:
+                                c_up.terminate(term, scenario=scenario, term_flow=c_up.flow)
                             if term.entity_type == 'process' and set_background:
                                 c_up.set_background()
                     continue
@@ -560,7 +562,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             c = self.new_fragment(flow, y.direction, value=y.value, units=y.unit, parent=parent, **y.args)
 
             if term is not None:
-                c.terminate(term, scenario=scenario)
+                c.terminate(term, scenario=scenario, term_flow=c.flow)
                 if term.entity_type == 'process' and set_background:
                     c.set_background()
             self.observe(c)  # use cached implicitly via fg interface
