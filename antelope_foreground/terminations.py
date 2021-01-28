@@ -190,7 +190,14 @@ class FlowTermination(object):
         """
         if term_flow is None:
             if self.is_process:
-                self._term_flow = self._term.reference().flow
+                try:
+                    self._term_flow = self._term.reference().flow
+                except MultipleReferences as e:
+                    try:
+                        self._term_flow = self._term.reference(self._parent.flow)
+                    except KeyError:
+                        raise e
+
             elif self.is_frag:
                 self._term_flow = None  # leave unspecified to plug into term's ref flow
             else:
