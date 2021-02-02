@@ -193,10 +193,16 @@ class LcFragment(LcEntity):
         else:
             self._terminations[None] = FlowTermination(self, termination, term_flow=term_flow)
             if 'StageName' not in self._d:
+                stagename = ''
                 try:
-                    self._d['StageName'] = termination['Name']
-                except NoCatalog:
-                    self._d['StageName'] = ''
+                    stagename = termination['Name']
+                except (TypeError, KeyError):
+                    try:
+                        stagename = termination.name
+                    except AttributeError:
+                        pass
+                finally:
+                    self._d['StageName'] = stagename
 
 
     def __hash__(self):
