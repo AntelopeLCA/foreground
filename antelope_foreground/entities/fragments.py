@@ -12,7 +12,7 @@ from ..fragment_flows import group_ios, FragmentFlow, frag_flow_lcia
 from antelope_core.entities import LcEntity, LcFlow
 from antelope_core.exchanges import ExchangeValue
 # from lcatools.interact import ifinput, parse_math
-from ..terminations import FlowTermination
+from ..terminations import FlowTermination, MissingFlow
 
 
 class InvalidParentChild(Exception):
@@ -31,10 +31,6 @@ class BalanceAlreadySet(Exception):
 
 
 class CacheAlreadySet(Exception):
-    pass
-
-
-class MissingFlow(Exception):
     pass
 
 
@@ -1355,11 +1351,12 @@ class LcFragment(LcEntity):
 
         term = ff.term
         if term.term_is_bg:
-            # collapse trivial bg terminations into the parent fragment flow
-            bg_ff, _ = term.term_node._traverse_node(ff.node_weight, scenario, observed=observed)
-            assert len(bg_ff) == 1
-            bg_ff[0].fragment = self
-            return bg_ff
+            if term.term_flow == term.term_node.flow:
+                # collapse trivial bg terminations into the parent fragment flow
+                bg_ff, _ = term.term_node._traverse_node(ff.node_weight, scenario, observed=observed)
+                assert len(bg_ff) == 1
+                bg_ff[0].fragment = self
+                return bg_ff
 
         # traverse the subfragment, match the driven flow, compute downstream node weight and normalized inventory
         ffs, unit_inv, downstream_nw = _do_subfragment_traversal(ff, scenario, observed)

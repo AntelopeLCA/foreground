@@ -562,9 +562,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             c = self.new_fragment(flow, y.direction, value=y.value, units=y.unit, parent=parent, **y.args)
 
             if term is not None:
-                c.terminate(term, scenario=scenario, term_flow=c.flow)
-                if term.entity_type == 'process' and set_background:
-                    c.set_background()
+                if term.entity_type in ('process', 'flow'):
+                    c.terminate(term, scenario=scenario, term_flow=c.flow)
+                    if set_background:
+                        c.set_background()
+                else:
+                    c.terminate(term, scenario=scenario)
             self.observe(c)  # use cached implicitly via fg interface
 
         return parent

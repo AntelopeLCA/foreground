@@ -6,7 +6,7 @@ as a ProductFlow in lca-matrix, plus features to compute LCIA.  It should be eas
 other.
 """
 
-from antelope import BackgroundRequired, check_direction, comp_dir, NoFactorsFound, QuantityRequired, MultipleReferences
+from antelope import BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences
 
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
@@ -15,6 +15,13 @@ from .lcia_dict import LciaResults
 
 # from lcatools.catalog_ref import NoCatalog
 # from lcatools.interact import parse_math
+
+
+class MissingFlow(Exception):
+    """
+    Raised when a termination does not match with the specified term_flow
+    """
+    pass
 
 
 class FlowConversionError(Exception):
@@ -203,8 +210,16 @@ class FlowTermination(object):
             else:
                 self._term_flow = self._parent.flow
         else:
-            # TODO: check to see if supplied term flow is valid / can be a reference flow for term
-            self._term_flow = term_flow
+            if self.is_process:
+                try:
+                    self._term_flow = self._term.reference(term_flow).flow
+                except KeyError:
+                    raise MissingFlow(term_flow)
+            elif self.is_frag:
+                if term_flow in (x.flow for x in self._term.inventory()):
+                    self._term_flow = term_flow
+                else:
+                    raise MissingFlow(term_flow)
         if self.valid and self.node_weight_multiplier == 0:
             print('Warning: 0 node weight multiplier for term of %s' % self._parent.external_ref)
 
