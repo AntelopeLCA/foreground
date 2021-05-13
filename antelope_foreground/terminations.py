@@ -201,7 +201,7 @@ class FlowTermination(object):
                     self._term_flow = self._term.reference().flow
                 except MultipleReferences as e:
                     try:
-                        self._term_flow = self._term.reference(self._parent.flow)
+                        self._term_flow = self._term.reference(self._parent.flow).flow
                     except KeyError:
                         raise e
 
@@ -461,7 +461,7 @@ class FlowTermination(object):
             return '%4g unit' % self.inbound_exchange_value
         return '%4g %s' % (self.inbound_exchange_value, self.term_flow.unit)  # process
 
-    def _unobserved_exchanges(self):
+    def _unobserved_exchanges(self, refresh=False):
         """
         Generator which yields exchanges from the term node's inventory that are not found among the child flows, for
           LCIA purposes
@@ -486,7 +486,7 @@ class FlowTermination(object):
             try:
                 if self.is_bg or len(list(self._parent.child_flows)) == 0:
                     # ok we're bringing it back but only because it is efficient to cache lci
-                    for x in self.term_node.lci(ref_flow=self.term_flow):
+                    for x in self.term_node.lci(ref_flow=self.term_flow, refresh=refresh):
                         yield x
                 else:
                     for x in self.term_node.unobserved_lci(self._parent.child_flows, ref_flow=self.term_flow):
@@ -497,7 +497,7 @@ class FlowTermination(object):
                     if (x.flow.external_ref, x.direction) not in child_flows:
                         yield x  # this should forward out any cutoff exchanges
 
-    def compute_unit_score(self, quantity_ref, **kwargs):
+    def compute_unit_score(self, quantity_ref, refresh=False, **kwargs):
         """
         four different ways to do this.
         0- we are a subfragment-- no direct impacts unless non-descend, which is caught earlier
@@ -506,6 +506,7 @@ class FlowTermination(object):
 
         If
         :param quantity_ref:
+        :param refresh:
         :return:
         """
         if self.is_frag:
@@ -519,7 +520,7 @@ class FlowTermination(object):
         except KeyError:
             locale = 'GLO'
         # just go ahead and fail if we ever encounter a PrivateArchive
-        res = quantity_ref.do_lcia(self._unobserved_exchanges(), locale=locale, **kwargs)
+        res = quantity_ref.do_lcia(self._unobserved_exchanges(refresh=refresh), locale=locale, refresh=refresh, **kwargs)
 
         res.scale_result(self.inbound_exchange_value)
         return res

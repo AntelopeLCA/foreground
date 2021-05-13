@@ -187,7 +187,7 @@ class FragmentFlow(object):
         return self.fragment.flow.unit
 
 
-def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.33):
+def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
     """
     Utility function for dealing with a traversal result (list of FragmentFlows)
     Creates a list of cutoff flows from the inputs and outputs from a fragment traversal.
