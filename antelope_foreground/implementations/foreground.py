@@ -483,6 +483,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param _xg: Generates a list of exchanges or exchange references
         :param parent: if None, create parent from first exchange
         :param ref: if parent is created, assign it a name (if parent is non-None, ref is ignored
+        :param scenario: [None] specify the scenario under which to terminate child flows
         :param set_background: [True] whether to regard process-terminated fragments as background fragments
         :param include_context: [False] whether to model context-terminated flows as child fragments
         :param multi_flow: [False] if True, child flows are matched on flow, direction, and termination

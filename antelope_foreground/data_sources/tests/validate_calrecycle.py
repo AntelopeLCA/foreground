@@ -11,7 +11,7 @@ import json
 CALRECYCLE_CAT = '/data/LCI/CalRecycle'
 
 cat = LcCatalog(CALRECYCLE_CAT)
-if 'calrecycle.antelope' not in cat.references:
+if 'calrecycle.antelope' not in cat.origins:
     cat.new_resource('calrecycle.antelope', 'http://www.antelope-lca.net/uo-lca/api/', 'AntelopeV1Client', store=False,
                       interfaces=['index', 'inventory', 'quantity'], quiet=True)
 

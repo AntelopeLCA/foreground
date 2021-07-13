@@ -281,7 +281,7 @@ class FlowTermination(object):
     def to_exchange(self):
         if self.is_null:
             return None
-        return ExchangeValue(self.term_node, self.term_flow, self.direction, value=self.inbound_exchange_value)
+        return ExchangeValues(self.term_node, self.term_flow, self.direction, value=self.inbound_exchange_value)
     '''
 
     @property
@@ -698,7 +698,7 @@ class FlowTermination(object):
                 if self.term_node.term.is_null:
                     term = '--C '
                 else:
-                    term = '-B  '
+                    term = '-#B  '
             else:
                 if self.descend:
                     term = '-#::'
