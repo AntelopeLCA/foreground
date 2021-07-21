@@ -1,5 +1,6 @@
 from antelope.refs.base import EntityRef
-# from ..fragment_flows import group_ios
+from antelope import ExchangeRef, comp_dir
+from ..fragment_flows import group_ios
 """
 Not sure what to do about Fragment Refs, whether they belong in the main interface. I'd like to think no, but
 for now we will just deprecate them and remove functionality,
@@ -18,11 +19,15 @@ class FragmentRef(EntityRef):
     _etype = 'fragment'
     _ref_field = 'parent'
 
+    def dbg_print(self, *args):
+        pass
+
     def __init__(self, *args, **kwargs):
         super(FragmentRef, self).__init__(*args, **kwargs)
         self._direction = None
         self._flow = None
         self._isset = False
+        self._ref_vals = dict()
 
     def set_config(self, flow, direction):
         if self._isset:
@@ -61,11 +66,30 @@ class FragmentRef(EntityRef):
     def is_conserved_parent(self):
         return None
 
+    def top(self):
+        return self
+
     def set_name(self, name, **kwargs):
         return self._query.name_fragment(self, name, **kwargs)
 
+    '''
+    Process compatibility
+    '''
     def inventory(self, scenario=None, **kwargs):
-        return self._query.inventory(self.external_ref, scenario=scenario, **kwargs)
+        ffs = self.traverse(scenario=scenario)  # in the future, may want to cache this
+        ios, nodes = group_ios(self, ffs, **kwargs)
+        frag_exchs = []
+        for f in ios:
+            is_ref = (f.fragment.flow == self.flow and f.fragment.direction == comp_dir(self.direction))
+
+            xv = ExchangeRef(self, f.fragment.flow, f.fragment.direction, value=f.magnitude, is_reference=is_ref)
+            frag_exchs.append(xv)
+            if scenario is None:
+                self._ref_vals[xv.flow.external_ref] = f.magnitude
+        return sorted(frag_exchs, key=lambda x: (x.direction == 'Input', x.value), reverse=True)
+
+    def reference_value(self, flow):
+        return self._ref_vals[flow.external_ref]
 
     def traverse(self, scenario=None, **kwargs):
         return self._query.traverse(self.external_ref, scenario=scenario, **kwargs)

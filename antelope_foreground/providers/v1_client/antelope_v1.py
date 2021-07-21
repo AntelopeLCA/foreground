@@ -106,9 +106,8 @@ class AntelopeV1Client(BasicArchive):
         #print('done') ## super slow DiscountASP gotta get away
         self._fetched_all['flowproperty'] = True
 
-    @property
-    def query(self):
-        return AntelopeV1Query(self)
+    def _set_query(self):
+        self._query = AntelopeV1Query(self)
 
     def make_interface(self, iface):
         if iface == 'index':
@@ -369,7 +368,7 @@ class AntelopeV1Client(BasicArchive):
         j['SpatialScope'] = j.pop('geography')
         j['TemporalScope'] = j.pop('referenceYear')
         j['Comment'] = DeferredProcessComment(self._get_comment, process_id)
-        ref = self._make_ref(ext_ref, 'process', **j)
+        ref = self._make_ref(ext_ref, 'process', reference_entity=[], **j)
         self._cached['processes'][process_id] = ref
         return ref
 

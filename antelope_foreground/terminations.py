@@ -6,7 +6,7 @@ as a ProductFlow in lca-matrix, plus features to compute LCIA.  It should be eas
 other.
 """
 
-from antelope import BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences
+from antelope import BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences, NoReference
 
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
@@ -213,6 +213,8 @@ class FlowTermination(object):
             if self.is_process:
                 try:
                     self._term_flow = self._term.reference(term_flow).flow
+                except NoReference:  # we need to allow processes with no reference to be used as term nodes
+                    self._term_flow = term_flow
                 except KeyError:
                     raise MissingFlow(term_flow)
             elif self.is_frag:
