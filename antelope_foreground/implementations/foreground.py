@@ -457,6 +457,11 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         fragment.observe(accept_all=True)
         return fragment
     '''
+    def _grounded_entity(self, entity, **kwargs):
+        if (not entity.is_entity) and (not entity.resolved):
+            return self._archive.catalog_ref(entity.origin, entity.external_ref, **kwargs)
+        else:
+            return entity
 
     '''# Create or update a fragment from a list of exchanges.
 
@@ -491,7 +496,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         """
         if parent is None:
             x = next(_xg)
-            parent = self.new_fragment(x.flow, x.direction, value=x.value, units=x.unit, Name=str(x.process), **x.args)
+            parent = self.new_fragment(self._grounded_entity(x.flow), x.direction, value=x.value, units=x.unit, Name=str(x.process), **x.args)
             if ref is None:
                 print('Creating new fragment %s (%s)' % (x.process.name, parent.uuid))
             else:
@@ -503,10 +508,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         for y in _xg:
             if hasattr(y.flow, 'entity_type') and y.flow.entity_type == 'flow':
-                if (not y.flow.is_entity) and (not y.flow.resolved):
-                    flow = self._archive.catalog_ref(y.flow.origin, y.flow.external_ref)
-                else:
-                    flow = y.flow
+                flow = self._grounded_entity(y.flow)
             else:
                 flow = self[y.flow]
                 if flow is None:

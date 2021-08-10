@@ -98,12 +98,15 @@ class FragmentFlow(object):
         self.node_weight = node_weight
         self.term = term
         self.is_conserved = is_conserved
-        self._subfrags_params = None
+        self._subfrags_params = ()
 
     @property
     def subfragments(self):
         if self.term.is_subfrag and (self.term.descend is False):
-            return self._subfrags_params[0]
+            try:
+                return self._subfrags_params[0]
+            except IndexError:
+                return []
         return []
 
     @property
@@ -407,7 +410,7 @@ class GhostFragment(object):
     def __str__(self):
         re = self.reference_entity.uuid[:7]
         return '(%s) %s %.5s %s --:   [%s] %s' % (re, self.dirn, self.uuid, self.dirn,
-                                                  self.flow.unit(), self.flow['Name'])
+                                                  self.flow.unit, self.flow['Name'])
 
     def __getitem__(self, item):
         return self.flow[item]
