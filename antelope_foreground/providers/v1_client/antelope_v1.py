@@ -1,7 +1,7 @@
 import json
 from collections import defaultdict
 from time import time
-from antelope import CatalogRef, BasicQuery, comp_dir
+from antelope import CatalogRef, BasicQuery, comp_dir, NoReference, NoAccessToEntity
 
 from antelope_core.archives import BasicArchive, LC_ENTITY_TYPES
 # from lcatools.fragment_flows import FragmentFlow
@@ -44,7 +44,11 @@ def remote_ref(url):
 
 
 class AntelopeV1Query(BasicQuery, AntelopeForegroundInterface):
-    pass
+    def get_reference(self, external_ref):
+        try:
+            return super(AntelopeV1Query, self).get_reference(external_ref)
+        except NoAccessToEntity:
+            raise NoReference(self.origin, external_ref)
 
 
 class DeferredProcessComment(object):

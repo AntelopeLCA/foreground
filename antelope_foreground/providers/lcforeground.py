@@ -210,6 +210,9 @@ class LcForeground(BasicArchive):
                 current = self[entity.link]
                 current.merge(entity)
 
+        if hasattr(entity, 'uuid') and entity.uuid is not None:
+            self._entities[entity.uuid] = entity
+
         if entity.origin == self.ref and entity.external_ref != entity.uuid:
             self._add_ext_ref_mapping(entity)
 
