@@ -150,3 +150,72 @@ this other stuff is wrapped.  And we should get CalRecycle tested first, to ensu
 stuff.
 
 But thereafter the termination no longer needs to distinguish between background and foreground!
+
+==========
+Sat Mar 06 14:55:26 -0800 2021
+
+Currently debugging a problem involving overly-permissive subfragment traversal.  Basically, a foreground flow specified in m3 of natural gas is using a background process specified in MJ of natural gas, without a unit conversion.
+
+- Question 0, why did the problem occur, is answered: "fragment_from_exchanges" automatically passes exchange flow as term_flow, and FlowTermination uses it uncritically
+
+- Question 1: how do we repair the problem? proximate solution is to not pass term_flows when terminating to fragment (corner case: when we want to back-drive a fragment- but, fairly, that should not necessarily be supported in the default-implicit case)
+
+- Question 2: how do we prevent the problem? The traversal should detect the condition and throw an exception. so: where?
+
+- Question 3: how do we unittest? ans: depends on Q2.
+
+I have a hunch that this is occurring because of the 'term_is_bg' test in _traverse_subfragment... to be validated soon, but first:
+
+ * the situation should not have been allowed to stand, but in order to catch it would have required performing a traversal at the time the termination is constructed (in answering an inventory() call).  Right now the dstance is to (a) continue to allow FlowTerminations to use fragment term_flows uncritically, but (b) change the behavior of fragment_from_exchanges so that exchanges terminated to fragments do not pass term_flows but accept terminations' reference flows.  That would prevent the situation from coming about.
+
+If the situation DID come about, then it should raise a traversal-time error (which argues in favor of testing upon specification). The error comes because the term-flow does not match with the termination.
+
+Let's test the hunch: if the term_is_bg shortcut is the proximate cause, then disabling it should lead to a MissingFlow exception when the subfragment is traversed.
+
+OK, that test is confirmed.
+
+
+Remedies:
+ (1) we should test consistency between term_flow and term_node.flow in the shortcut case
+ (2) failing that test, the code will fall-back to _traverse_subfragment and raise the MissingFlow exception
+
+Next, we change the term_flow setting to test for consistency-- go ahead and run the inventory and look for it, raise MissingFlow
+
+and last, we change the fragment_from_exchanges behavior as noted... and the problem is solved, and the traversal includes a 38MJ/m3 conversion which has already been specified!
+
+
+==========
+Thu Apr 15 12:37:48 -0700 2021
+
+New problem.
+Fragments of the following form:
+
+
+(ref) <---[Flow]-(1.0 kg)---O {conv}
+                 [x kg]     |
+	                    *<---[V-Flow]-(1.0 m3)---#
+
+Fragment is designed as a unit converter, in this case from a background process whose reference property is volume, to a new reference property which is mass.
+
+Volume-to-mass exchange value is specified by observing the fragment (First error)
+
+When I run conv.fragment_lcia() I am getting the *unit impact score* for the fragment- but the fragment's output is defined by the observed reference flow.
+
+By default, this is a problem when the fragment is traversed un-observed because you wind up with 1kg reference = 1m3 background.  No problem when you run observed because you wind up with the proper xkg reference = 1m3 background.  BUT you have to make sure to interpret the result based on the inventory-- i.e. the fragment unit impact is associated with providing xkg of reference flow. SO: client code modification required to properly internalize the inventory result.
+
+Zero proposed solution: modify the client code to divide by the inventory result.
+
+One proposed solution: nest the unit-conversion fragment inside a wrapper that forces the subfragment traversal to be handled internally. This has been observed to work.
+
+Two proposed solution: mark the background flow a balance flow and establish a flow property. I actually like this a lot better.  HOWEVER: two drawbacks.
+
+1- As currently coded, the reference flow must be characterized in terms of the background flow's property-- it doesn't work vice versa.  This is because _traverse_node() only uses conserved_qty.cf(self.flow) and does not check whether the balance flow is characterized w.r.t. the reference flow's property.  And this is CORRECT because ALL the flows need to be checked w.r.t. the same flow property.  SO: it should be possible to raise at least a warning when the conserved_quantity is set if the flow has not been characterized w.r.t. the conserved quantity.
+
+2- If used in concert with an observed reference exchange- then this still works, and now it works in both the observed and unobserved cases- but the client code still needs to normalize by the inventory amount (which is undesirable).
+
+So, the moral of the story is: when using unit scores of fragments, don't specify non-unit reference exchange values unless you're willing to normalize by inventory results.
+
+And use balance flows- they work.
+
+conclusion: NO code changes required, except add a warning to set_conserved_quantity() to detect zero-valued reference exchanges.
+

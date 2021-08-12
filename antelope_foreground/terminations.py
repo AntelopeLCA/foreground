@@ -6,7 +6,7 @@ as a ProductFlow in lca-matrix, plus features to compute LCIA.  It should be eas
 other.
 """
 
-from antelope import PrivateArchive, check_direction, comp_dir, NoFactorsFound, QuantityRequired, MultipleReferences
+from antelope import BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences, NoReference
 
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
@@ -15,6 +15,13 @@ from .lcia_dict import LciaResults
 
 # from lcatools.catalog_ref import NoCatalog
 # from lcatools.interact import parse_math
+
+
+class MissingFlow(Exception):
+    """
+    Raised when a termination does not match with the specified term_flow
+    """
+    pass
 
 
 class FlowConversionError(Exception):
@@ -190,14 +197,31 @@ class FlowTermination(object):
         """
         if term_flow is None:
             if self.is_process:
-                self._term_flow = self._term.reference().flow
+                try:
+                    self._term_flow = self._term.reference().flow
+                except MultipleReferences as e:
+                    try:
+                        self._term_flow = self._term.reference(self._parent.flow).flow
+                    except KeyError:
+                        raise e
+
             elif self.is_frag:
                 self._term_flow = None  # leave unspecified to plug into term's ref flow
             else:
                 self._term_flow = self._parent.flow
         else:
-            # TODO: check to see if supplied term flow is valid / can be a reference flow for term
-            self._term_flow = term_flow
+            if self.is_process:
+                try:
+                    self._term_flow = self._term.reference(term_flow).flow
+                except NoReference:  # we need to allow processes with no reference to be used as term nodes
+                    self._term_flow = term_flow
+                except KeyError:
+                    raise MissingFlow(term_flow)
+            elif self.is_frag:
+                if term_flow in (x.flow for x in self._term.inventory()):
+                    self._term_flow = term_flow
+                else:
+                    raise MissingFlow(term_flow)
         if self.valid and self.node_weight_multiplier == 0:
             print('Warning: 0 node weight multiplier for term of %s' % self._parent.external_ref)
 
@@ -259,7 +283,7 @@ class FlowTermination(object):
     def to_exchange(self):
         if self.is_null:
             return None
-        return ExchangeValue(self.term_node, self.term_flow, self.direction, value=self.inbound_exchange_value)
+        return ExchangeValues(self.term_node, self.term_flow, self.direction, value=self.inbound_exchange_value)
     '''
 
     @property
@@ -439,7 +463,7 @@ class FlowTermination(object):
             return '%4g unit' % self.inbound_exchange_value
         return '%4g %s' % (self.inbound_exchange_value, self.term_flow.unit)  # process
 
-    def _unobserved_exchanges(self):
+    def _unobserved_exchanges(self, refresh=False):
         """
         Generator which yields exchanges from the term node's inventory that are not found among the child flows, for
           LCIA purposes
@@ -461,56 +485,33 @@ class FlowTermination(object):
             for x in []:
                 yield x
         else:
-            children = set()
-            children.add((self.term_flow.external_ref, self.direction, None))
-            for c in self._parent.child_flows:
-                children.add((c.flow.external_ref, c.direction))
-            if self.is_bg:
-                iterable = self.term_node.lci(self.term_flow)
-            else:
-                iterable = self.term_node.inventory(ref_flow=self.term_flow)
-            for x in iterable:
-                if (x.flow.external_ref, x.direction) not in children:
-                    yield x
+            try:
+                if self.is_bg or len(list(self._parent.child_flows)) == 0:
+                    # ok we're bringing it back but only because it is efficient to cache lci
+                    for x in self.term_node.lci(ref_flow=self.term_flow, refresh=refresh):
+                        yield x
+                else:
+                    for x in self.term_node.unobserved_lci(self._parent.child_flows, ref_flow=self.term_flow):
+                        yield x  # this should forward out any cutoff exchanges
+            except (BackgroundRequired, NotImplementedError):
+                child_flows = set((k.flow.external_ref, k.direction) for k in self._parent.child_flows)
+                for x in self.term_node.inventory(ref_flow=self.term_flow):
+                    if (x.flow.external_ref, x.direction) not in child_flows:
+                        yield x  # this should forward out any cutoff exchanges
 
-    def compute_unit_score(self, quantity_ref, **kwargs):
+    def compute_unit_score(self, quantity_ref, refresh=False, **kwargs):
         """
         four different ways to do this.
-        0- we are a subfragment-- throw exception: use subfragment traversal results contained in the FragmentFlow
+        0- we are a subfragment-- no direct impacts unless non-descend, which is caught earlier
         1- parent is bg: ask catalog to give us bg_lcia (process or fragment)
         2- get fg lcia for unobserved exchanges
 
         If
         :param quantity_ref:
+        :param refresh:
         :return:
         """
         if self.is_frag:
-            '''
-            if self.is_subfrag:
-                if not self.descend:
-                    raise SubFragmentAggregation  # to be caught
-
-            #
-
-            # either is_fg (no impact) or is_bg or term_is_bg (both equiv)
-
-            elif self.is_bg:
-                # need bg_lcia method for FragmentRefs
-                # this is probably not currently supported
-                # return self.term_node.bg_lcia(lcia_qty=quantity_ref, ref_flow=self.term_flow.external_ref, **kwargs)
-                # instead- just do fragment_lcia
-                print('Warning: ignoring spurious background setting for subfrag:\n%s\n%s' % (self._parent, self.term_node))
-                return LciaResult(quantity_ref)
-
-            else:
-                assert self.is_fg
-
-                # in the current pre-ContextRefactor world, this is how we are handling
-                # cached-LCIA-score nodes
-                # in the post-Context-Refactor world, foreground frags have no impact
-                #raise UnCachedScore('fragment: %s\nquantity: %s' % (self._parent, quantity_ref))
-                return LciaResult(quantity_ref)
-            '''
             return LciaResult(quantity_ref)
 
         try:
@@ -520,15 +521,8 @@ class FlowTermination(object):
                 locale = self.term_node['SpatialScope']
         except KeyError:
             locale = 'GLO'
-        try:
-            res = quantity_ref.do_lcia(self._unobserved_exchanges(), locale=locale, **kwargs)
-        except PrivateArchive:
-            if self.is_bg:
-                print('terminations.compute_unit_score UNTESTED for private bg archives!')
-                res = self.term_node.bg_lcia(lcia_qty=quantity_ref, ref_flow=self.term_flow.external_ref, **kwargs)
-            else:
-                res = self.term_node.fg_lcia(quantity_ref, ref_flow=self.term_flow.external_ref, **kwargs)
-                print('terminations.compute_unit_score UNTESTED for private fg archives!')
+        # just go ahead and fail if we ever encounter a PrivateArchive
+        res = quantity_ref.do_lcia(self._unobserved_exchanges(refresh=refresh), locale=locale, refresh=refresh, **kwargs)
 
         res.scale_result(self.inbound_exchange_value)
         return res
@@ -539,8 +533,7 @@ class FlowTermination(object):
 
         :param quantity:
         :param ignore_uncached:
-        :param refresh: If True, re-compute unit score even if it is already present in the cache. This fails on
-        multi-instance fragments by causing the
+        :param refresh: If True, re-compute unit score even if it is already present in the cache.
         :param kwargs:
         :return:
         """
@@ -552,12 +545,22 @@ class FlowTermination(object):
                 if not self.descend:
                     raise SubFragmentAggregation  # to be caught- subfrag needs to be queried w/scenario
             return LciaResult(quantity)  # otherwise, subfragment terminations have no impacts
+        if refresh:
+            self._score_cache.pop(quantity, None)
 
-        if quantity in self._score_cache and refresh is False:
+        if quantity in self._score_cache:
             return self._score_cache[quantity]
         else:
             try:
-                res = self.compute_unit_score(quantity, **kwargs)
+                '''
+                # This refresh situation is a problem.  On the one hand, if we don't pass refresh on to do_lcia,
+                then there's no way to clear "seen cfs" on flow refs.  On the other hand, passing it through recursively
+                from frag_flow_lcia means we will continually "see" and then "refresh" seen cfs on every flow, for every
+                fragment we traverse. This is just an efficiency bomb.  We need to find a better way to refresh scores
+                that won't suffer from this problem- but unfortunately I can't think of anyway to track that state 
+                mid-traversal. 
+                '''
+                res = self.compute_unit_score(quantity, refresh=refresh, **kwargs)
             except UnCachedScore:
                 if ignore_uncached:
                     res = LciaResult(quantity)
@@ -697,7 +700,7 @@ class FlowTermination(object):
                 if self.term_node.term.is_null:
                     term = '--C '
                 else:
-                    term = '-B  '
+                    term = '-#B  '
             else:
                 if self.descend:
                     term = '-#::'

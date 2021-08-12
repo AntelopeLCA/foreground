@@ -63,21 +63,23 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     '''
     Add some useful functions from other interfaces to the foreground
     '''
-    def get_local(self, external_ref, **kwargs):
+    def get_local(self, external_ref, origin=None, **kwargs):
         """
         The special characteristic of a foreground is its access to the catalog-- so-- use it
         lookup locally; fallback to catalog query- should make origin a kwarg
         :param external_ref:
+        :param origin: optional; if not provided, attempts to split the ref, then uses first
         :param kwargs:
         :return:
         """
-        e = self._fetch(external_ref, **kwargs)
+        e = self._fetch(external_ref, **kwargs)  # not sure what this does exactly
         if e is not None:
             return e
-        try:
-            origin, external_ref = external_ref.split('/', maxsplit=1)
-        except ValueError:
-            origin = 'foreground'
+        if origin is None:
+            try:
+                origin, external_ref = external_ref.split('/', maxsplit=1)
+            except ValueError:
+                origin = self.origin.split('.')[0]
         return self._archive.catalog_ref(origin, external_ref)
 
     def count(self, entity_type):
@@ -95,6 +97,31 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :return:
         """
         return self._archive.tm.get_canonical(quantity)
+
+    def _grounded_ref(self, ref, check_etype=None):
+        """
+        Accept either a string, an unresolved catalog ref, a resolved catalog ref, or an entity
+        Return an entity or grounded ref
+        :param ref:
+        :param check_etype:
+        :return:
+        """
+        if hasattr(ref, 'entity_type'):
+            if (not ref.is_entity) and (not ref.resolved):  # unresolved catalog ref
+                try:
+                    ent = self.get(ref.external_ref)
+                except EntityNotFound:
+                    ent = self._archive.catalog_ref(ref.origin, ref.external_ref)
+            else:  # entity or resolved catalog ref
+                ent = ref
+        else:  # stringable
+            try:
+                ent = self.get(ref)
+            except EntityNotFound:
+                ent = self.get_local(ref)
+        if check_etype is not None and ent.entity_type != check_etype:
+            raise TypeError('%s: Not a %s' % (ref, check_etype))
+        return ent
 
     '''
     fg implementation begins here
@@ -205,7 +232,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         else:
             # first context
             cx = self._archive.tm[term_ref]
-            if cx is not NullContext:
+            if cx not in (None, NullContext):
                 found_ref = cx
             else:
                 found_ref = self.get_local('/'.join(filter(None, (origin, term_ref))))
@@ -236,14 +263,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
           **kwargs passed to LcFragment
         :return:
         """
-        if isinstance(flow, str):
-            try:
-                f = self.get(flow)
-            except EntityNotFound:
-                f = self.get_local(flow)
-            if f.entity_type != 'flow':
-                raise TypeError('%s is not a flow' % flow)
-            flow = f
+        flow = self._grounded_ref(flow, check_etype='flow')
         frag = create_fragment(flow, direction, origin=self.origin, **kwargs)
         self._archive.add_entity_and_children(frag)
         if external_ref is not None:
@@ -437,6 +457,11 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         fragment.observe(accept_all=True)
         return fragment
     '''
+    def _grounded_entity(self, entity, **kwargs):
+        if (not entity.is_entity) and (not entity.resolved):
+            return self._archive.catalog_ref(entity.origin, entity.external_ref, **kwargs)
+        else:
+            return entity
 
     '''# Create or update a fragment from a list of exchanges.
 
@@ -463,6 +488,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param _xg: Generates a list of exchanges or exchange references
         :param parent: if None, create parent from first exchange
         :param ref: if parent is created, assign it a name (if parent is non-None, ref is ignored
+        :param scenario: [None] specify the scenario under which to terminate child flows
         :param set_background: [True] whether to regard process-terminated fragments as background fragments
         :param include_context: [False] whether to model context-terminated flows as child fragments
         :param multi_flow: [False] if True, child flows are matched on flow, direction, and termination
@@ -470,7 +496,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         """
         if parent is None:
             x = next(_xg)
-            parent = self.new_fragment(x.flow, x.direction, value=x.value, units=x.unit, Name=str(x.process), **x.args)
+            parent = self.new_fragment(self._grounded_entity(x.flow), x.direction, value=x.value, units=x.unit, Name=str(x.process), **x.args)
             if ref is None:
                 print('Creating new fragment %s (%s)' % (x.process.name, parent.uuid))
             else:
@@ -482,7 +508,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         for y in _xg:
             if hasattr(y.flow, 'entity_type') and y.flow.entity_type == 'flow':
-                flow = y.flow
+                flow = self._grounded_entity(y.flow)
             else:
                 flow = self[y.flow]
                 if flow is None:
@@ -527,6 +553,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                             c_up.clear_termination(scenario)
                             if term.entity_type == 'fragment':
                                 c_up.terminate(term, scenario=scenario)
+                            else:
+                                c_up.terminate(term, scenario=scenario, term_flow=c_up.flow)
                             if term.entity_type == 'process' and set_background:
                                 c_up.set_background()
                     continue
@@ -537,9 +565,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             c = self.new_fragment(flow, y.direction, value=y.value, units=y.unit, parent=parent, **y.args)
 
             if term is not None:
-                c.terminate(term, scenario=scenario)
-                if term.entity_type == 'process' and set_background:
-                    c.set_background()
+                if term.entity_type in ('process', 'flow'):
+                    c.terminate(term, scenario=scenario, term_flow=c.flow)
+                    if set_background:
+                        c.set_background()
+                else:
+                    c.terminate(term, scenario=scenario)
             self.observe(c)  # use cached implicitly via fg interface
 
         return parent

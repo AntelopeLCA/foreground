@@ -87,8 +87,8 @@ class LcForeground(BasicArchive):
             return self._ext_ref_mapping[key]
         else:
             uid = self._ref_to_uuid(key)
-            if uid in self._uuid_map:
-                return next(k for k in self._uuid_map[uid])
+            if uid in self._entities:
+                return self._entities[uid]
         return None
 
     def _add_ext_ref_mapping(self, entity):
@@ -131,7 +131,6 @@ class LcForeground(BasicArchive):
         if catalog is not None:
             kwargs['term_manager'] = kwargs.pop('term_manager', catalog.lcia_engine)
         super(LcForeground, self).__init__(fg_path, **kwargs)
-        self._uuid_map = defaultdict(set)
         self._catalog = catalog
         self._ext_ref_mapping = dict()
         self._frags_with_flow = defaultdict(set)
@@ -212,8 +211,7 @@ class LcForeground(BasicArchive):
                 current.merge(entity)
 
         if hasattr(entity, 'uuid') and entity.uuid is not None:
-            # self._entities[entity.uuid] = entity
-            self._uuid_map[entity.uuid].add(entity.link)
+            self._entities[entity.uuid] = entity
 
         if entity.origin == self.ref and entity.external_ref != entity.uuid:
             self._add_ext_ref_mapping(entity)
@@ -244,8 +242,6 @@ class LcForeground(BasicArchive):
         :return:
         """
         self._entities[frag.link] = self._entities.pop(oldname)
-        self._uuid_map[frag.uuid].remove(oldname)
-        self._uuid_map[frag.uuid].add(frag.link)
         self._ents_by_type['fragment'].remove(oldname)
         self._ents_by_type['fragment'].add(frag.link)
 
@@ -500,7 +496,8 @@ class LcForeground(BasicArchive):
         self._entities.pop(frag.link)
         self._ents_by_type['fragment'].remove(frag.link)
         self._counter['fragment'] -= 1
-        self._uuid_map.pop(frag.uuid)
+        if self._entities[frag.uuid] is frag:
+            self._entities.pop(frag.uuid)
         self._ext_ref_mapping.pop(frag.external_ref, None)
         self._frags_with_flow[frag.flow].remove(frag)
 

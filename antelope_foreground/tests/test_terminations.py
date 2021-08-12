@@ -30,8 +30,12 @@ class FlowTerminationTestCase(BasicEntityTest):
         return create_fragment(rx.flow, rx.direction, origin='test.termination')
 
     def _petro_term(self):
+        """
+        NOTE: this term will have a phony / proxy background implementation, since we don't have a true catalog query
+        :return:
+        """
         frag = self._petro_frag()
-        return frag.terminate(self.petro, term_flow=frag.flow)
+        return frag.terminate(self.petro.make_ref(self.A.query), term_flow=frag.flow)
 
     def test_create_term(self):
         frag = self._petro_frag()

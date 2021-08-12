@@ -1,9 +1,7 @@
-from antelope import local_ref
 from antelope_core.catalog import LcCatalog
 
 from shutil import rmtree
 import os
-import re
 
 
 class ForegroundCatalog(LcCatalog):
@@ -74,7 +72,7 @@ class ForegroundCatalog(LcCatalog):
 
         return res.make_interface('foreground')
 
-    def assign_new_ref(self, old_ref, new_ref):
+    def assign_new_origin(self, old_org, new_org):
         """
         This only works for certain types of archives. Foregrounds, in particular. but it is hard to say what else.
         What needs to happen here is:
@@ -83,12 +81,12 @@ class ForegroundCatalog(LcCatalog):
          - then we save the archive
          - then we rename the resource file
          = actually we just rewrite the resource file, since the filename and JSON key have to match
-         = since we can't update resource references, it's easiest to just blow them away and reload them
+         = since we can't update resource origins, it's easiest to just blow them away and reload them
          = but to save time we should transfer the archives from the old resource to the new resource
          = anyway, it's not clear when we would want to enable this operation in the first place.
          * so for now we leave it
-        :param old_ref:
-        :param new_ref:
+        :param old_org:
+        :param new_org:
         :return:
         """
         pass
@@ -111,12 +109,12 @@ class ForegroundCatalog(LcCatalog):
                         res.archive.write_to_file(abs_src, gzip=True,
                                                   exchanges=False, characterizations=False, values=False)
                 else:
-                    print('Saving resource configuration for %s' % res.reference)
+                    print('Saving resource configuration for %s' % res.origin)
                     res.save(self)
 
             else:
                 if res.internal:
-                    print('Deleting unconfigurable internal resource for %s\nsource: %s' % (res.reference, abs_src))
+                    print('Deleting unconfigurable internal resource for %s\nsource: %s' % (res.origin, abs_src))
                     self.delete_resource(res, delete_source=True)
                 else:
-                    print('Unable to apply configuration to resource for %s\nsource: %s' % (res.reference, res.source))
+                    print('Unable to apply configuration to resource for %s\nsource: %s' % (res.origin, res.source))

@@ -6,13 +6,13 @@
 import uuid
 # from collections import defaultdict
 
-from antelope import comp_dir, check_direction, PropertyExists, CatalogRef, NoCatalog
+from antelope import comp_dir, check_direction, PropertyExists, CatalogRef
 
 from ..fragment_flows import group_ios, FragmentFlow, frag_flow_lcia
 from antelope_core.entities import LcEntity, LcFlow
 from antelope_core.exchanges import ExchangeValue
 # from lcatools.interact import ifinput, parse_math
-from ..terminations import FlowTermination
+from ..terminations import FlowTermination, MissingFlow
 
 
 class InvalidParentChild(Exception):
@@ -31,10 +31,6 @@ class BalanceAlreadySet(Exception):
 
 
 class CacheAlreadySet(Exception):
-    pass
-
-
-class MissingFlow(Exception):
     pass
 
 
@@ -179,6 +175,24 @@ class LcFragment(LcEntity):
         self._terminations = dict()
         self._terminations[None] = FlowTermination.null(self)
 
+        # set termination and StageName
+        if termination is None:
+            if 'StageName' not in self._d:
+                self._d['StageName'] = ''
+        else:
+            self._terminations[None] = FlowTermination(self, termination, term_flow=term_flow)
+            if 'StageName' not in self._d:
+                stagename = ''
+                try:
+                    stagename = termination['Name']
+                except (TypeError, KeyError):
+                    try:
+                        stagename = termination.name
+                    except AttributeError:
+                        pass
+                finally:
+                    self._d['StageName'] = stagename
+        # set EV last
         if balance_flow:
             self.set_balance_flow()
         else:
@@ -186,20 +200,6 @@ class LcFragment(LcEntity):
                 self.set_exchange_value(0, exchange_value, units=units)
             if observe:
                 self.observed_ev = self.cached_ev
-
-        if termination is None:
-            if 'StageName' not in self._d:
-                self._d['StageName'] = ''
-        else:
-            self._terminations[None] = FlowTermination(self, termination, term_flow=term_flow)
-            if 'StageName' not in self._d:
-                if termination.entity_type == 'context':
-                    self._d['StageName'] = termination.name
-                else:
-                    try:
-                        self._d['StageName'] = termination['Name']
-                    except NoCatalog:
-                        self._d['StageName'] = ''
 
 
     def __hash__(self):
@@ -808,6 +808,8 @@ class LcFragment(LcEntity):
             print('%.5s conserving %s' % (self.uuid, self._conserved_quantity))
             raise BalanceAlreadySet
         self._conserved_quantity = child.flow.reference_entity
+        if self._conserved_quantity.cf(self.flow) == 0:
+            print('%.5s Warning: zero balance for conserved quantity %s' % (self.uuid, self._conserved_quantity))
         self.dbg_print('setting balance from %.5s: %s' % (child.uuid, self._conserved_quantity))
 
     @property
@@ -1352,11 +1354,12 @@ class LcFragment(LcEntity):
 
         term = ff.term
         if term.term_is_bg:
-            # collapse trivial bg terminations into the parent fragment flow
-            bg_ff, _ = term.term_node._traverse_node(ff.node_weight, scenario, observed=observed)
-            assert len(bg_ff) == 1
-            bg_ff[0].fragment = self
-            return bg_ff
+            if term.term_flow == term.term_node.flow:
+                # collapse trivial bg terminations into the parent fragment flow
+                bg_ff, _ = term.term_node._traverse_node(ff.node_weight, scenario, observed=observed)
+                assert len(bg_ff) == 1
+                bg_ff[0].fragment = self
+                return bg_ff
 
         # traverse the subfragment, match the driven flow, compute downstream node weight and normalized inventory
         ffs, unit_inv, downstream_nw = _do_subfragment_traversal(ff, scenario, observed)
@@ -1450,6 +1453,7 @@ class LcFragment(LcEntity):
         conserved_val = None
         if conserved_qty is not None:
             if self.is_balance:
+                self.dbg_print('Found balance flow')
                 raise FoundBalanceFlow  # to be caught
             cf = conserved_qty.cf(self.flow)
             self.dbg_print('consrv cf %g for qty %s' % (cf, conserved_qty), level=3)

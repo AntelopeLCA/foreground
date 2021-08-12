@@ -67,7 +67,7 @@ class CalRecycleArchive(DataSource):
         self._info = semantic_resource
 
     @property
-    def references(self):
+    def origins(self):
         for k in (self._info.ref,):
             yield k
 

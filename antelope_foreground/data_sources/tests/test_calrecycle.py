@@ -31,7 +31,7 @@ if _run_calrecycle:
     fg = crc.foreground(cat, fg_path='uolca')
     if fg.frag('aed7a').is_background:
         fg.frag('aed7a')._background = False  # postfix defect in repo generation
-    if 'calrecycle.antelope' not in cat.references:
+    if 'calrecycle.antelope' not in cat.origins:
         cat.new_resource('calrecycle.antelope', 'http://www.antelope-lca.net/uo-lca/api/', 'AntelopeV1Client',
                          store=False, interfaces=['index', 'inventory', 'quantity'], quiet=True)
     cr_time = time.time()

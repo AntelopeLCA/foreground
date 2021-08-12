@@ -51,6 +51,7 @@ import unittest
 # from math import floor
 
 from ..fragment_editor import create_fragment
+from ...terminations import MissingFlow, FlowConversionError
 from antelope_core.entities import LcFlow
 from antelope_core.archives import Qdb
 from antelope import CONTEXT_STATUS_
@@ -300,6 +301,13 @@ class FragmentTests(unittest.TestCase):
         a1_ancillary = a1_mj_in / self.a2.exchange_value() * a2_ancillary
         self._check_fragmentflows(self.a2.traverse(None), f7, 'Input', a2_ancillary)
         self._check_fragmentflows(self.a1.traverse(None), f7, 'Input', a1_ancillary)
+
+    def test_missing_flow(self):
+        k = create_fragment(f6, 'Output')
+        with self.assertRaises(MissingFlow):
+            k.terminate(self.a1, term_flow=f6)
+        with self.assertRaises(FlowConversionError):
+            k.terminate(self.a1)
 
     def test_unobserved_traversal(self):
         """

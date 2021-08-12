@@ -1,7 +1,7 @@
 import json
 from collections import defaultdict
 from time import time
-from antelope import CatalogRef, BasicQuery, comp_dir
+from antelope import CatalogRef, BasicQuery, comp_dir, NoReference, NoAccessToEntity
 
 from antelope_core.archives import BasicArchive, LC_ENTITY_TYPES
 # from lcatools.fragment_flows import FragmentFlow
@@ -11,7 +11,7 @@ from ...interfaces.iforeground import AntelopeForegroundInterface
 from ...refs.fragment_ref import FragmentRef
 from ...fragment_flows import FragmentFlow, GhostFragment
 
-from ...terminations import FlowTermination
+from ...terminations import FlowTermination, MissingFlow
 from antelope_core.characterizations import DuplicateCharacterizationError
 from math import isclose
 
@@ -44,7 +44,11 @@ def remote_ref(url):
 
 
 class AntelopeV1Query(BasicQuery, AntelopeForegroundInterface):
-    pass
+    def get_reference(self, external_ref):
+        try:
+            return super(AntelopeV1Query, self).get_reference(external_ref)
+        except NoAccessToEntity:
+            raise NoReference(self.origin, external_ref)
 
 
 class DeferredProcessComment(object):
@@ -85,6 +89,8 @@ class AntelopeV1Client(BasicArchive):
         if ref is None:
             ref = remote_ref(source)
 
+        self._set_query()
+
         super(AntelopeV1Client, self).__init__(source, ref=ref, **kwargs)
 
         self._s = requests.Session()
@@ -106,9 +112,12 @@ class AntelopeV1Client(BasicArchive):
         #print('done') ## super slow DiscountASP gotta get away
         self._fetched_all['flowproperty'] = True
 
+    def _set_query(self):
+        self._query = AntelopeV1Query(self)
+
     @property
     def query(self):
-        return AntelopeV1Query(self)
+        return self._query
 
     def make_interface(self, iface):
         if iface == 'index':
@@ -308,7 +317,10 @@ class AntelopeV1Client(BasicArchive):
                                    _direction=comp_dir(dirn))  # antelope v1 processes do not have reference flows!
         elif node_type == 'Fragment':
             term_node = self.query.get('fragments/%s' % ff['subFragmentID'])
-            term = FlowTermination(frag, term_node, term_flow=flow, inbound_ev=inbound_ev)
+            try:
+                term = FlowTermination(frag, term_node, term_flow=flow, inbound_ev=inbound_ev)
+            except MissingFlow:
+                term = FlowTermination(frag, term_node, term_flow=None, inbound_ev=inbound_ev)
         else:
             term = FlowTermination.null(frag)
         if 'isConserved' in ff:
@@ -369,7 +381,7 @@ class AntelopeV1Client(BasicArchive):
         j['SpatialScope'] = j.pop('geography')
         j['TemporalScope'] = j.pop('referenceYear')
         j['Comment'] = DeferredProcessComment(self._get_comment, process_id)
-        ref = self._make_ref(ext_ref, 'process', **j)
+        ref = self._make_ref(ext_ref, 'process', reference_entity=[], **j)
         self._cached['processes'][process_id] = ref
         return ref
 
