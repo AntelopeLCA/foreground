@@ -11,7 +11,7 @@ from ...interfaces.iforeground import AntelopeForegroundInterface
 from ...refs.fragment_ref import FragmentRef
 from ...fragment_flows import FragmentFlow, GhostFragment
 
-from ...terminations import FlowTermination
+from ...terminations import FlowTermination, MissingFlow
 from antelope_core.characterizations import DuplicateCharacterizationError
 from math import isclose
 
@@ -89,6 +89,8 @@ class AntelopeV1Client(BasicArchive):
         if ref is None:
             ref = remote_ref(source)
 
+        self._set_query()
+
         super(AntelopeV1Client, self).__init__(source, ref=ref, **kwargs)
 
         self._s = requests.Session()
@@ -112,6 +114,10 @@ class AntelopeV1Client(BasicArchive):
 
     def _set_query(self):
         self._query = AntelopeV1Query(self)
+
+    @property
+    def query(self):
+        return self._query
 
     def make_interface(self, iface):
         if iface == 'index':
@@ -311,7 +317,10 @@ class AntelopeV1Client(BasicArchive):
                                    _direction=comp_dir(dirn))  # antelope v1 processes do not have reference flows!
         elif node_type == 'Fragment':
             term_node = self.query.get('fragments/%s' % ff['subFragmentID'])
-            term = FlowTermination(frag, term_node, term_flow=flow, inbound_ev=inbound_ev)
+            try:
+                term = FlowTermination(frag, term_node, term_flow=flow, inbound_ev=inbound_ev)
+            except MissingFlow:
+                term = FlowTermination(frag, term_node, term_flow=None, inbound_ev=inbound_ev)
         else:
             term = FlowTermination.null(frag)
         if 'isConserved' in ff:
