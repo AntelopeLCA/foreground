@@ -1,18 +1,20 @@
 from setuptools import setup, find_packages
 
 requires = [
-    'antelope_core'
+    'antelope_core>=0.1.7'
 ]
 
 """
 Revision history
+
+0.1.7 - 11 Aug 2021 - TRAVIS release
 
 0.1.3 - 30 Dec 2020 - First public release
 """
 
 setup(
     name="antelope_foreground",
-    version="0.1.3rc1",
+    version="0.1.7",
     author="Brandon Kuczenski",
     author_email="bkuczenski@ucsb.edu",
     install_requires=requires,
