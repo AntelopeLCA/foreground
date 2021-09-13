@@ -237,7 +237,7 @@ class LcForeground(BasicArchive):
 
         This can surely be simplified (currently, renaming a fragment requires calling this twice) but not today.
 
-        :param frag:
+        :param frag:ment being renamed
         :param oldname:
         :return:
         """
@@ -262,7 +262,7 @@ class LcForeground(BasicArchive):
         This function is complicated because we have so many dicts:
          _entities maps link to entity
          _ext_ref_mapping maps custom name to link
-         _uuid_map maps UUID to a set of links that share the uuid
+         XX removed XX _uuid_map maps UUID to a set of links that share the uuid
          _ents_by_type keeps a set of links by entity type
 
         So, when we name a fragment, we want to do the following:
@@ -270,7 +270,7 @@ class LcForeground(BasicArchive):
          - ensure the name is not already taken
          - set the fragment entity's name
          * pop the old link and replace its object with the new link in _entities
-         * remove the old link and replace it with the new link in the uuid map
+         XX remove the old link and replace it with the new link in the uuid map
          * remove the old link and replace it with the new link in ents_by_type['fragment']
          * add the name with the new link to the ext_ref_mapping
         :param frag:
@@ -280,7 +280,7 @@ class LcForeground(BasicArchive):
          This requires:
            - first de-naming the prior fragment,
            - then swapping its _entities entry
-           - then swapping its _uuid_map entry
+           XX then swapping its _uuid_map entry
            - then swapping its _ents_by_type entry
            - then removing its duplicate ext_ref_mapping
            = then proceeding to normally rename the new frag
@@ -389,6 +389,15 @@ class LcForeground(BasicArchive):
             os.makedirs(self._fragment_dir)
         self.save_fragments(save_unit_scores=save_unit_scores)
 
+    def all_fragments(self):
+        """
+        Generate all fragments [should someday be in topological order]- as it is the fragments are locally-ordered
+        :return:
+        """
+        for r in self._fragments():
+            for t in self._recurse_frags(r):
+                yield t
+
     def clear_unit_scores(self, lcia_method=None):
         for f in self.entities_by_type('fragment'):
             for s, t in f.terminations():
@@ -400,6 +409,11 @@ class LcForeground(BasicArchive):
     Retrieve + display fragments
     '''
     def _fragments(self, background=None, **kwargs):
+        """
+        :param background:
+        :param kwargs:
+        :return:
+        """
         for f in self.search('fragment', **kwargs):
             if f.reference_entity is None:
                 if background is None or f.is_background == background:

@@ -1,7 +1,18 @@
 from antelope_core.catalog import LcCatalog
 
+from antelope_core.catalog_query import CatalogQuery
+from .interfaces.iforeground import AntelopeForegroundInterface
+
 from shutil import rmtree
 import os
+
+
+class ForegroundQuery(AntelopeForegroundInterface, CatalogQuery):
+    """
+    Give catalog queries the foreground interface
+    """
+    pass
+
 
 
 class ForegroundCatalog(LcCatalog):
@@ -11,7 +22,12 @@ class ForegroundCatalog(LcCatalog):
 
     '''
     ForegroundCatalog
+    do I need to override query to handle foregrounds separately? standard CatalogQueries don't have foreground i-f
+    
+    nope- change the type
+    def query(self, origin, strict=False, refresh=False, **kwargs):
     '''
+    _query_type = ForegroundQuery
 
     def foreground(self, ref, path=None, quiet=True, reset=False, delete=False):
         """

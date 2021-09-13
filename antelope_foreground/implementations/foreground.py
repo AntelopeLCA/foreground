@@ -89,6 +89,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for f in self._archive.search('flow', **kwargs):
             yield f
 
+    def frag(self, string, many=False, **kwargs):
+        return self._archive.frag(string, many=many, **kwargs)
+
     def get_canonical(self, quantity):
         """
         By convention, a foreground archive's Term Manager is the catalog's LCIA engine, which is the Qdb of record
