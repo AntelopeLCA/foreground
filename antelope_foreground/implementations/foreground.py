@@ -276,14 +276,21 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         return self._archive.name_fragment(fragment, name, auto=auto, force=force)
     '''
 
-    def observe(self, fragment, exchange_value=None, name=None, scenario=None, units=None, auto=None, force=None,
+    def observe(self, fragment, exchange_value=None, termination=None, name=None, scenario=None,
+                units=None, auto=None, force=None,
                 accept_all=None, **kwargs):
         if accept_all is not None:
             print('%s: cannot "accept all"' % fragment)
-        if name is not None and scenario is None:  #
-            if fragment.external_ref != name:
-                print('Naming fragment %s -> %s' % (fragment.external_ref, name))
-                self._archive.name_fragment(fragment, name, auto=auto, force=force)
+        if name is not None:
+            if scenario is None:  #
+                if fragment.external_ref != name:
+                    print('Naming fragment %s -> %s' % (fragment.external_ref, name))
+                    self._archive.name_fragment(fragment, name, auto=auto, force=force)
+                else:
+                    # nothing to do
+                    pass
+            else:
+                print('Ignoring fragment name under a scenario specification')
         if fragment.observable(scenario):
             if fragment not in self._observations:
                 self._observations.append(fragment)
@@ -295,6 +302,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 print('Note: Ignoring exchange value %g for unobservable fragment %s [%s]' % (exchange_value,
                                                                                               fragment.external_ref,
                                                                                               scenario))
+        if termination is not None:
+            term = self.find_term(termination)
+            fragment.terminate(term, scenario=scenario)
+
         return fragment.link
 
     @property

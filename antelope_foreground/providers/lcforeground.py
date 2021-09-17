@@ -135,8 +135,6 @@ class LcForeground(BasicArchive):
         self._ext_ref_mapping = dict()
         self._frags_with_flow = defaultdict(set)
 
-        if not os.path.isdir(self.source):
-            os.makedirs(self.source)
         self.load_all()
         self.check_counter('fragment')
 
@@ -384,6 +382,9 @@ class LcForeground(BasicArchive):
                 os.remove(os.path.join(self._fragment_dir, leftover))
 
     def save(self, save_unit_scores=False):
+        if not os.path.isdir(self.source):
+            os.makedirs(self.source)
+
         self.write_to_file(self._archive_file, gzip=False, characterizations=True, values=True, domesticate=False)
         if not os.path.isdir(self._fragment_dir):
             os.makedirs(self._fragment_dir)

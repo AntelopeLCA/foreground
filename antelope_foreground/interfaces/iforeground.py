@@ -165,7 +165,7 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'delete_fragment', ForegroundRequired,
                                    fragment, **kwargs)
 
-    def observe(self, fragment, exchange_value=None, name=None, scenario=None, **kwargs):
+    def observe(self, fragment, exchange_value=None, termination=None, name=None, scenario=None, **kwargs):
         """
         Observe a fragment's exchange value with respect to its parent activity level.  Only applicable for
         non-balancing fragments whose parents are processes or foreground nodes (child flows of subfragments have
@@ -179,14 +179,16 @@ class AntelopeForegroundInterface(ForegroundInterface):
         scenario and name should be mutually exclusive; if both are supplied, name is ignored.
 
         :param fragment:
-        :param exchange_value:
+        :param exchange_value: [this must be the second positional argument for legacy reasons, but can still be None]
+        :param termination:
         :param name:
         :param scenario:
         :param kwargs:
         :return:
         """
         return self._perform_query(_interface, 'observe', ForegroundRequired,
-                                   fragment, exchange_value, name=name, scenario=scenario, **kwargs)
+                                   fragment, exchange_value=exchange_value, termination=termination, name=name,
+                                   scenario=scenario, **kwargs)
 
     def set_balance_flow(self, fragment, **kwargs):
         """
