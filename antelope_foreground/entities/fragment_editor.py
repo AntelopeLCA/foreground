@@ -22,6 +22,7 @@ def create_fragment(flow, direction, parent=None, **kwargs):
 
 
 def _create_fragment(flow, direction, uuid=None, parent=None, name=None, comment=None, value=None, balance=False,
+                     exchange_value=None,
                      **kwargs):
     """
 
@@ -40,6 +41,16 @@ def _create_fragment(flow, direction, uuid=None, parent=None, name=None, comment
     if name is None:
         name = flow['Name']
     name = kwargs.pop('Name', name)
+
+    # handle 'value' vs 'exchange_value' redundancy
+    if value is None:
+        if exchange_value is not None:
+            value = exchange_value
+        # counter-case- pass
+    else:
+        if exchange_value is not None:
+            raise TypeError('Cannot provide both "value" and "exchange_value" inputs')
+        # counter-case- pass
 
     if comment is None:
         comment = ''
