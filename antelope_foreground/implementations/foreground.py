@@ -304,7 +304,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                                                                                               scenario))
         if termination is not None:
             term = self.find_term(termination)
-            fragment.terminate(term, scenario=scenario)
+            fragment.terminate(term, scenario=scenario, **kwargs)
 
         return fragment.link
 

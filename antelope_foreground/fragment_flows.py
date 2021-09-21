@@ -134,7 +134,8 @@ class FragmentFlow(object):
         return name
 
     def __str__(self):
-        return '%.5s  %10.3g [%6s] %s %s' % (self.fragment.uuid, self.node_weight, self.fragment.direction,
+        # big change node_weight to magnitude
+        return '%.5s  %10.3g [%6s] %s %s' % (self.fragment.uuid, self.magnitude, self.fragment.direction,
                                              self.term, self.name)
 
     def __add__(self, other):
@@ -252,12 +253,16 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
     :return: [list of grouped IO flows], [list of internal non-null flows]
     """
     out = defaultdict(float)
+    dirs = dict()
     internal = []
     external = []
     for ff in ffs:
         if ff.term.is_null:
-            # accumulate IO flows under the convention that inflows are positive, outflows are negative
-            if ff.fragment.direction == 'Input':
+            # accumulate IO flows according to the first seen direction
+            if ff.fragment.flow not in dirs:
+                dirs[ff.fragment.flow] = ff.fragment.direction
+            # and correct the signs of subsequent flows
+            if ff.fragment.direction == dirs[ff.fragment.flow]:
                 magnitude = ff.magnitude
             else:
                 magnitude = -ff.magnitude
@@ -272,10 +277,11 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
         if ref_frag.flow in out:  # either pass through or autoconsumption
             ref_frag.dbg_print('either pass through or autoconsumption')
             val = out[ref_frag.flow]
+            auto_dirn = dirs[ref_frag.flow]
             if val < 0:
-                auto_dirn = 'Output'
-            else:
-                auto_dirn = 'Input'
+                auto_dirn = comp_dir(auto_dirn)  # this is rare, but
+            # else:
+            #    auto_dirn = 'Input'
             """
             If the directions are cumulating, we raise an error- bad fragment design. 
             
@@ -313,10 +319,9 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
             external.append(FragmentFlow.cutoff(parent, ref_frag.flow, comp_dir(ref_frag.direction), ref_mag))
 
     for flow, value in out.items():
+        direction = dirs[flow]
         if value < 0:
-            direction = 'Output'
-        else:
-            direction = 'Input'
+            direction = comp_dir(direction)
         external.append(FragmentFlow.cutoff(parent, flow, direction, abs(value)))
 
     return external, internal

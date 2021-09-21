@@ -135,6 +135,7 @@ class LcFragment(LcEntity):
                  term_flow=None,
                  external_ref=None,
                  observe=None,
+                 descend=None,
                  **kwargs):
         """
         Required params:
@@ -146,10 +147,11 @@ class LcFragment(LcEntity):
         :param units: to convert exchange value, if supplied
         :param private: forces aggregation of subfragments (not currently used)
         :param balance_flow: if true, exch val is always ignored and calculated based on parent
-        :param background: if true, fragment only returns LCIA results.
+        :param background: [[DEPRECATED / to be ignored]] if true, ends traversal
         :param termination: specify the fragment's default termination
         :param term_flow: specify the term_flow (ignored if termination is None)
         :param observe: [None] if True, assign observed_ev to match cached_ev
+        :param descend: [None] if a termination is provided, whether to set its descend flag
         :param kwargs:
         """
 
@@ -180,7 +182,7 @@ class LcFragment(LcEntity):
             if 'StageName' not in self._d:
                 self._d['StageName'] = ''
         else:
-            self._terminations[None] = FlowTermination(self, termination, term_flow=term_flow)
+            self._terminations[None] = FlowTermination(self, termination, term_flow=term_flow, descend=descend)
             if 'StageName' not in self._d:
                 stagename = ''
                 try:
@@ -907,7 +909,9 @@ class LcFragment(LcEntity):
                 raise CacheAlreadySet('Scenario termination already set. use clear_termination()')
 
         if scenario is None and term_node in self._terminations:
-            # shortcut: assign an existing scenario to be default
+            # shortcut: assign an existing scenario to be default  ## DWR? this is surely nonstandard-
+            # causes namespace conflicts btwn scenario and external_ref, but not really because the argument is
+            # supposed to be a node. supplying txt as an argument is nonstandard- so it's clearly a hack. eh.
             self._terminations[None] = self._terminations[term_node]
             return self._terminations[term_node]
 
