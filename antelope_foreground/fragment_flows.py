@@ -134,7 +134,7 @@ class FragmentFlow(object):
         return name
 
     def __str__(self):
-        return '%.5s  %10.3g [%6s] %s %s' % (self.fragment.uuid, self.node_weight, self.fragment.direction,
+        return '%.5s  %10.3g [%6s] %s %s' % (self.fragment.uuid, self.magnitude, self.fragment.direction,
                                              self.term, self.name)
 
     def __add__(self, other):
