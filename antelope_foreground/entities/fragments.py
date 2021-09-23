@@ -6,7 +6,7 @@
 import uuid
 # from collections import defaultdict
 
-from antelope import comp_dir, check_direction, PropertyExists, CatalogRef
+from antelope import comp_dir, check_direction, PropertyExists, CatalogRef, RxRef
 
 from ..fragment_flows import group_ios, FragmentFlow, frag_flow_lcia
 from antelope_core.entities import LcEntity, LcFlow
@@ -245,6 +245,13 @@ class LcFragment(LcEntity):
         if level < self.__dbg_threshold:
             print('%.3s %s' % (self.uuid, qwer))
 
+    def reference(self):
+        """
+        For process interoperability
+        :return:
+        """
+        return RxRef(self, self.flow, comp_dir(self.direction), self.get('Comment', None), value=self.observed_ev)
+
     def make_ref(self, query):
         ref = super(LcFragment, self).make_ref(query)
         ref.set_config(self.flow.make_ref(query.cascade(self.flow.origin)), self.direction)
@@ -267,6 +274,8 @@ class LcFragment(LcEntity):
         parent.add_child(self)
 
     def unset_parent(self):
+        if self.is_balance:
+            self.unset_balance_flow()
         self.reference_entity.remove_child(self)
         self._set_reference(None)
 

@@ -98,6 +98,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         """
         return self._archive.tm.get_canonical(quantity)
 
+    def targets(self, flow, direction, **kwargs):
+        return self.fragments_with_flow(flow, direction, **kwargs)
+
     def _grounded_ref(self, ref, check_etype=None):
         """
         Accept either a string, an unresolved catalog ref, a resolved catalog ref, or an entity
@@ -313,12 +316,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for k in self._observations:
             yield k
 
-    def fragments_with_flow(self, flow, direction=None, reference=None, background=None, **kwargs):
+    def fragments_with_flow(self, flow, direction=None, reference=True, background=None, **kwargs):
         """
         Requires flow identity
         :param flow:
         :param direction:
-        :param reference:
+        :param reference: {True} | False | None
         :param background:
         :param kwargs:
         :return:
