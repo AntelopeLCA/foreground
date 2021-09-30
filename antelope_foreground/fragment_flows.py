@@ -134,7 +134,6 @@ class FragmentFlow(object):
         return name
 
     def __str__(self):
-        # big change node_weight to magnitude
         return '%.5s  %10.3g [%6s] %s %s' % (self.fragment.uuid, self.magnitude, self.fragment.direction,
                                              self.term, self.name)
 
