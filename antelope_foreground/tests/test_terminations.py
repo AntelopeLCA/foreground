@@ -46,7 +46,7 @@ class FlowTerminationTestCase(BasicEntityTest):
         self.assertFalse(term.is_null)
         self.assertFalse(term.is_null)
         self.assertFalse(term.is_subfrag)
-        self.assertFalse(term.is_bg)
+        self.assertTrue(term.is_bg)  # bg now means "no child flows"
         self.assertFalse(term.term_is_bg)
 
     def test_unobserved(self):

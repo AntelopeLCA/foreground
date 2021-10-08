@@ -85,8 +85,7 @@ class LcFragment(LcEntity):
         frag = cls(j['entityId'], flow, j['direction'], origin=fg.ref, parent=parent,
                    exchange_value=j['exchangeValues'].pop('0'),
                    private=j['isPrivate'],
-                   balance_flow=j['isBalanceFlow'],
-                   background=j['isBackground'])
+                   balance_flow=j['isBalanceFlow'])
         if j['externalId'] != j['entityId']:
             frag.external_ref = j['externalId']
         frag._exchange_values[1] = j['exchangeValues'].pop('1')
@@ -159,7 +158,7 @@ class LcFragment(LcEntity):
         self._exchange_values = _new_evs()
         self._conserved_quantity = None
         self._private = private
-        self._background = background
+        # self._background = background
         self._is_balance = False
         self._child_flows = set()
 
@@ -307,6 +306,8 @@ class LcFragment(LcEntity):
         if child.reference_entity is not self:
             raise InvalidParentChild('Fragment should list parent as reference entity')
         self._child_flows.add(child)
+        for term in self._terminations.values():
+            term.clear_score_cache()
 
     def remove_child(self, child):
         """
@@ -317,6 +318,8 @@ class LcFragment(LcEntity):
         if child.reference_entity is not self:
             raise InvalidParentChild('Fragment is not a child')
         self._child_flows.remove(child)
+        for term in self._terminations.values():
+            term.clear_score_cache()
 
     @property
     def child_flows(self):
@@ -395,7 +398,7 @@ class LcFragment(LcEntity):
             'flow': f_e_r,
             'direction': self.direction,
             'isPrivate': self._private,
-            'isBackground': self._background,
+            'isBackground': self.is_background,  # descriptive only
             'isBalanceFlow': self.is_balance,
             'exchangeValues': self._serialize_evs(),
             'terminations': self._serialize_terms(save_unit_scores=save_unit_scores),
@@ -630,7 +633,7 @@ class LcFragment(LcEntity):
 
     @property
     def is_background(self):
-        return self._background
+        return len(self._child_flows) == 0  # self._background
 
     def scenarios(self, recurse=True):
         """
@@ -949,7 +952,7 @@ class LcFragment(LcEntity):
                     self['StageName'] = termination.term_node.name
                 else:
                     try:
-                        self['StageName'] = termination.term_node['Classifications'][-1]
+                        self['StageName'] = termination.term_node['Name']
                     except (KeyError, TypeError, IndexError):
                         print('%.5s StageName failed %s' % (self.uuid, termination.term_node))
                         self['StageName'] = termination.term_node.name
@@ -966,10 +969,11 @@ class LcFragment(LcEntity):
         :param scenario:
         :return:
         """
-        self.unset_background()
+        # self.unset_background()
         if self.termination(scenario).is_null:
             self.terminate(self, scenario=scenario)
 
+    '''
     def unset_background(self):
         if self._background is True:
             for term in self._terminations.values():
@@ -985,6 +989,7 @@ class LcFragment(LcEntity):
             for term in self._terminations.values():
                 term.clear_score_cache()
         self._background = True
+    '''
 
     def term_from_json(self, catalog, scenario, j):
         if isinstance(scenario, tuple):
@@ -1366,13 +1371,16 @@ class LcFragment(LcEntity):
         '''
 
         term = ff.term
-        if term.term_is_bg:
+        if 0:  #  term.term_is_bg: this is deprecated
+            pass
+            '''
             if term.term_flow == term.term_node.flow:
                 # collapse trivial bg terminations into the parent fragment flow
                 bg_ff, _ = term.term_node._traverse_node(ff.node_weight, scenario, observed=observed)
-                assert len(bg_ff) == 1
+                assert len(bg_ff) == 1, (self.uuid, term.term_node.external_ref)
                 bg_ff[0].fragment = self
                 return bg_ff
+            '''
 
         # traverse the subfragment, match the driven flow, compute downstream node weight and normalized inventory
         ffs, unit_inv, downstream_nw = _do_subfragment_traversal(ff, scenario, observed)
@@ -1494,7 +1502,7 @@ class LcFragment(LcEntity):
         '''
         now looking forward: is our termination a cutoff, background, foreground or subfragment?
         '''
-        if term.is_null or term.is_context or self.is_background or magnitude == 0:
+        if term.is_null or term.is_context or magnitude == 0:
             # cutoff /context and background end traversal
             self.dbg_print('cutoff or bg')
             return [ff], conserved_val

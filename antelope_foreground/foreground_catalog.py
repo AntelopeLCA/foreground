@@ -118,3 +118,16 @@ class ForegroundCatalog(LcCatalog):
                     self.delete_resource(res, delete_source=True)
                 else:
                     print('Unable to apply configuration to resource for %s\nsource: %s' % (res.origin, res.source))
+
+    def delete_foreground(self, foreground, really=False):
+        res = self.get_resource(foreground, 'foreground')
+        self.delete_resource(res)
+        abs_src = self.abs_path(res.source)
+        if really:
+            rmtree(abs_src)
+        else:
+            del_path = abs_src + '-DELETED'
+            if os.path.exists(del_path):
+                rmtree(del_path)
+
+            os.rename(abs_src, del_path)

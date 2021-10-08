@@ -6,7 +6,7 @@ from antelope_core.entities.quantities import new_quantity
 from antelope_core.contexts import NullContext
 from antelope_core.entities.flows import new_flow
 from ..entities.fragments import InvalidParentChild
-from ..entities.fragment_editor import create_fragment, clone_fragment, _fork_fragment  # interpose,
+from ..entities.fragment_editor import create_fragment, clone_fragment, _fork_fragment, interpose
 
 
 class NotForeground(Exception):
@@ -56,6 +56,19 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     #_frags_with_flow = defaultdict(set)  # we actually want this to be shared among
     #_recursion_check = None
 
+    ''' # NOT YET
+    def __getitem__(self, item):
+        """
+        Let's have some standard etiquette here, people
+        :param item:
+        :return:
+        """
+        value = super(AntelopeForegroundImplementation, self).__getitem__(item)
+        if value is None:
+            raise EntityNotFound
+        return value
+    '''
+
     def __init__(self, *args, **kwargs):
         super(AntelopeForegroundImplementation, self).__init__(*args, **kwargs)
         self._observations = []
@@ -89,6 +102,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for f in self._archive.search('flow', **kwargs):
             yield f
 
+    def targets(self, flow, direction, **kwargs):
+        return self.fragments_with_flow(flow, direction, **kwargs)
+
+    '''
+    for internal / convenience use
+    '''
     def get_canonical(self, quantity):
         """
         By convention, a foreground archive's Term Manager is the catalog's LCIA engine, which is the Qdb of record
@@ -98,9 +117,13 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         """
         return self._archive.tm.get_canonical(quantity)
 
-    def targets(self, flow, direction, **kwargs):
-        return self.fragments_with_flow(flow, direction, **kwargs)
+    def context(self, item):
+        return self._archive.tm[item]
 
+    def flowable(self, item):
+        return self._archive.tm.get_flowable(item)
+
+    ''' # outmoded by find_term?
     def _grounded_ref(self, ref, check_etype=None):
         """
         Accept either a string, an unresolved catalog ref, a resolved catalog ref, or an entity
@@ -125,6 +148,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         if check_etype is not None and ent.entity_type != check_etype:
             raise TypeError('%s: Not a %s' % (ref, check_etype))
         return ent
+    '''
 
     '''
     fg implementation begins here
@@ -137,10 +161,6 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         else:
             raise NotForeground('The resource does not contain fragments: %s' % self._archive.ref)
 
-    def context(self, item):
-        return self._archive.tm[item]
-
-    '''
     def frag(self, string, **kwargs):
         """
         :param string:
@@ -148,7 +168,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :return:
         """
         return self._archive.frag(string, **kwargs)
-    '''
+
     '''
     Create and modify fragments
     '''
@@ -231,7 +251,15 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         if term_ref is None:
             return
         if hasattr(term_ref, 'entity_type'):
-            found_ref = term_ref
+            if term_ref.entity_type == 'context':
+                found_ref = term_ref
+            elif (not term_ref.is_entity) and (not term_ref.resolved):  # unresolved catalog ref
+                try:
+                    found_ref = self.get(term_ref.external_ref)
+                except EntityNotFound:
+                    found_ref = self._archive.catalog_ref(term_ref.origin, term_ref.external_ref)
+            else:
+                found_ref = term_ref
         else:
             # first context
             cx = self._archive.tm[term_ref]
@@ -266,7 +294,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
           **kwargs passed to LcFragment
         :return:
         """
-        flow = self._grounded_ref(flow, check_etype='flow')
+        flow = self.find_term(flow, check_etype='flow')
+        if flow.entity_type != 'flow':
+            raise TypeError('%s: Not a %s' % (flow, 'flow'))
         frag = create_fragment(flow, direction, origin=self.origin, **kwargs)
         self._archive.add_entity_and_children(frag)
         if external_ref is not None:
@@ -316,6 +346,15 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for k in self._observations:
             yield k
 
+    def knobs(self, search=None, **kwargs):
+        args = tuple(filter(None, [search]))
+        for k in self._archive.fragments(*args, show_all=True):
+            if k.is_reference:
+                continue
+            if k.external_ref == k.uuid:  # only generate named fragments
+                continue
+            yield k
+
     def fragments_with_flow(self, flow, direction=None, reference=True, background=None, **kwargs):
         """
         Requires flow identity
@@ -340,15 +379,15 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 continue
             yield f
 
-    def clone_fragment(self, frag, **kwargs):
+    def clone_fragment(self, frag, tag=None, **kwargs):
         """
 
         :param frag: the fragment (and subfragments) to clone
-        :param kwargs: suffix (default: ' (copy)', applied to Name of top-level fragment only)
-                       comment (override existing Comment if present; applied to all)
+        :param tag: string to attach to named external refs
+        :param kwargs: passed to new fragment
         :return:
         """
-        clone = clone_fragment(frag, **kwargs)
+        clone = clone_fragment(frag, tag=tag, **kwargs)
         self._archive.add_entity_and_children(clone)
         return clone
 
@@ -377,7 +416,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 raise InvalidParentChild('Replacement is not a reference fragment')
 
         surrogate = _fork_fragment(fragment, comment='New subfragment')
-        self._archive.add_entity_and_children(surrogate)
+        self._archive.add(surrogate)
 
         fragment.unset_parent()
         if replacement is None:
@@ -386,6 +425,14 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             surrogate.terminate(replacement, descend=descend)
 
         return fragment
+
+    def interpose(self, fragment, balance=True):
+        inter = interpose(fragment)
+        self._archive.add(inter)
+        if balance:
+            fragment.set_balance_flow()
+
+        return inter
 
     def delete_fragment(self, fragment, **kwargs):
         """
@@ -419,7 +466,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for f in self._archive.entities_by_type('fragment'):
             f.clear_scenarios(terminations=terminations)
 
-    def create_process_model(self, process, ref_flow=None, set_background=True, **kwargs):
+    def create_process_model(self, process, ref_flow=None, set_background=None, **kwargs):
         rx = process.reference(ref_flow)
         if process.reference_value(ref_flow) < 0:  # put in to handle Ecoinvent treatment processes
             dirn = comp_dir(rx.direction)
@@ -427,8 +474,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             dirn = rx.direction
         frag = self.new_fragment(rx.flow, dirn, value=1.0, **kwargs)
         frag.terminate(process, term_flow=rx.flow)
-        if set_background:
-            frag.set_background()
+        # if set_background:
+        #     frag.set_background()
         # self.fragment_from_exchanges(process.inventory(rx), parent=frag,
         #                              include_context=include_context, multi_flow=multi_flow)
         return frag
@@ -437,7 +484,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         term = fragment.termination(scenario)
         if not term.is_process:
             raise TypeError('Termination is not to process')
-        fragment.unset_background()
+        # fragment.unset_background()
         process = term.term_node
         self.fragment_from_exchanges(process.inventory(ref_flow=term.term_flow), parent=fragment, scenario=scenario,
                                      **kwargs)
@@ -482,7 +529,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     This needs to be an interface method.
     '''
     def fragment_from_exchanges(self, _xg, parent=None, ref=None, scenario=None,
-                                set_background=True,
+                                term_dict=None,
+                                set_background=None,
                                 include_context=False,
                                 multi_flow=False):
         """
@@ -503,11 +551,17 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param parent: if None, create parent from first exchange
         :param ref: if parent is created, assign it a name (if parent is non-None, ref is ignored
         :param scenario: [None] specify the scenario under which to terminate child flows
-        :param set_background: [True] whether to regard process-terminated fragments as background fragments
+        :param term_dict: [None] a mapping from EITHER existing termination OR flow external ref to target OR (target, term_flow) tuple
+        :param set_background: [None] DEPRECATED / background is meaningless
         :param include_context: [False] whether to model context-terminated flows as child fragments
         :param multi_flow: [False] if True, child flows are matched on flow, direction, and termination
         :return:
         """
+        if term_dict is None:
+            term_dict = {}
+
+        if set_background is not None:
+            print('Warning: set_background is no longer meaningful- all terminations are background')
         if parent is None:
             x = next(_xg)
             parent = self.new_fragment(self._grounded_entity(x.flow), x.direction, value=x.value, units=x.unit, Name=str(x.process), **x.args)
@@ -528,13 +582,26 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 if flow is None:
                     print('Skipping unknown flow %s' % y.flow)
                     continue
-            try:
-                if hasattr(y.process, 'origin'):
-                    term = self.find_term(y.termination, origin=y.process.origin)
-                else:
-                    term = self.find_term(y.termination)
-            except EntityNotFound:
-                term = None
+            """
+            Determine / retrieve termination
+            """
+            if y.termination in term_dict:
+                term = term_dict[y.termination]
+            elif y.flow.external_ref in term_dict:
+                term = term_dict[y.flow.external_ref]
+            else:
+                try:
+                    if hasattr(y.process, 'origin'):
+                        term = self.find_term(y.termination, origin=y.process.origin)
+                    else:
+                        term = self.find_term(y.termination)
+                except EntityNotFound:
+                    term = None
+            if isinstance(term, tuple):
+                term, term_flow = term
+            else:
+                term_flow = None
+
             if term is not None and term.entity_type == 'context' and include_context is False:
                 continue
             if term == y.process:
@@ -565,12 +632,11 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                         if term != c_up.term.term_node:
                             print('Updating %s termination %s' % (c_up, term))
                             c_up.clear_termination(scenario)
-                            if term.entity_type == 'fragment':
-                                c_up.terminate(term, scenario=scenario)
-                            else:
-                                c_up.terminate(term, scenario=scenario, term_flow=c_up.flow)
+                            c_up.terminate(term, scenario=scenario, term_flow=term_flow, descend=False)  # none unless specified
+                            '''
                             if term.entity_type == 'process' and set_background:
                                 c_up.set_background()
+                            '''
                     continue
                 except StopIteration:
                     print('No child flow found; creating new %s %s' % (flow, y.direction))
@@ -579,12 +645,15 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             c = self.new_fragment(flow, y.direction, value=y.value, units=y.unit, parent=parent, **y.args)
 
             if term is not None:
-                if term.entity_type in ('process', 'flow'):
+                c.terminate(term, scenario=scenario, term_flow=term_flow, descend=False)  # already sets stage name
+                '''
+                if term.entity_type in ('process', 'flow'):  ##?? whaaa? process should terminate to reference, flow should terminate to itself
                     c.terminate(term, scenario=scenario, term_flow=c.flow)
                     if set_background:
                         c.set_background()
                 else:
                     c.terminate(term, scenario=scenario)
+                '''
             self.observe(c)  # use cached implicitly via fg interface
 
         return parent
@@ -610,12 +679,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for x in exchanges:
             if x.process.external_ref in parents:
                 parent = parents[x.process.external_ref]
-                parent.unset_background()
+                # parent.unset_background()
                 frag = self.new_fragment(x.flow, x.direction, parent=parent, **x.args)
                 term = self.find_term(x.termination, origin=x.process.origin)
                 if term is not None:
                     frag.terminate(term)
-                    frag.set_background()
+                    # frag.set_background()
             else:
                 # unmatched flows become roots
                 if x.termination is not None:

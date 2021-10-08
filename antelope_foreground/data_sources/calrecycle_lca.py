@@ -343,7 +343,8 @@ class CalRecycleImporter(object):
             frag.clear_termination()
             frag.terminate(term_node, term_flow=term_flow)
             if term_node.origin in private_roots:
-                frag.set_background()
+                # frag.set_background()
+                pass
             else:
                 set_child_exchanges(frag)
         elif ff['NodeTypeID'] == '2':
@@ -369,7 +370,8 @@ class CalRecycleImporter(object):
                 if bg['NodeTypeID'] == '1':
                     term_node = qi.get(bg['TargetUUID'])
                     if term_node.origin in private_roots:
-                        frag.set_background()
+                        pass
+                        # frag.set_background()
                 else:
                     term_node = next(_f for _f in self._fragments.values() if _f.uuid == bg['TargetUUID'])
                 frag.clear_termination()
@@ -412,7 +414,7 @@ class CalRecycleImporter(object):
         uslci_bg_ffids = ('14', '26', '38', '50', '62', '74')
         for i in uslci_bg_ffids:
             frag = self._frags[i]
-            frag.set_background()
+            # frag.set_background()
 
     def inv_ethylene_glycol_correction(self):
         """

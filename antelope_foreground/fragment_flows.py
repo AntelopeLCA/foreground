@@ -253,6 +253,7 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
     """
     out = defaultdict(float)
     dirs = dict()
+    cons = dict()
     internal = []
     external = []
     for ff in ffs:
@@ -265,6 +266,14 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
                 magnitude = ff.magnitude
             else:
                 magnitude = -ff.magnitude
+
+            # ditto conservation status
+            if ff.fragment.flow not in cons:
+                cons[ff.fragment.flow] = ff.is_conserved
+            else:
+                if ff.is_conserved ^ cons[ff.fragment.flow]:
+                    print('** Surprise! conservation status not shared among matching flows %s' % ff.fragment.uuid)
+
             out[ff.fragment.flow] += magnitude
         else:
             internal.append(ff)
@@ -272,6 +281,7 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
     # now deal with reference flow-- trivial fragment should wind up with two equal-and-opposite [pass-through] flows
     if include_ref_flow:
         ref_frag = parent.top()
+        ref_cons = ref_frag.is_conserved_parent
         ref_mag = ffs[0].magnitude
         if ref_frag.flow in out:  # either pass through or autoconsumption
             ref_frag.dbg_print('either pass through or autoconsumption')
@@ -305,7 +315,8 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
                     # A.1.a, A.3.a, A.2, A.4
                     ref_frag.dbg_print('pass thru no effect %g %g' % (val, ref_mag))
                     # pass-thru: pre-initialize external with the reference flow, having the opposite direction
-                    external.append(FragmentFlow.cutoff(parent, ref_frag.flow, comp_dir(auto_dirn), ref_mag))
+                    external.append(FragmentFlow.cutoff(parent, ref_frag.flow, comp_dir(auto_dirn), ref_mag,
+                                                        is_conserved=ref_cons))
             else:
                 # all case B
                 ref_frag.dbg_print('cumulation! %g %g' % (val, ref_mag))
@@ -315,13 +326,14 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
         else:
             ref_frag.dbg_print('uncomplicated ref flow')
             # no autoconsumption or pass-through, but we still want the ref flow to show up in the inventory
-            external.append(FragmentFlow.cutoff(parent, ref_frag.flow, comp_dir(ref_frag.direction), ref_mag))
+            external.append(FragmentFlow.cutoff(parent, ref_frag.flow, comp_dir(ref_frag.direction), ref_mag,
+                                                is_conserved=ref_cons))
 
     for flow, value in out.items():
         direction = dirs[flow]
         if value < 0:
             direction = comp_dir(direction)
-        external.append(FragmentFlow.cutoff(parent, flow, direction, abs(value)))
+        external.append(FragmentFlow.cutoff(parent, flow, direction, abs(value), is_conserved=cons[flow]))
 
     return external, internal
 

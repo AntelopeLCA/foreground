@@ -309,13 +309,10 @@ class LcForeground(BasicArchive):
         oldname = frag.link
         try:
             frag.external_ref = name  # will raise PropertyExists if already set
-        except PropertyExists:
-            if force:
-                self._dename_fragment(frag)
-                oldname = frag.link
-                frag.external_ref = name
-            else:
-                raise
+        except PropertyExists:  # don't need force to rename a nonconflicting fragment
+            self._dename_fragment(frag)
+            oldname = frag.link
+            frag.external_ref = name
 
         self._add_ext_ref_mapping(frag)
         self._rename_mechanics(frag, oldname)

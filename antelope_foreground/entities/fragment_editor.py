@@ -67,8 +67,8 @@ def _create_fragment(flow, direction, uuid=None, parent=None, name=None, comment
     else:
         if parent.term.is_null:
             parent.to_foreground()
-        else:
-            parent.unset_background()
+        # else:
+        #     parent.unset_background()
         if balance or parent.term.is_subfrag:
             # exchange value set during traversal
             value = None
@@ -98,28 +98,32 @@ def _transfer_evs(frag, new):
             new.set_exchange_value(scen, frag.exchange_value(scen))
 
 
-def clone_fragment(frag, suffix=' (copy)', comment=None, _parent=None, origin=None):
+def clone_fragment(frag, tag='copy', comment=None, _parent=None, origin=None):
     """
     Creates duplicates of the fragment and its children. returns the new reference fragment.
     :param frag:
     :param _parent: used internally
-    :param suffix: attached to top level fragment
+    :param tag: attached to top level fragment
     :param origin:
     :param comment: can be used in place of source fragment's comment
     :return:
     """
-    if suffix is None:
-        suffix = ''
     if origin is None:
         origin = frag.origin
     the_comment = comment or frag['Comment']
-    new = _create_fragment(parent=_parent, origin=origin,
-                           Name=frag['Name'] + suffix, StageName=frag['StageName'],
-                           flow=frag.flow, direction=frag.direction, comment=the_comment,
-                           value=frag.cached_ev, balance=frag.balance_flow,
-                           background=frag.is_background)
+    the_name = frag['Name']
+    if _parent is None:
+        the_name += ' (%s)' % tag
 
-    _transfer_evs(frag, new)
+    new = _create_fragment(parent=_parent, origin=origin,
+                           Name=the_name, StageName=frag.get('StageName'),
+                           flow=frag.flow, direction=frag.direction, comment=the_comment,
+                           value=frag.cached_ev, balance=frag.is_balance)
+
+    if frag.external_ref != frag.uuid and len(str(tag)) > 0:
+        new.external_ref = frag.external_ref + '_%s' % tag
+
+    _transfer_evs(frag, new)  # this obviates the need for observation
 
     for t_scen, term in frag.terminations():
         if term.term_node is frag:
@@ -129,7 +133,7 @@ def clone_fragment(frag, suffix=' (copy)', comment=None, _parent=None, origin=No
                           scenario=t_scen)
 
     for c in frag.child_flows:
-        clone_fragment(c, _parent=new, suffix='', origin=origin)
+        clone_fragment(c, _parent=new, tag=tag, origin=origin)
     return new
 
 

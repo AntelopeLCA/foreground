@@ -121,16 +121,15 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'create_fragment_from_node', ForegroundRequired,
                                    process_ref, ref_flow=ref_flow, include_elementary=include_elementary)
 
-    def clone_fragment(self, frag, **kwargs):
+    def clone_fragment(self, frag, tag=None, **kwargs):
         """
 
         :param frag: the fragment (and subfragments) to clone
-        :param kwargs: suffix (default: ' (copy)', applied to Name of top-level fragment only)
-                       comment (override existing Comment if present; applied to all)
+        :param kwargs: tag - appended to all named child fragments
         :return:
         """
         return self._perform_query(_interface, 'clone_fragment', ForegroundRequired,
-                                   frag, **kwargs)
+                                   frag, tag=tag, **kwargs)
 
     def split_subfragment(self, fragment, replacement=None, **kwargs):
         """
@@ -190,6 +189,15 @@ class AntelopeForegroundInterface(ForegroundInterface):
                                    fragment, exchange_value=exchange_value, termination=termination, name=name,
                                    scenario=scenario, **kwargs)
 
+    def knobs(self, search=None, **kwargs):
+        """
+        Return a list of named fragments whose values can be observed to define scenarios.  Generates a list
+        of non-reference fragments with names
+        :return:
+        """
+        return self._perform_query(_interface, 'knobs', ForegroundRequired,
+                                   search=search, **kwargs)
+
     def set_balance_flow(self, fragment, **kwargs):
         """
         This should get folded into observe
@@ -215,14 +223,14 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'unset_balance_flow', ForegroundRequired,
                                    fragment, **kwargs)
 
-    def create_process_model(self, process, ref_flow=None, set_background=True, **kwargs):
+    def create_process_model(self, process, ref_flow=None, set_background=None, **kwargs):
         """
         Create a fragment from a process_ref.  If process has only one reference exchange, it will be used automatically.
         By default, a child fragment is created for each exchange not terminated to context, and exchanges terminated
         to nodes are so terminated in the fragment.
         :param process:
         :param ref_flow: specify which exchange to use as a reference
-        :param set_background: [True] whether to terminate the node to background
+        :param set_background: [None] Deprecated. All terminations are "to background".
         :param kwargs:
         :return:
         """

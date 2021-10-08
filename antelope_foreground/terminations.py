@@ -349,22 +349,30 @@ class FlowTermination(object):
     @property
     def term_is_bg(self):
         """
-        Termination is local and background
+        Termination is local and background.  This is deprecated and always returns False.
+
+        (Reason for its existence dates to when 'background' was a user-specified designation, and fragments were
+        often terminated to a singleton-background fragment (fragment with an immediate background node and no children)
+
+        The idea was simply to shorten the list of FragmentFlows generated in a traversal by removing the "connective
+        tissue" fragment that terminated to the singleton background.  Now that background status is automatically
+        determined by number of children, this is not reliable.)
         :return:
         """
-        return self.is_frag and self.is_local and self.term_node.is_background
+        return False
+        # return self.is_frag and self.is_local and self.term_node.is_background
 
     @property
     def is_subfrag(self):
         """
-        Termination is a non-background, non-self fragment.
+        Termination is a non-self fragment.  (we were excluding background frags too but that is outmoded)
         Controversy around whether expression should be:
         self.is_frag and not (self.is_fg or self.is_bg or self.term_is_bg)  [current] or
         self.is_frag and (not self.is_fg) and (not self.is_bg)  [old; seems wrong]
 
         :return:
         """
-        return self.is_frag and not (self.is_fg or self.is_bg or self.term_is_bg)
+        return self.is_frag and not self.is_fg  # or self.is_bg or self.term_is_bg)
 
     @property
     def is_null(self):
