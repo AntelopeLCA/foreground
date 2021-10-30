@@ -79,9 +79,14 @@ class LcFragment(LcEntity):
             parent = fg[j['parent']]
         flow = fg[j['flow']]
         if flow is None:
-            print('Flow %s not found in foreground %s' % (j['flow'], fg.ref))
-            flow = LcFlow(j['flow'], Name=j['tags']['Name'], Compartment=['Intermediate Flows', 'Fragments'])
-            fg.add(flow)
+            try:
+                org, ext = j['flow'].split('/')
+                flow = fg.catalog_ref(org, ext)
+            except ValueError:
+                print('%s: Flow %s not found in foreground %s' % (j['entityId'], j['flow'], fg.ref))
+                flow = LcFlow(j['flow'], Name=j['tags']['Name'], Compartment=['Intermediate Flows', 'Fragments'],
+                              referenceQuantity=fg.get_canonical('mass'))
+                fg.add(flow)
         frag = cls(j['entityId'], flow, j['direction'], origin=fg.ref, parent=parent,
                    exchange_value=j['exchangeValues'].pop('0'),
                    private=j['isPrivate'],
@@ -156,7 +161,7 @@ class LcFragment(LcEntity):
 
         self.__dbg_threshold = -1  # higher number is more verbose
         self._exchange_values = _new_evs()
-        self._conserved_quantity = None
+        self._balance_child = None
         self._private = private
         # self._background = background
         self._is_balance = False
@@ -170,6 +175,7 @@ class LcFragment(LcEntity):
             self.set_parent(parent)
 
         assert flow.entity_type == 'flow', '%s %s' % (flow.entity_type, flow.link)
+        assert flow.reference_entity.entity_type == 'quantity'
         self.flow = flow
         self.direction = check_direction(direction)  # w.r.t. parent
 
@@ -201,7 +207,6 @@ class LcFragment(LcEntity):
                 self.set_exchange_value(0, exchange_value, units=units)
             if observe:
                 self.observed_ev = self.cached_ev
-
 
     def __hash__(self):
         """
@@ -246,12 +251,16 @@ class LcFragment(LcEntity):
         if level < self.__dbg_threshold:
             print('%.3s %s' % (self.uuid, qwer))
 
-    def reference(self):
+    def reference(self, flow=None):
         """
         For process interoperability
         :return:
         """
-        return RxRef(self, self.flow, comp_dir(self.direction), self.get('Comment', None), value=self.observed_ev)
+        rx = RxRef(self, self.flow, comp_dir(self.direction), self.get('Comment', None), value=self.observed_ev)
+        if flow is not None:
+            if not rx.flow.match(flow):
+                raise ValueError('%.5s: Supplied flow %s does not match fragment' % (self.uuid, flow))
+        return rx
 
     def make_ref(self, query):
         ref = super(LcFragment, self).make_ref(query)
@@ -771,17 +780,11 @@ class LcFragment(LcEntity):
 
     @property
     def conserved(self):
-        return self._conserved_quantity is not None
+        return bool(self.balance_magnitude)  # None or 0 -> False
 
     @property
     def balance_flow(self):
-        if self.conserved:
-            try:
-                return next(f for f in self.child_flows if f.is_balance)
-            except StopIteration:
-                raise MissingFlow('No balance flow found')
-        else:
-             return None
+        return self._balance_child
 
     @property
     def is_balance(self):
@@ -807,31 +810,46 @@ class LcFragment(LcEntity):
         if self.reference_entity is None:
             raise InvalidParentChild('Reference flow cannot be a balance flow')
         if self.is_balance is False:
-            self.reference_entity.set_conserved_quantity(self)
+            self.reference_entity.set_conservation_child(self)
             self._is_balance = True
 
     def unset_balance_flow(self):
         if self.is_balance:
-            self.reference_entity.unset_conserved_quantity()
+            self.reference_entity.unset_conservation_child()
             self._is_balance = False
 
-    def set_conserved_quantity(self, child):
+    def set_conservation_child(self, child):
         if child.reference_entity != self:
             raise InvalidParentChild
-        if self.is_conserved_parent:
-            print('%.5s conserving %s' % (self.uuid, self._conserved_quantity))
+        if self.is_conserved_parent and child is not self._balance_child:
+            print('%.5s conserving %s' % (self.uuid, self._balance_child))
             raise BalanceAlreadySet
-        self._conserved_quantity = child.flow.reference_entity
-        if self._conserved_quantity.cf(self.flow) == 0:
-            print('%.5s Warning: zero balance for conserved quantity %s' % (self.uuid, self._conserved_quantity))
-        self.dbg_print('setting balance from %.5s: %s' % (child.uuid, self._conserved_quantity))
+        self._balance_child = child
+        if self.balance_magnitude == 0:
+            print('%.5s Warning: zero balance for conserved quantity %s' % (self.uuid,
+                                                                            self.conserved_quantity))
+        self.dbg_print('setting balance from %.5s: %s' % (child.uuid, self._balance_child))
 
     @property
     def is_conserved_parent(self):
-        return self._conserved_quantity is not None
+        return self._balance_child is not None
 
-    def unset_conserved_quantity(self):
-        self._conserved_quantity = None
+    def unset_conservation_child(self):
+        self._balance_child = None
+
+    @property
+    def conserved_quantity(self):
+        if self._balance_child is None:
+            return None
+        else:
+            return self._balance_child.flow.reference_entity
+
+    @property
+    def balance_magnitude(self):
+        if self._balance_child is None:
+            return None
+        else:
+            return self._balance_child.flow.reference_entity.cf(self.flow)
 
     '''
     def balance(self, scenario=None, observed=False):
@@ -1300,8 +1318,8 @@ class LcFragment(LcEntity):
         else:
             stock = term.inbound_exchange_value  # balance measurement w.r.t. term node's unit magnitude
         bal_f = None
-        if self._conserved_quantity is not None:
-            stock *= self._conserved_quantity.cf(self.flow)
+        if self.is_conserved_parent:
+            stock *= self.balance_magnitude
             if self.direction == 'Input':  # convention: inputs to self are positive
                 stock *= -1
             self.dbg_print('%g inbound-balance' % stock, level=2)
@@ -1312,7 +1330,7 @@ class LcFragment(LcEntity):
             try:
                 # traverse child, collecting conserved value if applicable
                 child_ff, cons = f._traverse_node(node_weight, scenario, observed=observed,
-                                                  frags_seen=set(frags_seen), conserved_qty=self._conserved_quantity)
+                                                  frags_seen=set(frags_seen), conserved_qty=self.conserved_quantity)
                 if cons is None:
                     self.dbg_print('-- returned cons_value', level=3)
                 else:
@@ -1489,11 +1507,8 @@ class LcFragment(LcEntity):
         elif self.is_balance:
             # traversing balance flow after FoundBalanceFlow exception
             conserved = True
-        elif self.balance_flow is not None and self._conserved_quantity.cf(self.flow) != 0.0:
-            # parent whose flow is balanced by child flow
-            conserved = True
         else:
-            conserved = False
+            conserved = self.conserved
 
         # print('%6f %6f %s' % (magnitude, node_weight, self))
         # TODO: figure out how to cache + propagate matched scenarios
