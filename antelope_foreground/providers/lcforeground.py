@@ -9,7 +9,7 @@ from collections import defaultdict
 
 from ..implementations import AntelopeForegroundImplementation as ForegroundImplementation
 
-from antelope import PropertyExists
+from antelope import PropertyExists, q_node_activity
 from antelope_core.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES
 from ..entities.fragments import LcFragment
 
@@ -489,6 +489,8 @@ class LcForeground(BasicArchive):
         :param frag:
         :return:
         """
+        if frag.origin != self.ref:
+            raise FragmentMismatch('Fragment belongs to another foreground!')
         if frag.reference_entity is not None:
             frag.unset_parent()
         self._entities.pop(frag.link)
