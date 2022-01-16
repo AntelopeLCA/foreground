@@ -13,6 +13,10 @@ class NotForeground(Exception):
     pass
 
 
+class UnknownFlow(Exception):
+    pass
+
+
 class UnknownRefQuantity(Exception):
     pass
 
@@ -93,7 +97,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 origin, external_ref = external_ref.split('/', maxsplit=1)
             except ValueError:
                 origin = self.origin.split('.')[0]
-        return self._archive.catalog_ref(origin, external_ref)
+        last_try = self._archive.catalog_ref(origin, external_ref)
+        if last_try.is_entity:
+            return last_try
+        elif hasattr(last_try, 'resolved') and last_try.resolved:
+            return last_try
+        raise EntityNotFound(origin, external_ref)
 
     def count(self, entity_type):
         return self._archive.count_by_type(entity_type)
@@ -184,6 +193,18 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         self._archive.add(q)
         return q
 
+    def add_entity_and_children(self, *args, **kwargs):
+        """
+        This is invoked by xlsx_editor - putatively on an archive- when trying to create quantities that are found
+        in the quantity db but not in the local archive.
+        Then the model_updater replaces the archive with a foreground implementation, but as far as I can tell the
+        foreground implementation NEVER had this method. So I don't understand how it was working before.
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        return self._archive.add_entity_and_children(*args, **kwargs)  # this is a hack
+
     def add_or_retrieve(self, external_ref, reference, name, group=None, strict=False, **kwargs):
         """
         Gets a flow with the given external_ref, and creates it if it doesn't exist from the given spec.
@@ -257,7 +278,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 try:
                     found_ref = self.get(term_ref.external_ref)
                 except EntityNotFound:
-                    found_ref = self._archive.catalog_ref(term_ref.origin, term_ref.external_ref)
+                    found_ref = term_ref  # why would we sub an unresolved catalog ref FOR an unresolved catalog ref?
             else:
                 found_ref = term_ref
         else:
@@ -294,7 +315,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
           **kwargs passed to LcFragment
         :return:
         """
-        flow = self.find_term(flow, check_etype='flow')
+        try:
+            flow = self.find_term(flow, check_etype='flow')
+        except TypeError:
+            raise UnknownFlow('Unknown flow spec %s (%s)' % (flow, type(flow)))
         if flow.entity_type != 'flow':
             raise TypeError('%s: Not a %s' % (flow, 'flow'))
         frag = create_fragment(flow, direction, origin=self.origin, **kwargs)

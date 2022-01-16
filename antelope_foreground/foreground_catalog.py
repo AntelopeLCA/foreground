@@ -1,7 +1,33 @@
+from antelope import CatalogRef
 from antelope_core.catalog import LcCatalog
+from antelope_core.catalog_query import CatalogQuery
+
+from .interfaces.iforeground import AntelopeForegroundInterface
 
 from shutil import rmtree
 import os
+
+
+class BackReference(Exception):
+    """
+    trying to instantiate a foreground that's currently being loaded
+    """
+    pass
+
+
+class ForegroundNotSafe(Exception):
+    """
+    This foreground has not been loaded yet. keep our references unresolved
+    """
+    pass
+
+
+class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
+    """
+    Add foreground interface to query object
+    """
+    pass
+
 
 
 class ForegroundCatalog(LcCatalog):
@@ -11,6 +37,37 @@ class ForegroundCatalog(LcCatalog):
 
     '''
     ForegroundCatalog
+    '''
+    _fg_queue = set()  # fgs we are *currently* opening
+
+    '''
+    def delete_foreground(self, ref):
+        """
+        
+        :param ref: 
+        :return: 
+        """
+        """
+        Creates or activates a foreground as a sub-folder within the catalog's root directory.  Returns a
+        Foreground interface.
+        :param path: either an absolute path or a subdirectory path relative to the catalog root
+        :param ref: semantic reference (optional)
+        :param quiet: passed to fg archive
+        :param reset: [False] if True, clear the archive and create it from scratch, before returning the interface
+        :param delete: [False] if True, delete the existing tree completely and irreversibly. actually just rename
+        the directory to whatever-DELETED; but if this gets overwritten, there's no going back.  Overrides reset.
+        :return:
+        if localpath:
+            if os.path.exists(localpath):
+                del_path = localpath + '-DELETED'
+                if os.path.exists(del_path):
+                    rmtree(del_path)
+                os.rename(abs_path, del_path)
+        dels = [k for k in self._resolver.resolve(ref, interfaces='foreground')]
+        """
+        dels = [k for k in self._resolver.resolve(ref, interfaces='foreground')]
+        for k in dels:
+            self.delete_resource(k, delete_source=True, delete_cache=True)
     '''
 
     def foreground(self, ref, path=None, quiet=True, reset=False, delete=False):
@@ -24,53 +81,46 @@ class ForegroundCatalog(LcCatalog):
         :param delete:
         :return:
         """
-        """
-        Creates or activates a foreground as a sub-folder within the catalog's root directory.  Returns a
-        Foreground interface.
-        :param path: either an absolute path or a subdirectory path relative to the catalog root
-        :param ref: semantic reference (optional)
-        :param quiet: passed to fg archive
-        :param reset: [False] if True, clear the archive and create it from scratch, before returning the interface
-        :param delete: [False] if True, delete the existing tree completely and irreversibly. actually just rename
-        the directory to whatever-DELETED; but if this gets overwritten, there's no going back.  Overrides reset.
-        :return:
-        """
+        if ref in self._fg_queue:
+            raise BackReference(ref)
         if path is None:
             path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
-            localpath = ref
+            # localpath = ref
         else:
             if os.path.isabs(path):
-                localpath = None
+                pass
+                # localpath = None
             else:
-                localpath = path
+                # localpath = path
                 path = os.path.join(self._rootdir, path)
 
 
         abs_path = os.path.abspath(path)
         local_path = self._localize_source(abs_path)
 
-        if delete:
-            if localpath:
-                if os.path.exists(localpath):
-                    del_path = localpath + '-DELETED'
-                    if os.path.exists(del_path):
-                        rmtree(del_path)
-                    os.rename(abs_path, del_path)
-            dels = [k for k in self._resolver.resolve(ref, interfaces='foreground')]
-            for k in dels:
-                self.delete_resource(k, delete_source=True, delete_cache=True)
-
         try:
-            res = next(self._resolver.resources_with_source(local_path))
+            res = next(self._resolver.resolve(ref, interfaces='foreground'))
         except StopIteration:
             res = self.new_resource(ref, local_path, 'LcForeground', interfaces=['index', 'foreground', 'quantity'],
                                     quiet=quiet)
 
         if reset:
             res.remove_archive()
+        self._fg_queue.add(ref)
         res.check(self)
+        self._fg_queue.remove(ref)
+        self._queries[ref] = ForegroundQuery(ref, catalog=self)
 
         return res.make_interface('foreground')
+    
+    @property
+    def foregrounds(self):
+        f = set()
+        for k in self.interfaces:
+            org, inf = k.split(':')
+            if inf == 'foreground' and org not in f:
+                yield org
+                f.add(org)
 
     def assign_new_origin(self, old_org, new_org):
         """
@@ -131,3 +181,23 @@ class ForegroundCatalog(LcCatalog):
                 rmtree(del_path)
 
             os.rename(abs_src, del_path)
+            
+    def query(self, origin, strict=False, refresh=False, **kwargs):
+        if origin in self.foregrounds:
+            if origin not in self._queries:
+                # we haven't loaded this fg yet, so
+                raise ForegroundNotSafe(origin)
+            if origin in self._fg_queue:
+                raise BackReference(origin)
+            if refresh:
+                self._queries[origin] = ForegroundQuery(origin, catalog=self, **kwargs)
+            return self._queries[origin]
+
+        return super(ForegroundCatalog, self).query(origin, strict=strict, **kwargs)
+
+
+    def catalog_ref(self, origin, external_ref, entity_type=None, **kwargs):
+        try:
+            return super(ForegroundCatalog, self).catalog_ref(origin, external_ref, entity_type=entity_type, **kwargs)
+        except ForegroundNotSafe:
+            return CatalogRef(origin, external_ref, entity_type=entity_type, **kwargs)

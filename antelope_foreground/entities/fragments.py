@@ -81,7 +81,7 @@ class LcFragment(LcEntity):
         if flow is None:
             try:
                 org, ext = j['flow'].split('/')
-                flow = fg.catalog_ref(org, ext)
+                flow = fg.catalog_ref(org, ext, entity_type='flow')
             except ValueError:
                 print('%s: Flow %s not found in foreground %s' % (j['entityId'], j['flow'], fg.ref))
                 flow = LcFlow(j['flow'], Name=j['tags']['Name'], Compartment=['Intermediate Flows', 'Fragments'],

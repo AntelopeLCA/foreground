@@ -38,7 +38,7 @@ class NonLocalEntity(Exception):
 
 class LcForeground(BasicArchive):
     """
-    An LcForeground is defined by being anchored to a physical directory, which is used to serialize the non-fragment
+    An LcForeground is defined by being anchored to a physical directory, which is used to serialize_grant_spec the non-fragment
     entities.  Also within this directory is a subdirectory called fragments, which is used to store fragments
     individually as files.
 
