@@ -8,6 +8,7 @@ import re
 from collections import defaultdict
 
 from ..foreground_query import ForegroundQuery, ForegroundNotSafe
+from ..refs.fragment_ref import FragmentRef
 from ..implementations import AntelopeForegroundImplementation, AntelopeBasicImplementation
 
 from antelope import PropertyExists, CatalogRef
@@ -163,12 +164,19 @@ class LcForeground(BasicArchive):
         self.load_all()
 
     def catalog_ref(self, origin, external_ref, entity_type=None, **kwargs):
+        if entity_type == 'term':
+            if origin in self._catalog.foregrounds:
+                entity_type = 'fragment'
+            else:
+                entity_type = 'process'
         try:
-            return self._catalog.catalog_ref(origin, external_ref, **kwargs)
+            return self._catalog.catalog_ref(origin, external_ref, entity_type=entity_type, **kwargs)
         except ForegroundNotSafe:
             print('{%s} Creating delayed ref %s/%s [%s]' % (self.ref, origin, external_ref, entity_type))
-            return CatalogRef.from_query(external_ref, query=DelayedQuery(origin, self._catalog, self.ref),
-                                         etype=entity_type, **kwargs)
+            dq = DelayedQuery(origin, self._catalog, self.ref)
+            if entity_type == 'fragment':
+                return FragmentRef(external_ref, dq, **kwargs)
+            return CatalogRef.from_query(external_ref, query=dq, etype=entity_type, **kwargs)
 
     def _fetch(self, entity, **kwargs):
         return self.__getitem__(entity)

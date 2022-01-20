@@ -36,8 +36,14 @@ class FragmentRef(EntityRef):
         self._flow = flow
         self._direction = direction
 
+    def _retrieve_config(self):
+        rx = self.reference_entity[0]
+        self.set_config(rx.flow, rx.direction)
+
     @property
     def direction(self):
+        if not self._isset:
+            self._retrieve_config()
         return self._direction
 
     @property
@@ -50,6 +56,8 @@ class FragmentRef(EntityRef):
 
     @property
     def flow(self):
+        if not self._isset:
+            self._retrieve_config()
         return self._flow
 
     @property
@@ -108,9 +116,9 @@ class FragmentRef(EntityRef):
         :return:
         """
         '''
+        return NotImplemented
+        '''
         if observed is False:
             print('Ignoring false observed flag')
         ffs = self.traverse(scenario=scenario)  # in the future, may want to cache this
         return group_ios(self, ffs)
-        '''
-        return NotImplemented

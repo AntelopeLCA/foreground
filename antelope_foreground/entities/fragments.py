@@ -1009,10 +1009,10 @@ class LcFragment(LcEntity):
         self._background = True
     '''
 
-    def term_from_json(self, catalog, scenario, j):
+    def term_from_json(self, fg, scenario, j):
         if isinstance(scenario, tuple):
             raise ScenarioConflict('Set termination must specify single scenario')
-        self._terminations[scenario] = FlowTermination.from_json(self, catalog, scenario, j)
+        self._terminations[scenario] = FlowTermination.from_json(self, fg, scenario, j)
 
     def termination(self, scenario=None):
         match = self._match_scenario_term(scenario)

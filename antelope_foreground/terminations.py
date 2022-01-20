@@ -110,7 +110,7 @@ class FlowTermination(object):
             if origin == fg.ref:
                 term_node = fg[external_ref]
             else:
-                term_node = fg.catalog_ref(origin, external_ref, entity_type='process')
+                term_node = fg.catalog_ref(origin, external_ref, entity_type='term')  # need to lookup type
 
         direction = j.pop('direction', None)
         descend = j.pop('descend', True)
