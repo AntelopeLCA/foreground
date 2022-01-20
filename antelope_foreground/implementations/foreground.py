@@ -21,6 +21,14 @@ class UnknownRefQuantity(Exception):
     pass
 
 
+class AntelopeBasicImplementation(BasicImplementation):
+    def get_reference(self, key):
+        entity = self._dereference_entity(key)
+        if entity.entity_type == 'fragment':
+            return [entity.reference()]
+        return super(AntelopeBasicImplementation, self).get_reference(key)
+
+
 class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundInterface):
     """
     A foreground manager allows a user to build foregrounds.  This should work with catalog references, rather

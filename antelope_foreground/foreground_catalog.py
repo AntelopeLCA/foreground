@@ -1,8 +1,5 @@
-from antelope import CatalogRef
 from antelope_core.catalog import LcCatalog
-from antelope_core.catalog_query import CatalogQuery
-
-from .interfaces.iforeground import AntelopeForegroundInterface
+from .foreground_query import ForegroundQuery, ForegroundNotSafe
 
 from shutil import rmtree
 import os
@@ -15,21 +12,6 @@ class BackReference(Exception):
     pass
 
 
-class ForegroundNotSafe(Exception):
-    """
-    This foreground has not been loaded yet. keep our references unresolved
-    """
-    pass
-
-
-class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
-    """
-    Add foreground interface to query object
-    """
-    pass
-
-
-
 class ForegroundCatalog(LcCatalog):
     """
     Adds the ability to create (and manage?) foreground resources
@@ -39,6 +21,9 @@ class ForegroundCatalog(LcCatalog):
     ForegroundCatalog
     '''
     _fg_queue = set()  # fgs we are *currently* opening
+
+    def is_in_queue(self, home):
+        return home in self._fg_queue
 
     '''
     def delete_foreground(self, ref):
@@ -83,6 +68,7 @@ class ForegroundCatalog(LcCatalog):
         """
         if ref in self._fg_queue:
             raise BackReference(ref)
+
         if path is None:
             path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
             # localpath = ref
@@ -106,10 +92,13 @@ class ForegroundCatalog(LcCatalog):
 
         if reset:
             res.remove_archive()
+
+        if reset or (ref not in self._queries):
+            self._queries[ref] = ForegroundQuery(ref, catalog=self)
+
         self._fg_queue.add(ref)
         res.check(self)
         self._fg_queue.remove(ref)
-        self._queries[ref] = ForegroundQuery(ref, catalog=self)
 
         return res.make_interface('foreground')
     
@@ -189,15 +178,8 @@ class ForegroundCatalog(LcCatalog):
                 raise ForegroundNotSafe(origin)
             if origin in self._fg_queue:
                 raise BackReference(origin)
-            if refresh:
+            if refresh or (origin not in self._queries):
                 self._queries[origin] = ForegroundQuery(origin, catalog=self, **kwargs)
             return self._queries[origin]
 
         return super(ForegroundCatalog, self).query(origin, strict=strict, **kwargs)
-
-
-    def catalog_ref(self, origin, external_ref, entity_type=None, **kwargs):
-        try:
-            return super(ForegroundCatalog, self).catalog_ref(origin, external_ref, entity_type=entity_type, **kwargs)
-        except ForegroundNotSafe:
-            return CatalogRef(origin, external_ref, entity_type=entity_type, **kwargs)

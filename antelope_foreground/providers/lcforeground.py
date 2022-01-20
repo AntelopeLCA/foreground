@@ -7,9 +7,10 @@ import re
 
 from collections import defaultdict
 
-from ..implementations import AntelopeForegroundImplementation as ForegroundImplementation
+from ..foreground_query import ForegroundQuery, ForegroundNotSafe
+from ..implementations import AntelopeForegroundImplementation, AntelopeBasicImplementation
 
-from antelope import PropertyExists, q_node_activity
+from antelope import PropertyExists, CatalogRef
 from antelope_core.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES
 from ..entities.fragments import LcFragment
 
@@ -36,6 +37,27 @@ class NonLocalEntity(Exception):
     pass
 
 
+class QueryIsDelayed(Exception):
+    pass
+
+
+class DelayedQuery(ForegroundQuery):
+    """
+    unresolved query that can sub itself in
+    all it needs to do is raise a validation error until it's switched on
+    """
+    _home = None
+
+    def __init__(self, origin, catalog, home, **kwargs):
+        self._home = home
+        super(DelayedQuery, self).__init__(origin, catalog, **kwargs)
+
+    def _perform_query(self, itype, attrname, exc, *args, strict=False, **kwargs):
+        if self._catalog.is_in_queue(self._home):
+            raise QueryIsDelayed
+        return super(DelayedQuery, self)._perform_query(itype, attrname, exc, *args, strict=strict, **kwargs)
+
+
 class LcForeground(BasicArchive):
     """
     An LcForeground is defined by being anchored to a physical directory, which is used to serialize_grant_spec the non-fragment
@@ -52,6 +74,7 @@ class LcForeground(BasicArchive):
     """
     _entity_types = FOREGROUND_ENTITY_TYPES
     _ns_uuid_required = None
+    _frags_loaded = False
 
     def _load_entities_json(self, filename):
         with open(filename, 'r') as fp:
@@ -135,11 +158,17 @@ class LcForeground(BasicArchive):
         self._ext_ref_mapping = dict()
         self._frags_with_flow = defaultdict(set)
 
-        self.load_all()
-        self.check_counter('fragment')
+        self._delayed_refs = []
 
-    def catalog_ref(self, origin, external_ref, **kwargs):
-        return self._catalog.catalog_ref(origin, external_ref, **kwargs)
+        self.load_all()
+
+    def catalog_ref(self, origin, external_ref, entity_type=None, **kwargs):
+        try:
+            return self._catalog.catalog_ref(origin, external_ref, **kwargs)
+        except ForegroundNotSafe:
+            print('{%s} Creating delayed ref %s/%s [%s]' % (self.ref, origin, external_ref, entity_type))
+            return CatalogRef.from_query(external_ref, query=DelayedQuery(origin, self._catalog, self.ref),
+                                         etype=entity_type, **kwargs)
 
     def _fetch(self, entity, **kwargs):
         return self.__getitem__(entity)
@@ -147,11 +176,18 @@ class LcForeground(BasicArchive):
     def _load_all(self):
         if os.path.exists(self._archive_file):
             self._load_entities_json(self._archive_file)
-            self._load_fragments()
 
     def make_interface(self, iface):
-        if iface == 'foreground':
-            return ForegroundImplementation(self)
+
+        if iface == 'foreground' or iface == 'basic':
+            if self._frags_loaded is False:
+                self._load_fragments()
+                self.check_counter('fragment')
+                self._frags_loaded = True
+            if iface == 'foreground':
+                return AntelopeForegroundImplementation(self)
+            else:
+                return AntelopeBasicImplementation(self)
         else:
             return super(LcForeground, self).make_interface(iface)
 
@@ -169,7 +205,7 @@ class LcForeground(BasicArchive):
             ref_qty_uu = next(cf['quantity'] for cf in c if 'isReference' in cf and cf['isReference'] is True)
         ref_qty = self[ref_qty_uu]
         ref = self.catalog_ref(origin, external_ref, entity_type='flow')
-        if not ref.resolved:  # not found
+        if not ref.resolved and self._frags_loaded:  # not found
             name = e.pop('Name', None) or 'unnamed flow %s' % origin
             ref = self.make_interface('foreground').add_or_retrieve(external_ref, ref_qty, name, **e)
         return ref
