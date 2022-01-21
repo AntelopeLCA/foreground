@@ -79,6 +79,7 @@ class LcForegroundTestCase(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
+        rmtree(WORKING_DIR)
         cls.fg = LcForeground(WORKING_DIR, ref=test_ref)
         cls.fg.entity_from_json(mass_json)
         cls.fg.entity_from_json(flow_json)
@@ -113,6 +114,7 @@ class LcForegroundTestCase(unittest.TestCase):
     def test_6_save_foreground(self):
         self.fg.save()
         new_fg = LcForeground(WORKING_DIR)
+        new_fg.make_interface('basic')  # must now trigger fragment load- this happens automatically in query apparatus
         self.assertEqual(self.fg[flow_uuid], new_fg[flow_uuid])
         self.assertEqual(self.fg[a_different_frag_ref].uuid, new_fg[a_different_frag_uuid].uuid)
 

@@ -1,3 +1,4 @@
+from antelope import UnknownOrigin
 from antelope_core.archives import InterfaceError
 from antelope_core.catalog import LcCatalog
 from .foreground_query import ForegroundQuery, ForegroundNotSafe
@@ -25,7 +26,7 @@ class ForegroundCatalog(LcCatalog):
 
     def is_in_queue(self, home):
         """
-        This tells us whether the foreground named 'home' is actively being instantiated
+        This tells us whether the foreground named in home is actively being instantiated
         :param home:
         :return:
         """
@@ -96,31 +97,28 @@ class ForegroundCatalog(LcCatalog):
         if ref in self._fg_queue:
             raise BackReference(ref)
 
-        if path is None:
-            path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
-            # localpath = ref
-        else:
-            if os.path.isabs(path):
-                pass
-                # localpath = None
-            else:
-                # localpath = path
-                path = os.path.join(self._rootdir, path)
-
-
-        abs_path = os.path.abspath(path)
-        local_path = self._localize_source(abs_path)
-
         try:
             res = next(self._resolver.resolve(ref, interfaces='foreground'))
-        except StopIteration:
+        except UnknownOrigin:
+            if path is None:
+                path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
+                # localpath = ref
+            else:
+                if os.path.isabs(path):
+                    pass
+                    # localpath = None
+                else:
+                    # localpath = path
+                    path = os.path.join(self._rootdir, path)
+
+            abs_path = os.path.abspath(path)
+            local_path = self._localize_source(abs_path)
+
             res = self.new_resource(ref, local_path, 'LcForeground', interfaces=['index', 'foreground', 'quantity'],
                                     quiet=quiet)
 
         if reset:
             res.remove_archive()
-
-        if reset:
             self._queries.pop(ref, None)
 
         self._fg_queue.add(ref)
