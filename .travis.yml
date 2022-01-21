@@ -5,7 +5,7 @@ env:
   - ANTELOPE_CATALOG_ROOT="./CATALOG_ROOT"
 install:
   - pip install coverage coveralls
-  - pip install -r requirements.txt
+  - pip install --no-deps -r requirements.txt
 script:
   - coverage run --source=antelope_foreground -m unittest
 after_success:
