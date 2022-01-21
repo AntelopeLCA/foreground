@@ -79,7 +79,7 @@ class LcForegroundTestCase(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        rmtree(WORKING_DIR)
+        rmtree(WORKING_DIR, ignore_errors=True)
         cls.fg = LcForeground(WORKING_DIR, ref=test_ref)
         cls.fg.entity_from_json(mass_json)
         cls.fg.entity_from_json(flow_json)
