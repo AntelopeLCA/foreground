@@ -38,7 +38,7 @@ class FragmentRef(EntityRef):
 
     def _retrieve_config(self):
         rx = self.reference_entity[0]
-        self.set_config(rx.flow, rx.direction)
+        self.set_config(rx.flow, comp_dir(rx.direction))
 
     @property
     def direction(self):

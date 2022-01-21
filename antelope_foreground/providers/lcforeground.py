@@ -7,7 +7,7 @@ import re
 
 from collections import defaultdict
 
-from ..foreground_query import ForegroundQuery, ForegroundNotSafe
+from ..foreground_query import DelayedQuery, ForegroundNotSafe
 from ..refs.fragment_ref import FragmentRef
 from ..implementations import AntelopeForegroundImplementation, AntelopeBasicImplementation
 
@@ -36,27 +36,6 @@ class NonLocalEntity(Exception):
     Foregrounds should store only local entities and references to remote entities
     """
     pass
-
-
-class QueryIsDelayed(Exception):
-    pass
-
-
-class DelayedQuery(ForegroundQuery):
-    """
-    unresolved query that can sub itself in
-    all it needs to do is raise a validation error until it's switched on
-    """
-    _home = None
-
-    def __init__(self, origin, catalog, home, **kwargs):
-        self._home = home
-        super(DelayedQuery, self).__init__(origin, catalog, **kwargs)
-
-    def _perform_query(self, itype, attrname, exc, *args, strict=False, **kwargs):
-        if self._catalog.is_in_queue(self._home):
-            raise QueryIsDelayed
-        return super(DelayedQuery, self)._perform_query(itype, attrname, exc, *args, strict=strict, **kwargs)
 
 
 class LcForeground(BasicArchive):
@@ -373,6 +352,8 @@ class LcForeground(BasicArchive):
             # if frag.external_ref != frag.uuid:  # don't need this anymore- auto-added for entities with self.ref
             #     self._add_ext_ref_mapping(frag)
             self.add(frag)
+
+        self._frags_loaded = True  # they all now exist and should not be loaded again
 
         for f in fragments:
             frag = self[f['entityId']]

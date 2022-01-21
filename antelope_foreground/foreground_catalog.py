@@ -1,3 +1,4 @@
+from antelope_core.archives import InterfaceError
 from antelope_core.catalog import LcCatalog
 from .foreground_query import ForegroundQuery, ForegroundNotSafe
 
@@ -23,6 +24,11 @@ class ForegroundCatalog(LcCatalog):
     _fg_queue = set()  # fgs we are *currently* opening
 
     def is_in_queue(self, home):
+        """
+        This tells us whether the foreground named 'home' is actively being instantiated
+        :param home:
+        :return:
+        """
         return home in self._fg_queue
 
     '''
@@ -54,6 +60,27 @@ class ForegroundCatalog(LcCatalog):
         for k in dels:
             self.delete_resource(k, delete_source=True, delete_cache=True)
     '''
+
+    def gen_interfaces(self, origin, itype=None, strict=False, ):
+        """
+        Override parent method to also create local backgrounds
+        :param origin:
+        :param itype:
+        :param strict:
+        :return:
+        """
+        if origin in self.foregrounds:
+            for res in self._sorted_resources(origin, itype, strict):
+                self._fg_queue.add(origin)
+                res.check(self)
+                self._fg_queue.remove(origin)
+                try:
+                    yield res.make_interface(itype)
+                except InterfaceError:
+                    continue
+        else:
+            for k in super(ForegroundCatalog, self).gen_interfaces(origin, itype=itype, strict=strict):
+                yield k
 
     def foreground(self, ref, path=None, quiet=True, reset=False, delete=False):
         """
@@ -93,15 +120,19 @@ class ForegroundCatalog(LcCatalog):
         if reset:
             res.remove_archive()
 
-        if reset or (ref not in self._queries):
-            self._queries[ref] = ForegroundQuery(ref, catalog=self)
+        if reset:
+            self._queries.pop(ref, None)
 
         self._fg_queue.add(ref)
         res.check(self)
         self._fg_queue.remove(ref)
 
-        return res.make_interface('foreground')
-    
+        fg = res.make_interface('foreground')
+        if ref not in self._queries:
+            self._queries[ref] = ForegroundQuery(ref, catalog=self)
+
+        return fg
+
     @property
     def foregrounds(self):
         f = set()
