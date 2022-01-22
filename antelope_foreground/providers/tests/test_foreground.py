@@ -117,7 +117,7 @@ class LcForegroundTestCase(unittest.TestCase):
         self.assertEqual(self.fg[a_different_frag_ref].uuid, new_fg[a_different_frag_uuid].uuid)
 
     def test_7_different_origins(self):
-        my_id = uuid4()
+        my_id = str(uuid4())
         f_ref_1 = CatalogRef('fictitious.origin.v1', my_id, entity_type='flow')
         f_ref_2 = CatalogRef('fictitious.origin.v2', my_id, entity_type='flow')
         self.fg.add(f_ref_1)
@@ -127,6 +127,7 @@ class LcForegroundTestCase(unittest.TestCase):
             self.fg.add(q_ref_2)
         '''
         self.fg.add(f_ref_2)
+        self.assertIs(self.fg[f_ref_2.external_ref], f_ref_1)
         self.assertIs(self.fg[f_ref_2.link], f_ref_2)
 
     @classmethod
