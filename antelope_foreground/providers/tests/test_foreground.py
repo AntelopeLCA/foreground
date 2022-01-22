@@ -127,8 +127,8 @@ class LcForegroundTestCase(unittest.TestCase):
             self.fg.add(q_ref_2)
         '''
         self.fg.add(f_ref_2)
-        self.assertIs(self.fg[f_ref_2.external_ref], f_ref_1)
-        self.assertIs(self.fg[f_ref_2.link], f_ref_2)
+        self.assertIs(self.fg[f_ref_1.external_ref], f_ref_2)
+        self.assertIs(self.fg[f_ref_1.link], f_ref_1)
 
     @classmethod
     def tearDownClass(cls):
