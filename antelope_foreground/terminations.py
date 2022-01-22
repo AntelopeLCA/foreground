@@ -291,7 +291,7 @@ class FlowTermination(object):
     @property
     def is_local(self):
         """
-        Fragment and termination have the same origin
+        Fragment and termination have the same origin. Implies is_frag, since processes cannot be added to foregrounds
         :return:
         """
         if self.is_null:
@@ -623,7 +623,7 @@ class FlowTermination(object):
             return {}
         if self.is_context:
             j = {
-                'origin': self._term_flow.origin,
+                'origin': 'foreground',
                 'context': self._term.name
             }
         else:
@@ -631,6 +631,9 @@ class FlowTermination(object):
                 'origin': self._term.origin,
                 'externalId': self._term.external_ref
             }
+            if self.is_local:
+                j['origin'] = 'foreground'  # override
+
         # saving term_flow: for subfragments, we save it only it it's specified
         if self.is_frag:
             if self._term_flow is not None:
