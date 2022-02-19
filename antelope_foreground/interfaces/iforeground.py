@@ -144,6 +144,17 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'delete_fragment', ForegroundRequired,
                                    fragment, **kwargs)
 
+    def scenarios(self, fragment, recurse=True, **kwargs):
+        """
+        Return a recursive list
+        :param fragment:
+        :param recurse: [True] whether to include scenarios in child fragments
+        :param kwargs:
+        :return:
+        """
+        return self._perform_query(_interface, 'scenarios', ForegroundRequired,
+                                   fragment, recurse=recurse, **kwargs)
+
     def knobs(self, search=None, **kwargs):
         """
         Return a list of named fragments whose values can be observed to define scenarios.  Generates a list

@@ -122,3 +122,6 @@ class FragmentRef(EntityRef):
             print('Ignoring false observed flag')
         ffs = self.traverse(scenario=scenario)  # in the future, may want to cache this
         return group_ios(self, ffs)
+
+    def scenarios(self, **kwargs):
+        return self._query.scenarios(self.external_ref, **kwargs)

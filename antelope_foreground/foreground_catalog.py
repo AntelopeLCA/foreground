@@ -3,6 +3,7 @@ from antelope_core.archives import InterfaceError
 from antelope_core.catalog import LcCatalog
 from .foreground_query import ForegroundQuery, ForegroundNotSafe
 
+from itertools import chain
 from shutil import rmtree
 import os
 
@@ -212,3 +213,134 @@ class ForegroundCatalog(LcCatalog):
             return self._queries[origin]
 
         return super(ForegroundCatalog, self).query(origin, strict=strict, **kwargs)
+
+    '''
+    Parameterization
+    Observing fragments requires the catalog because observations can come from different resources.
+    '''
+
+    def apply_observation(self, scenario, fragment, obs, default_fg=None):
+        """
+
+        :param scenario:
+        :param fragment:
+        :param obs:
+        :param default_fg:
+        :return:
+        """
+        if isinstance(obs, str):
+            term = default_fg.find_term(obs)
+            fragment.observe(scenario=scenario, termination=term)
+        elif isinstance(obs, tuple):
+            origin, ref = obs
+            term = self.query(origin).get(ref)
+            fragment.observe(scenario=scenario, termination=term)
+        else:
+            fragment.observe(obs, scenario=scenario)
+
+    def apply_ad_hoc_parameter(self, adhoc_scenario, param_spec, factor, default_fg=None):
+        """
+        Apply an ad hoc parameterization to a uniquely specified child fragment.  User must specify:
+         - the name or external ref of the parent fragment
+         - the external ref of the child flow
+
+        User may optionally specify:
+         - the foreground that contains the fragment [default_fg must be provided]
+         - the observed scenario that should be altered [default is base case]
+
+        The routine will find the unique child flow, retrieve its observed exchange value, multiply it by the factor,
+        and enter a new observation under the adhoc_scenario.
+
+        :param adhoc_scenario: the scenario under which the ad hoc parameter will be observed
+        :param param_spec: A tuple having 2, 3, or 4 elements:
+         2-element: (fragment_ref, flow_ref) using default_fg, default (observed) reference scenario
+         3-element: (origin, fragment_ref, flow_ref) using default scenario [if origin is found in cat.foregrounds]
+         3-element: (fragment_ref, flow_ref, scenario) using default_fg [if origin is not found in cat.foregrounds]
+         4-element: (origin, fragment_ref, flow_ref, reference_scenario)
+        :param factor: The value by which to multiply the base exchange value
+        :param default_fg: used when origin is not specified; not required if origin is provided
+        :return:
+        """
+        if len(param_spec) == 2:  # (fragment, child_flow)
+            fg = default_fg
+            frag, child = param_spec
+            sc = None
+        elif len(param_spec) == 3:  # (origin, fragment, child_flow)
+            if param_spec[0] in self.foregrounds:
+                org, frag, child = param_spec
+                fg = self.foreground(org)
+                sc = None
+            else:
+                fg = default_fg
+                frag, child, sc = param_spec
+        elif len(param_spec) == 4:
+            org, frag, child, sc = param_spec
+            fg = self.foreground(org)
+        else:
+            print('%s: skipping unrecognized ad hoc parameter %s' % (adhoc_scenario, param_spec))
+            return
+        if fg is None:
+            print('%s: unknown or unspecified foreground for ad hoc param %s' % (adhoc_scenario, param_spec))
+            return
+        tgt = fg[frag]
+        if tgt is None:
+            print('%s: Unable to retrieve fragment %s' % (adhoc_scenario, param_spec))
+            return
+        flow = fg.get_local(child)
+        cfs = list(tgt.children_with_flow(flow))
+        if len(cfs) == 1:
+            cf = cfs[0]
+            base_value = cf.exchange_value(scenario=sc, observed=True)
+            try:
+                value = base_value * factor
+                fg.observe(cf, value, scenario=adhoc_scenario)
+            except TypeError:
+                self.apply_observation(adhoc_scenario, cf, factor, default_fg=default_fg)
+        elif len(cfs) == 0:
+            print('%s: no child flow found %s' % (adhoc_scenario, param_spec))
+        else:
+            print('%s: too many (%d) child flows found %s' % (adhoc_scenario, len(cfs), child))
+            print('Or, actually, maybe the thing to do is to paramaterize ALL of them!')
+
+    def set_scenario_knobs(self, scenarios, *foregrounds):
+        """
+        Apply parameter values to a set of "knobs" (fragment names) to define scenarios.
+        Note: if "knob name" is a tuple, interpret it as an ad hoc parameterization, specifying the parent fragment,
+        the child to parameterize, and the optional scenario case to be altered.  Ad hoc parameters are multiplicative,
+        meaning they are applied to the existing value and not interpreted as absolute values.  This means they
+        cannot be used to parameterize zero-valued cases.
+        ([origin], parent fragment, child flow, [scenario])
+        :param scenarios: mapping of scenario names to {knob name: value} mappings (dict of dicts)- a scenario will
+         be created for each key, with the corresponding knobs set to spec.  Use 'scenario': True to add scenario
+         flags
+        :param foregrounds: use to specify where to draw named knobs from.  First one listed is the default.
+        If all knobs are specified 'ad hoc', no foregrounds are required
+        :return: None
+        """
+        if scenarios is None or len(scenarios) == 0:
+            return
+        # this is ALL OF THEM
+        knobs = {k.external_ref: k for k in chain(*(z.knobs() for z in foregrounds))
+                 if not k.external_ref.startswith('__')}
+
+        if foregrounds:
+            default_fg = foregrounds[0]
+        else:
+            default_fg = None
+
+        for k, vd in scenarios.items():
+
+            if vd is None:
+                continue
+
+            for i, v in vd.items():
+                if v is True:
+                    # valid setting at runtime; nothing to do here
+                    continue
+                if i in knobs:
+                    self.apply_observation(k, knobs[i], v, default_fg=default_fg)
+                elif isinstance(i, tuple):
+                    self.apply_ad_hoc_parameter(k, i, v, default_fg=default_fg)
+                else:
+                    print('%s: Skipping unknown scenario key %s=%g' % (k, i, v))
+

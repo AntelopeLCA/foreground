@@ -378,6 +378,13 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for k in self._observations:
             yield k
 
+    def scenarios(self, fragment, recurse=True, **kwargs):
+        if isinstance(fragment, str):
+            fragment = self.get(fragment)
+
+        for s in fragment.scenarios(recurse=recurse):
+            yield s
+
     def knobs(self, search=None, **kwargs):
         args = tuple(filter(None, [search]))
         for k in self._archive.fragments(*args, show_all=True):
