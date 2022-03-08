@@ -215,7 +215,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
     def add_or_retrieve(self, external_ref, reference, name, group=None, strict=False, **kwargs):
         """
-        Gets a flow with the given external_ref, and creates it if it doesn't exist from the given spec.
+        Gets an entity with the given external_ref if it exists, , and creates it if it doesn't exist from the args.
 
         Note that the full spec is mandatory so it could be done by tuple.  With strict=False, an entity will be
         returned if it exists.
@@ -359,9 +359,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         if fragment.observable(scenario):
             if fragment not in self._observations:
                 self._observations.append(fragment)
-            if exchange_value is None:
-                exchange_value = fragment.cached_ev  # do not expose accept_all via the interface; instead allow implicit
-            fragment.observe(scenario=scenario, value=exchange_value, units=units)
+            if exchange_value is not None:
+                fragment.observe(scenario=scenario, value=exchange_value, units=units)
+            elif scenario is None:
+                # If we are observing a fragment with no scenario, we simply apply the cached ev to the observed ev
+                fragment.observe(value=fragment.cached_ev)
+
         else:
             if exchange_value is not None:
                 print('Note: Ignoring exchange value %g for unobservable fragment %s [%s]' % (exchange_value,
@@ -490,8 +493,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             self.delete_fragment(c)
         return True
 
-    def save(self, **kwargs):
-        self._archive.save(**kwargs)
+    def save(self, save_unit_scores=False):
+        self._archive.save(save_unit_scores=save_unit_scores)
         return True
 
     def traverse(self, fragment, scenario=None, **kwargs):

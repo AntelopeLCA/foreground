@@ -146,7 +146,7 @@ class FragmentFlow(object):
             if not self.term == other.term:
                 raise ValueError('These fragment flows are differently terminated')
 
-            if mag * self.node_weight / (self.magnitude * nw) != 1.0:
+            if mag * self.node_weight != (self.magnitude * nw):  # formally if m*N/M*n != 1.0:
                 raise ValueError('These fragment flows cannot be combined because their implicit evs do not match')
             conserved = self.is_conserved and other.is_conserved
         elif isinstance(other, DetailedLciaResult):

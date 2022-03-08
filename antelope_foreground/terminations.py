@@ -487,7 +487,7 @@ class FlowTermination(object):
         """
         if self.is_context:
             x = ExchangeValue(self._parent, self.term_flow, self._parent.direction, termination=self.term_node,
-                              value=self.node_weight_multiplier)
+                              value=self.node_weight_multiplier)  # TODO: need to figure out how we are handling locales
             yield x
         elif self.is_frag:  # fragments can have unobserved exchanges too! (CAN THEY?)
             for x in []:

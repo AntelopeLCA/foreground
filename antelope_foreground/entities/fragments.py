@@ -755,11 +755,15 @@ class LcFragment(LcEntity):
         The exchange value may not be set on a reference fragment UNLESS the termination for the named scenario is
         to foreground- in which case the term's inbound_ev is set instead. (and a term is created if none exists)
         :param scenario:
-        :param value:
+        :param value: if 'None', un-set any observation for the given scenario
         :param units: unit string, if value is to be converted from non-reference units
         :return:
         """
         if value is None:
+            if scenario not in {1, '1', 0, '0', None}:
+                v = self._exchange_values.pop(scenario, None)
+                if v:
+                    self.dbg_print('Removed observation %g for scenario %s' % (scenario, v), level=0)
             return
         if not self._check_observability(scenario=scenario):
             raise DependentFragment('Fragment exchange value set during traversal')
@@ -826,8 +830,8 @@ class LcFragment(LcEntity):
             raise BalanceAlreadySet
         self._balance_child = child
         if self.balance_magnitude == 0:
-            print('%.5s Warning: zero balance for conserved quantity %s' % (self.uuid,
-                                                                            self.conserved_quantity))
+            self.dbg_print('%.5s Notice: zero balance for conserved quantity %s' % (self.uuid,
+                                                                                    self.conserved_quantity))
         self.dbg_print('setting balance from %.5s: %s' % (child.uuid, self._balance_child))
 
     @property
