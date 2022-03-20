@@ -165,7 +165,7 @@ class LcFragment(LcEntity):
         self._private = private
         # self._background = background
         self._is_balance = False
-        self._child_flows = set()
+        self._child_flows = list()
 
         super(LcFragment, self).__init__('fragment', external_ref, entity_uuid=the_uuid, **kwargs)
         if self._external_ref == self._uuid:
@@ -312,9 +312,10 @@ class LcFragment(LcEntity):
         :param child:
         :return:
         """
-        if child.reference_entity is not self:
-            raise InvalidParentChild('Fragment should list parent as reference entity')
-        self._child_flows.add(child)
+        #if child.reference_entity is not self:
+        #    raise InvalidParentChild('Fragment should list parent as reference entity')
+        if child not in self._child_flows:
+            self._child_flows.append(child)
         for term in self._terminations.values():
             term.clear_score_cache()
 
@@ -332,7 +333,7 @@ class LcFragment(LcEntity):
 
     @property
     def child_flows(self):
-        for k in sorted(self._child_flows, key=lambda x: x.uuid):
+        for k in self._child_flows:  # sorted(self._child_flows, key=lambda x: x.uuid):
             yield k
 
     def children_with_flow(self, flow, direction=None, termination=None, recurse=False):

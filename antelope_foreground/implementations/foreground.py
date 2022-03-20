@@ -186,6 +186,11 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         """
         return self._archive.frag(string, **kwargs)
 
+    def frags(self, string):
+        for k in self.knobs():
+            if k.external_ref.startswith(string):
+                yield k
+
     '''
     Create and modify fragments
     '''
@@ -651,6 +656,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             if update:
                 try:
                     # TODO: children_with_flow needs to be scenario aware
+                    # TODO: Update fails with multi_flow when terms are not specified- bc there is no way to tell which
+                    # record corresponds to which child.
                     if multi_flow:
                         c_up = next(parent.children_with_flow(flow, direction=y.direction, termination=term,
                                                               recurse=False))

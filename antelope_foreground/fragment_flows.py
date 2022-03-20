@@ -392,6 +392,10 @@ class GhostFragment(object):
         return self._parent.origin
 
     @property
+    def external_ref(self):
+        return self._parent.external_ref
+
+    @property
     def uuid(self):
         if self.flow.uuid is not None:
             return self.flow.uuid
