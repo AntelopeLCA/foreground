@@ -648,8 +648,10 @@ class LcFragment(LcEntity):
     def scenarios(self, recurse=True):
         """
         Generate a list of scenarios known to the fragment.
+
         :param recurse: [True] By default, traverse all child flows, including subfragments. If False, only report
          the present fragment
+         filter out internal scenarios (start with '__') from recursive queries but not from the top level
         :return:
         """
         scenarios = set(list(self._exchange_values.keys()))
@@ -657,6 +659,8 @@ class LcFragment(LcEntity):
             scenarios.add(scen)
             if recurse and term.is_subfrag:
                 for k in term.term_node.scenarios(recurse=True):
+                    if str(k).startswith('__'):
+                        continue
                     scenarios.add(k)
 
         if recurse:
