@@ -15,6 +15,13 @@ class BackReference(Exception):
     pass
 
 
+class NoSuchForeground(Exception):
+    """
+    foregrounds must be explicitly created
+    """
+    pass
+
+
 class ForegroundCatalog(LcCatalog):
     """
     Adds the ability to create (and manage?) foreground resources
@@ -73,26 +80,54 @@ class ForegroundCatalog(LcCatalog):
         """
         if origin in self.foregrounds:
             for res in self._sorted_resources(origin, itype, strict):
+                '''
                 self._fg_queue.add(origin)
                 res.check(self)
                 self._fg_queue.remove(origin)
+                '''
                 try:
-                    yield res.make_interface(itype)
+                    yield self._check_resource(res)
                 except InterfaceError:
                     continue
+
         else:
             for k in super(ForegroundCatalog, self).gen_interfaces(origin, itype=itype, strict=strict):
                 yield k
 
-    def foreground(self, ref, path=None, quiet=True, reset=False, delete=False):
+    def create_foreground(self, ref, path=None, quiet=True, delete=False):
         """
-        Creates or activates a foreground resource and returns an interface to that resource.
+        Creates foreground resource and returns an interface to that resource.
         By default creates in a subdirectory of the catalog root with the ref as the folder
         :param ref:
         :param path:
         :param quiet:
-        :param reset:
         :param delete:
+        :return:
+        """
+        if path is None:
+            path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
+            # localpath = ref
+        else:
+            if os.path.isabs(path):
+                pass
+                # localpath = None
+            else:
+                # localpath = path
+                path = os.path.join(self._rootdir, path)
+
+        abs_path = os.path.abspath(path)
+        local_path = self._localize_source(abs_path)
+
+        res = self.new_resource(ref, local_path, 'LcForeground', interfaces=['index', 'foreground', 'quantity'],
+                                quiet=quiet)
+
+        return self._check_resource(res)
+
+    def foreground(self, ref, reset=False):
+        """
+        activates a foreground resource and returns an interface to that resource.
+        :param ref:
+        :param reset:
         :return:
         """
         if ref in self._fg_queue:
@@ -101,26 +136,21 @@ class ForegroundCatalog(LcCatalog):
         try:
             res = next(self._resolver.resolve(ref, interfaces='foreground'))
         except UnknownOrigin:
-            if path is None:
-                path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
-                # localpath = ref
-            else:
-                if os.path.isabs(path):
-                    pass
-                    # localpath = None
-                else:
-                    # localpath = path
-                    path = os.path.join(self._rootdir, path)
-
-            abs_path = os.path.abspath(path)
-            local_path = self._localize_source(abs_path)
-
-            res = self.new_resource(ref, local_path, 'LcForeground', interfaces=['index', 'foreground', 'quantity'],
-                                    quiet=quiet)
+            raise NoSuchForeground(ref)
 
         if reset:
             res.remove_archive()
             self._queries.pop(ref, None)
+
+        return self._check_resource(res)
+
+    def _check_resource(self, res):
+        """
+        finish foreground activation + return interface
+        :param res:
+        :return:
+        """
+        ref = res.origin
 
         self._fg_queue.add(ref)
         res.check(self)

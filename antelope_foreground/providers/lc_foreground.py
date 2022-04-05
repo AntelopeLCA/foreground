@@ -185,14 +185,14 @@ class LcForeground(BasicArchive):
 
     def _flow_ref_from_json(self, e, external_ref):
         origin = e.pop('origin')
-        try:
-            ref_qty_uu = e.pop('referenceQuantity')
-        except KeyError:
-            c = e.pop('characterizations')
-            ref_qty_uu = next(cf['quantity'] for cf in c if 'isReference' in cf and cf['isReference'] is True)
-        ref_qty = self[ref_qty_uu]
         ref = self.catalog_ref(origin, external_ref, entity_type='flow')
         if not ref.resolved and self._frags_loaded:  # not found
+            try:
+                ref_qty_uu = e.pop('referenceQuantity')
+            except KeyError:
+                c = e.pop('characterizations', [])
+                ref_qty_uu = next(cf['quantity'] for cf in c if 'isReference' in cf and cf['isReference'] is True)
+            ref_qty = self[ref_qty_uu]
             name = e.pop('Name', None) or 'unnamed flow %s' % origin
             ref = self.make_interface('foreground').add_or_retrieve(external_ref, ref_qty, name, **e)
         return ref
