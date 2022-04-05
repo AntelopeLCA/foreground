@@ -137,6 +137,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     def context(self, item):
         return self._archive.tm[item]
 
+    def get_context(self, item):
+        return self._archive.tm[item]
+
     def flowable(self, item):
         return self._archive.tm.get_flowable(item)
 
@@ -578,21 +581,18 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     def fragment_from_exchanges(self, _xg, parent=None, ref=None, scenario=None,
                                 term_dict=None,
                                 set_background=None,
-                                include_context=False,
-                                multi_flow=False):
+                                include_context=False):
         """
         If parent is None, first generated exchange is reference flow; and subsequent exchanges are children.
         Else, all generated exchanges are children of the given parent, and if a child flow exists, update it.
-
-        We can take two approaches: in the simple view, the child flow is unique, and the termination can be updated
-        by a subsequent specification.  This obviously fails if a fragment has multiple children with the same flow--
-        as is in fact the case with ecoinvent.  So for that case we just need to match on termination as well; but
-        that means a termination cannot get updated automatically through this process.
+        The generated exchanges are assumed to be ordered, and are matched to child flows in the order originally created.
 
         This is all tricky if we expect it to work with both ExchangeRefs and actual exchanges (which, obviously, we
         should) because: ExchangeRefs may have only a string for process and flow, but Exchanges will have entities
         for each.  We need to get(flow_ref) and find_term(term_ref) but we can simply use flow entities and catalog
         refs if we have process.origin.  For now we will just swiss-army-knife it.
+
+        And now we are adding auto-terminate to anything that comes back from fragments_with_flow
 
         :param _xg: Generates a list of exchanges or exchange references
         :param parent: if None, create parent from first exchange
@@ -601,7 +601,6 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param term_dict: [None] a mapping from EITHER existing termination OR flow external ref to target OR (target, term_flow) tuple
         :param set_background: [None] DEPRECATED / background is meaningless
         :param include_context: [False] whether to model context-terminated flows as child fragments
-        :param multi_flow: [False] if True, child flows are matched on flow, direction, and termination
         :return:
         """
         if term_dict is None:
@@ -617,9 +616,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             else:
                 print('Creating new fragment %s' % ref)
                 self.observe(parent, name=ref)
-            update = False
-        else:
-            update = True
+
+        _children = list(parent.child_flows)
 
         for y in _xg:
             if hasattr(y.flow, 'entity_type') and y.flow.entity_type == 'flow':
@@ -653,8 +651,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 continue
             if term == y.process:
                 term = None  # don't terminate self-term
-            if update:
+            if _children:
                 try:
+                    c_up = next(g for g in _children if g.flow == flow and g.direction == y.direction)
+
+                    '''
+                    #
                     # TODO: children_with_flow needs to be scenario aware
                     # TODO: Update fails with multi_flow when terms are not specified- bc there is no way to tell which
                     # record corresponds to which child.
@@ -663,6 +665,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                                                               recurse=False))
                     else:
                         c_up = next(parent.children_with_flow(flow, direction=y.direction, recurse=False))
+                    '''
 
                     # update value
                     v = y.value
@@ -673,8 +676,16 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                         print('Updating %s exchange value %.3f' % (c_up, v))
 
                         self.observe(c_up, exchange_value=v, scenario=scenario)
+
+                    '''# we certainly can
                     if multi_flow:
                         continue  # cannot update terms in the multi-flow case
+                    '''
+                    if term is None:
+                        try:
+                            term = next(self.fragments_with_flow(c_up.flow, c_up.direction))
+                        except StopIteration:
+                            pass
 
                     # set term
                     if term is not None:
@@ -686,12 +697,20 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                             if term.entity_type == 'process' and set_background:
                                 c_up.set_background()
                             '''
+                    _children.remove(c_up)
                     continue
+
                 except StopIteration:
                     print('No child flow found; creating new %s %s' % (flow, y.direction))
                     pass
 
             c = self.new_fragment(flow, y.direction, value=y.value, units=y.unit, parent=parent, **y.args)
+
+            if term is None:
+                try:
+                    term = next(self.fragments_with_flow(c.flow, c.direction))
+                except StopIteration:
+                    pass
 
             if term is not None:
                 c.terminate(term, scenario=scenario, term_flow=term_flow, descend=False)  # already sets stage name
