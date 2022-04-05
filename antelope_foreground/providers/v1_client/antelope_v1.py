@@ -6,7 +6,7 @@ from antelope import CatalogRef, BasicQuery, comp_dir, NoReference, NoAccessToEn
 from antelope_core.archives import BasicArchive, LC_ENTITY_TYPES
 # from lcatools.fragment_flows import FragmentFlow
 
-from ..lcforeground import FOREGROUND_ENTITY_TYPES
+from ..lc_foreground import FOREGROUND_ENTITY_TYPES
 from ...interfaces.iforeground import AntelopeForegroundInterface
 from ...refs.fragment_ref import FragmentRef
 from ...fragment_flows import FragmentFlow, GhostFragment
