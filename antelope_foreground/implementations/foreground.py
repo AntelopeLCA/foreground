@@ -369,7 +369,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 self._observations.append(fragment)
             if exchange_value is not None:
                 fragment.observe(scenario=scenario, value=exchange_value, units=units)
-            elif scenario is None:
+            elif scenario is None and fragment.observed_ev == 0:
                 # If we are observing a fragment with no scenario, we simply apply the cached ev to the observed ev
                 fragment.observe(value=fragment.cached_ev)
 

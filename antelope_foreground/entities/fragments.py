@@ -546,10 +546,17 @@ class LcFragment(LcEntity):
 
     @property
     def observed_ev(self):
+        """
+
+        :return: the observed exchange value
+        """
+        ''' # this is bogus
         ev = self._exchange_values[1]
         if self.reference_entity is None and ev == 0:  # now with named = observed, shouldn't every frag be observed?
             ev = self._exchange_values[0]
         return ev
+        '''
+        return self._exchange_values[1]
 
     def observable(self, scenario=None):
         return self._check_observability(scenario=scenario)
