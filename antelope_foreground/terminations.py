@@ -341,10 +341,15 @@ class FlowTermination(object):
     @property
     def is_bg(self):
         """
-        parent is marked background, or termination is a background fragment
+        A term is "background" if the traversal does not include any descending fragments.  This condition is
+        met in either of the following two cases:
+         - the parent is background (no child flows) and the termination is to a process (i.e. not fg or cutoff)
+         - the termination is to a fragment and descend is False
+        old:
+        # parent is marked background, or termination is a background fragment
         :return:
         """
-        return self._parent.is_background
+        return (self._parent.is_background and self.is_process) or (self.is_subfrag and not self.descend)
 
     @property
     def term_is_bg(self):
@@ -366,7 +371,8 @@ class FlowTermination(object):
     def is_subfrag(self):
         """
         Termination is a non-self fragment.  (we were excluding background frags too but that is outmoded)
-        Controversy around whether expression should be:
+
+        Old: Controversy around whether expression should be:
         self.is_frag and not (self.is_fg or self.is_bg or self.term_is_bg)  [current] or
         self.is_frag and (not self.is_fg) and (not self.is_bg)  [old; seems wrong]
 
