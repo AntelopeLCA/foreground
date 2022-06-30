@@ -148,6 +148,8 @@ class LcForeground(BasicArchive):
                 entity_type = 'fragment'
             else:
                 entity_type = 'process'
+        if origin in self._catalog.foregrounds:
+            self._catalog.foreground(origin)  # initialize foreground
         try:
             return self._catalog.catalog_ref(origin, external_ref, entity_type=entity_type, **kwargs)
         except ForegroundNotSafe:
@@ -156,6 +158,9 @@ class LcForeground(BasicArchive):
             if entity_type == 'fragment':
                 return FragmentRef(external_ref, dq, **kwargs)
             return CatalogRef.from_query(external_ref, query=dq, etype=entity_type, **kwargs)
+
+    def catalog_query(self, origin, **kwargs):
+        return self._catalog.query(origin, **kwargs)
 
     def _fetch(self, entity, **kwargs):
         return self.__getitem__(entity)

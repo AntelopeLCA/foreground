@@ -2,6 +2,7 @@ from antelope import CONTEXT_STATUS_, EntityNotFound, comp_dir  # , BackgroundRe
 from ..interfaces.iforeground import AntelopeForegroundInterface
 from antelope_core.implementations import BasicImplementation
 
+from antelope_core.entities.xlsx_editor import XlsxArchiveUpdater
 from antelope_core.entities.quantities import new_quantity
 from antelope_core.contexts import NullContext
 from antelope_core.entities.flows import new_flow
@@ -88,6 +89,23 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     '''
     Add some useful functions from other interfaces to the foreground
     '''
+    def catalog_ref(self, *args, **kwargs):
+        return self._archive.catalog_ref(*args, **kwargs)
+    
+    def catalog_query(self, origin, **kwargs):
+        return self._archive.catalog_query(origin, **kwargs)
+
+    def apply_xlsx(self, xlsx, quiet=True):
+        """
+        This is kind of inside baseball as long as xls_tools is not public
+        :param self: a resource
+        :param xlsx: an Xlrd-like spreadsheet: __getitem__(sheetname); sheet.row(i), sheet.column(j), sheet.nrows, sheet.ncols
+        :param quiet:
+        :return: nothing to return- user already has the resource
+        """
+        with XlsxArchiveUpdater(self._archive, xlsx, quiet=quiet, merge='overwrite') as x:
+            x.apply()
+
     def get_local(self, external_ref, origin=None, **kwargs):
         """
         The special characteristic of a foreground is its access to the catalog-- so-- use it
@@ -396,14 +414,17 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for s in fragment.scenarios(recurse=recurse):
             yield s
 
-    def knobs(self, search=None, **kwargs):
+    def knobs(self, search=None, param_dict=False, **kwargs):
         args = tuple(filter(None, [search]))
-        for k in self._archive.fragments(*args, show_all=True):
+        for k in sorted(self._archive.fragments(*args, show_all=True), key=lambda x: x.external_ref):
             if k.is_reference:
                 continue
             if k.external_ref == k.uuid:  # only generate named fragments
                 continue
-            yield k
+            if param_dict:
+                yield k.parameters()
+            else:
+                yield k
 
     def fragments_with_flow(self, flow, direction=None, reference=True, background=None, **kwargs):
         """
@@ -518,11 +539,13 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
     def create_process_model(self, process, ref_flow=None, set_background=None, **kwargs):
         rx = process.reference(ref_flow)
-        if process.reference_value(ref_flow) < 0:  # put in to handle Ecoinvent treatment processes
+        rv = process.reference_value(ref_flow)
+        if rv < 0:  # put in to handle Ecoinvent treatment processes
             dirn = comp_dir(rx.direction)
+            rv = abs(rv)
         else:
             dirn = rx.direction
-        frag = self.new_fragment(rx.flow, dirn, value=1.0, **kwargs)
+        frag = self.new_fragment(rx.flow, dirn, value=rv, observed=True, **kwargs)
         frag.terminate(process, term_flow=rx.flow)
         # if set_background:
         #     frag.set_background()
@@ -621,7 +644,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         for y in _xg:
             if hasattr(y.flow, 'entity_type') and y.flow.entity_type == 'flow':
-                flow = self._grounded_entity(y.flow)
+                try:
+                    flow = self._grounded_entity(y.flow)
+                except EntityNotFound:
+                    flow = y.flow  # groundless flow, better than throwing an exception
             else:
                 flow = self[y.flow]
                 if flow is None:

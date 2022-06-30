@@ -118,7 +118,8 @@ class ForegroundCatalog(LcCatalog):
         abs_path = os.path.abspath(path)
         local_path = self._localize_source(abs_path)
 
-        res = self.new_resource(ref, local_path, 'LcForeground', interfaces=['index', 'foreground', 'quantity'],
+        res = self.new_resource(ref, local_path, 'LcForeground',
+                                interfaces=['basic', 'index', 'foreground', 'quantity'],
                                 quiet=quiet)
 
         return self._check_resource(res)
@@ -324,7 +325,7 @@ class ForegroundCatalog(LcCatalog):
             try:
                 value = base_value * factor
                 fg.observe(cf, value, scenario=adhoc_scenario)
-            except TypeError:
+            except TypeError:  # if 'factor' is not a float, it's interpreted as a termination
                 self.apply_observation(adhoc_scenario, cf, factor, default_fg=default_fg)
         elif len(cfs) == 0:
             print('%s: no child flow found %s' % (adhoc_scenario, param_spec))

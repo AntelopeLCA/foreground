@@ -150,10 +150,10 @@ class FragmentTests(unittest.TestCase):
         Build the test fragments
         :return:
         """
-        cls.a1 = new_fragment(f1, 'Output', Name='A Production Process')
+        cls.a1 = new_fragment(f1, 'Output', Name='A Production Process', observe=True)
         cls.a2 = new_fragment(f3, 'Output', value=a2_kwh, units='kWh', Name='A conserving energy conversion process', observe=True)
-        cls.af = new_fragment(f4, 'Output', Name='A fuel supply process')
-        cls.aa = new_fragment(f7, 'Output', Name='An auto-consumption process')
+        cls.af = new_fragment(f4, 'Output', Name='A fuel supply process', observe=True)
+        cls.aa = new_fragment(f7, 'Output', Name='An auto-consumption process', observe=True)
 
         afg = new_fragment(f4, 'Input', parent=cls.af, balance=True, Name='Internal fuel supply')
         afg.to_foreground()  # in the wild, this would be terminated and not show up as an IO-- fg emulates that
@@ -184,7 +184,7 @@ class FragmentTests(unittest.TestCase):
         (a1d is the same but with descend=True on "My third flow")
         '''
 
-        a3w = new_fragment(f3w, 'Output', parent=cls.a2, value=a2_waste_heat)
+        a3w = new_fragment(f3w, 'Output', parent=cls.a2, value=a2_waste_heat, observe=True)
         a3w.set_exchange_value('efficiency', a2_eff_waste_heat)
         a3w.to_foreground()
 

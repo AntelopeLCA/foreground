@@ -66,13 +66,13 @@ class AntelopeForegroundInterface(ForegroundInterface):
                                    fragment, name, **kwargs)
     '''
 
-    def fragments_with_flow(self, flow, direction=None, reference=None, background=None, **kwargs):
+    def fragments_with_flow(self, flow, direction=None, reference=True, background=None, **kwargs):
         """
         Generates fragments made with the specified flow, optionally filtering by direction, reference status, and
         background status.  For all three filters, the default None is to generate all fragments.
         :param flow:
         :param direction: [None | 'Input' | 'Output']
-        :param reference: [None | False | True]
+        :param reference: [None | False | {True} ]
         :param background: [None | False | True]
         :param kwargs:
         :return:

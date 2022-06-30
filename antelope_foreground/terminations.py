@@ -118,6 +118,9 @@ class FlowTermination(object):
             term = cls(fragment, term_node, _direction=direction, term_flow=term_flow, descend=descend)
         except MultipleReferences:
             raise TerminationFromJson('term_flow missing and ambiguous: %s (%s)' % (fragment.link, scenario))
+        except FlowConversionError:
+            t = term_flow or term_node
+            raise TerminationFromJson('Flow Conversion Error %s =/= %s' % (fragment.flow.link, t.link))
         if 'scoreCache' in j.keys():
             term._deserialize_score_cache(fg, j['scoreCache'], scenario)
         return term
@@ -168,8 +171,21 @@ class FlowTermination(object):
                 term_flow = entity
                 entity = fragment  # foreground termination with flow conversion
                 # raise TypeError('Can no longer terminate fragments with flows. Use context instead')
+            elif entity.entity_type == 'exchange':
+                term_flow = entity.flow
+                _direction = entity.direction
+                entity = entity.process
             elif entity.entity_type not in ('context', 'process', 'fragment'):
                 raise TypeError('Inappropriate termination type: %s' % entity.entity_type)
+
+            # check for recursive loops
+            if entity.entity_type == 'fragment' and entity is not fragment:
+                if entity.top() is fragment.top():
+                    # interior recursive loop can be resolved by leaving cut-off
+
+                    print('-- setting cut-off flow to resolve recursive loop')
+                    entity = None
+
         self._term = entity  # this must have origin, external_ref, and entity_type, and be operable (if ref)
         self._score_cache = LciaResults(fragment)
 
