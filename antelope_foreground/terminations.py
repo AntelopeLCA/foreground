@@ -574,7 +574,8 @@ class FlowTermination(object):
             if self.is_subfrag:
                 if not self.descend:
                     raise SubFragmentAggregation  # to be caught- subfrag needs to be queried w/scenario
-            return LciaResult(quantity)  # otherwise, subfragment terminations have no impacts
+                return LciaResult(quantity)  # otherwise, subfragment terminations have no impacts
+            # if we are still just a foreground fragment, go ahead and check the cache
         if refresh:
             self._score_cache.pop(quantity, None)
 
@@ -589,6 +590,9 @@ class FlowTermination(object):
                 fragment we traverse. This is just an efficiency bomb.  We need to find a better way to refresh scores
                 that won't suffer from this problem- but unfortunately I can't think of anyway to track that state 
                 mid-traversal. 
+                
+                note: the obvious answer is that flow_refs with their "seen cfs" should be cleared more locally than 
+                via frag_flow_lcia
                 '''
                 res = self.compute_unit_score(quantity, refresh=refresh, **kwargs)
             except UnCachedScore:
@@ -628,8 +632,8 @@ class FlowTermination(object):
 
     def add_lcia_score(self, quantity, score, scenario=None):
         res = LciaResult(quantity, scenario=scenario)
-        res.add_summary(self._parent.uuid, self._parent, 1.0, score)
-        self._score_cache.add(res)
+        res.add_summary(self._parent.external_ref, self._parent, 1.0, score)
+        self._score_cache[quantity] = res
 
     def _deserialize_score_cache(self, fg, sc, scenario):
         self._score_cache = LciaResults(self._parent)

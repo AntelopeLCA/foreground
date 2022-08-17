@@ -42,10 +42,12 @@ class LciaResults(dict):
         if key not in self._indices:
             self._indices.append(key)
 
+    '''
     def add(self, value):
         # TODO: add should cumulate components if LciaResult is already present
         assert isinstance(value, LciaResult)
         self.__setitem__(value.quantity.link, value)
+    '''
 
     def indices(self):
         for i in self._indices:

@@ -415,7 +415,7 @@ class LcFragment(LcEntity):
             'tags': self._d
         })
         for k in self._d.keys():
-            j.pop(k)  # we put these together in tags
+            j.pop(k, None)  # we put these together in tags
         return j
 
     @property
@@ -994,9 +994,11 @@ class LcFragment(LcEntity):
 
     def to_foreground(self, scenario=None):
         """
-        make the fragment a foreground node. This is done by setting the termination to self.  A foreground node
-        may not be a background node (obv.)  Also, a foreground node will act as an emission during traversal and
-        fragment LCIA, but will not show up as a cutoff.
+        make the fragment a foreground node. This is done by setting the termination to self (only if the term is
+        currently null).  A foreground node
+        may not be a background node (obv.)  Note: a foreground node will not act as an emission during traversal and
+        fragment LCIA (it must be terminated to a context), but it can have observed unit scores.
+        However, it will not show up as a cutoff.  foreground() fragments can conceal flows.
         :param scenario:
         :return:
         """

@@ -80,6 +80,7 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'fragments_with_flow', ForegroundRequired,
                                    flow, direction=direction, reference=reference, background=background, **kwargs)
 
+    '''
     def find_or_create_term(self, exchange, background=None):
         """
         Finds a fragment that terminates the given exchange
@@ -89,16 +90,17 @@ class AntelopeForegroundInterface(ForegroundInterface):
         """
         return self._perform_query(_interface, 'find_or_create_term', ForegroundRequired,
                                    exchange, background=background)
+    '''
 
     def create_fragment_from_node(self, process_ref, ref_flow=None, include_elementary=False):
         """
-
+        a synonym for create_process_model
         :param process_ref: a ProcessRef
         :param ref_flow:
         :param include_elementary:
         :return:
         """
-        return self._perform_query(_interface, 'create_fragment_from_node', ForegroundRequired,
+        return self._perform_query(_interface, 'create_process_model', ForegroundRequired,
                                    process_ref, ref_flow=ref_flow, include_elementary=include_elementary)
 
     def clone_fragment(self, frag, tag=None, **kwargs):
@@ -217,14 +219,3 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'fragment_from_exchanges', ForegroundRequired,
                                    parent=parent, include_context=include_context,
                                    multi_flow=multi_flow, **kwargs)
-
-    def traverse(self, fragment, scenario=None, **kwargs):
-        """
-        Traverse the fragment (observed) according to the scenario specification and return a list of FragmentFlows
-        :param fragment:
-        :param scenario:
-        :param kwargs:
-        :return:
-        """
-        return self._perform_query(_interface, 'traverse', ForegroundRequired,
-                                   fragment, scenario, **kwargs)

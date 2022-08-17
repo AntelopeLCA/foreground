@@ -402,6 +402,19 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         return fragment.link
 
+    def observe_unit_score(self, fragment, quantity, score, scenario=None, **kwargs):
+        """
+
+        :param fragment:
+        :param quantity:
+        :param score:
+        :param scenario:
+        :param kwargs:
+        :return:
+        """
+        term = fragment.termination(scenario)
+        term.add_lcia_score(quantity, score, scenario=scenario)
+
     @property
     def observed_flows(self):
         for k in self._observations:
@@ -537,6 +550,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for f in self._archive.entities_by_type('fragment'):
             f.clear_scenarios(terminations=terminations)
 
+    def fragment_lcia(self, fragment, quantity_ref, scenario=None, refresh=False, **kwargs):
+        frag = self._archive.retrieve_or_fetch_entity(fragment)
+        return frag.top().fragment_lcia(quantity_ref, scenario=scenario, refresh=refresh, **kwargs)
+
     def create_process_model(self, process, ref_flow=None, set_background=None, **kwargs):
         rx = process.reference(ref_flow)
         rv = process.reference_value(ref_flow)
@@ -545,7 +562,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             rv = abs(rv)
         else:
             dirn = rx.direction
-        frag = self.new_fragment(rx.flow, dirn, value=rv, observed=True, **kwargs)
+        frag = self.new_fragment(rx.flow, dirn, value=rv, observe=True, **kwargs)
         frag.terminate(process, term_flow=rx.flow)
         # if set_background:
         #     frag.set_background()
@@ -553,13 +570,14 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         #                              include_context=include_context, multi_flow=multi_flow)
         return frag
 
-    def extend_process(self, fragment, scenario=None, **kwargs):
+    def extend_process(self, fragment, scenario=None, include_context=False, **kwargs):
         term = fragment.termination(scenario)
         if not term.is_process:
             raise TypeError('Termination is not to process')
         # fragment.unset_background()
         process = term.term_node
         self.fragment_from_exchanges(process.inventory(ref_flow=term.term_flow), parent=fragment, scenario=scenario,
+                                     include_context=include_context,
                                      **kwargs)
 
 
@@ -604,7 +622,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     def fragment_from_exchanges(self, _xg, parent=None, ref=None, scenario=None,
                                 term_dict=None,
                                 set_background=None,
-                                include_context=False):
+                                include_context=True):
         """
         If parent is None, first generated exchange is reference flow; and subsequent exchanges are children.
         Else, all generated exchanges are children of the given parent, and if a child flow exists, update it.
@@ -673,9 +691,11 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             else:
                 term_flow = None
 
-            if term is not None and term.entity_type == 'context' and include_context is False:
-                continue
-            if term == y.process:
+            if term is not None and term.entity_type == 'context':
+                if include_context is False:
+                    continue
+            elif term == y.process:
+                # TODO: figure out why tuple(CatalogRef()) hangs
                 term = None  # don't terminate self-term
             if _children:
                 try:
