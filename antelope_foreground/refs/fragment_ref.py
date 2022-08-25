@@ -102,6 +102,15 @@ class FragmentRef(EntityRef):
     def traverse(self, scenario=None, **kwargs):
         return self._query.traverse(self.external_ref, scenario=scenario, **kwargs)
 
+    def lci(self, scenario=None):
+        """
+        TODO
+        complex process that will require a recursive traversal and accumulation of LCIs from self + child fragments
+        :param scenario:
+        :return:
+        """
+        raise NotImplementedError
+
     def fragment_lcia(self, lcia_qty, scenario=None, **kwargs):
         return self._query.fragment_lcia(self.external_ref, lcia_qty, scenario=scenario, **kwargs)
 

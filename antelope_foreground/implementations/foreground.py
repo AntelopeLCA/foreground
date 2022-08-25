@@ -555,14 +555,24 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         return frag.top().fragment_lcia(quantity_ref, scenario=scenario, refresh=refresh, **kwargs)
 
     def create_process_model(self, process, ref_flow=None, set_background=None, **kwargs):
+        """
+        Create a fragment from the designated process model.  Note: the fragment's reference flow will have a unit
+        value, even if the process's reference flow does not have a unit value, because both lci() and inventory()
+        normalize the process inventory during computation.
+        :param process:
+        :param ref_flow:
+        :param set_background:
+        :param kwargs:
+        :return:
+        """
         rx = process.reference(ref_flow)
         rv = process.reference_value(ref_flow)
         if rv < 0:  # put in to handle Ecoinvent treatment processes
             dirn = comp_dir(rx.direction)
-            rv = abs(rv)
+            # rv = abs(rv)
         else:
             dirn = rx.direction
-        frag = self.new_fragment(rx.flow, dirn, value=rv, observe=True, **kwargs)
+        frag = self.new_fragment(rx.flow, dirn, value=1.0, observe=True, **kwargs)
         frag.terminate(process, term_flow=rx.flow)
         # if set_background:
         #     frag.set_background()
