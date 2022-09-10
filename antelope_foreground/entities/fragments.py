@@ -175,7 +175,8 @@ class LcFragment(LcEntity):
             self.set_parent(parent)
 
         assert flow.entity_type == 'flow', '%s %s' % (flow.entity_type, flow.link)
-        # assert flow.reference_entity.entity_type == 'quantity'  ## this is a problem when referencing a flow with unknown origin / no query
+        # # this is a problem when referencing a flow with unknown origin / no query
+        # assert flow.reference_entity.entity_type == 'quantity'
         self.flow = flow
         self.direction = check_direction(direction)  # w.r.t. parent
 
@@ -312,8 +313,8 @@ class LcFragment(LcEntity):
         :param child:
         :return:
         """
-        #if child.reference_entity is not self:
-        #    raise InvalidParentChild('Fragment should list parent as reference entity')
+        # if child.reference_entity is not self:
+        #     raise InvalidParentChild('Fragment should list parent as reference entity')
         if child not in self._child_flows:
             self._child_flows.append(child)
         for term in self._terminations.values():
@@ -783,7 +784,7 @@ class LcFragment(LcEntity):
             if scenario not in {1, '1', 0, '0', None}:
                 v = self._exchange_values.pop(scenario, None)
                 if v:
-                    self.dbg_print('Removed observation %g for scenario %s' % (scenario, v), level=0)
+                    self.dbg_print('Removed observation %g for scenario %s' % (v, scenario), level=0)
             return
         if not self._check_observability(scenario=scenario):
             raise DependentFragment('Fragment exchange value set during traversal')
@@ -1183,18 +1184,18 @@ class LcFragment(LcEntity):
                     yield n
                     yds.add(n)
 
-    def fragment_lcia(self, quantity_ref, scenario=None, refresh=False, observed=True, **kwargs):
+    def fragment_lcia(self, quantity_ref, scenario=None, observed=True, **kwargs):
         """
         Fragments don't have access to a qdb, so this piggybacks on the quantity_ref.
+        note: refresh is no longer supported during traversal
         :param quantity_ref:
         :param scenario:
-        :param refresh: whether to refresh a cached unit score
         :param observed: [True] whether to limit the computation to observed flows
         :param kwargs: ultimately passed down to LCIA computation routine
         :return:
         """
         fragmentflows = self.traverse(scenario=scenario, observed=observed)
-        return frag_flow_lcia(fragmentflows, quantity_ref, scenario=scenario, refresh=refresh, **kwargs)
+        return frag_flow_lcia(fragmentflows, quantity_ref, scenario=scenario, **kwargs)
 
     def activity(self, scenario=None, observed=True):
         """

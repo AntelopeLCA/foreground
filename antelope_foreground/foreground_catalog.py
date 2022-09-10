@@ -128,7 +128,7 @@ class ForegroundCatalog(LcCatalog):
         """
         activates a foreground resource and returns an interface to that resource.
         :param ref:
-        :param reset:
+        :param reset: re-load the foreground from the saved files
         :return:
         """
         if ref in self._fg_queue:
@@ -145,12 +145,14 @@ class ForegroundCatalog(LcCatalog):
 
         return self._check_resource(res)
 
-    def _check_resource(self, res):
+    def _check_resource(self, res, delete=False):
         """
         finish foreground activation + return interface
         :param res:
         :return:
         """
+        if delete:
+            os.rename()
         ref = res.origin
 
         self._fg_queue.add(ref)
@@ -245,6 +247,13 @@ class ForegroundCatalog(LcCatalog):
 
         return super(ForegroundCatalog, self).query(origin, strict=strict, **kwargs)
 
+    def catalog_ref(self, origin, external_ref, entity_type=None, **kwargs):
+        if origin in self.foregrounds:
+            if origin not in self._queries:
+                raise ForegroundNotSafe(origin)
+        return super(ForegroundCatalog, self).catalog_ref(origin, external_ref, entity_type=entity_type, **kwargs)
+
+
     '''
     Parameterization
     Observing fragments requires the catalog because observations can come from different resources.
@@ -269,7 +278,7 @@ class ForegroundCatalog(LcCatalog):
         else:
             fragment.observe(obs, scenario=scenario)
 
-    def apply_ad_hoc_parameter(self, adhoc_scenario, param_spec, factor, default_fg=None):
+    def apply_ad_hoc_parameter(self, adhoc_scenario, param_spec, factor, default_fg=None, mult=True):
         """
         Apply an ad hoc parameterization to a uniquely specified child fragment.  User must specify:
          - the name or external ref of the parent fragment
@@ -282,6 +291,9 @@ class ForegroundCatalog(LcCatalog):
         The routine will find the unique child flow, retrieve its observed exchange value, multiply it by the factor,
         and enter a new observation under the adhoc_scenario.
 
+        If 'mult=False' is supplied, then the parameter is applied as-is, without multiplication (in this case, any
+        reference scenario specification is ignored)
+
         :param adhoc_scenario: the scenario under which the ad hoc parameter will be observed
         :param param_spec: A tuple having 2, 3, or 4 elements:
          2-element: (fragment_ref, flow_ref) using default_fg, default (observed) reference scenario
@@ -290,6 +302,8 @@ class ForegroundCatalog(LcCatalog):
          4-element: (origin, fragment_ref, flow_ref, reference_scenario)
         :param factor: The value by which to multiply the base exchange value
         :param default_fg: used when origin is not specified; not required if origin is provided
+        :param mult: If True (default), the factor is multiplicative and applied to the adhoc_scenario (future:
+        applied to fragment multiplicative root param). if false, is applied directly to the adhoc_scenario.
         :return:
         """
         if len(param_spec) == 2:  # (fragment, child_flow)
@@ -321,11 +335,14 @@ class ForegroundCatalog(LcCatalog):
         cfs = list(tgt.children_with_flow(flow))
         if len(cfs) == 1:
             cf = cfs[0]
-            base_value = cf.exchange_value(scenario=sc, observed=True)
-            try:
-                value = base_value * factor
-                fg.observe(cf, value, scenario=adhoc_scenario)
-            except TypeError:  # if 'factor' is not a float, it's interpreted as a termination
+            if mult:
+                base_value = cf.exchange_value(scenario=sc, observed=True)
+                try:
+                    value = base_value * factor
+                    fg.observe(cf, value, scenario=adhoc_scenario)
+                except TypeError:  # if 'factor' is not a float, it's interpreted as a termination
+                    self.apply_observation(adhoc_scenario, cf, factor, default_fg=default_fg)
+            else:
                 self.apply_observation(adhoc_scenario, cf, factor, default_fg=default_fg)
         elif len(cfs) == 0:
             print('%s: no child flow found %s' % (adhoc_scenario, param_spec))
@@ -341,7 +358,7 @@ class ForegroundCatalog(LcCatalog):
         meaning they are applied to the existing value and not interpreted as absolute values.  This means they
         cannot be used to parameterize zero-valued cases.
         ([origin], parent fragment, child flow, [scenario])
-        :param scenarios: mapping of scenario names to {knob name: value} mappings (dict of dicts)- a scenario will
+        :param scenarios: (dict of dicts) mapping of scenario names to {knob name: value} mappings - a scenario will
          be created for each key, with the corresponding knobs set to spec.  Use 'scenario': True to add scenario
          flags
         :param foregrounds: use to specify where to draw named knobs from.  First one listed is the default.

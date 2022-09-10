@@ -7,7 +7,7 @@ import re
 
 from collections import defaultdict
 
-from ..foreground_query import DelayedQuery, ForegroundNotSafe
+from ..foreground_query import DelayedQuery, ForegroundNotSafe, QueryIsDelayed
 from ..refs.fragment_ref import FragmentRef
 from ..implementations import AntelopeForegroundImplementation, AntelopeBasicImplementation
 
@@ -148,8 +148,6 @@ class LcForeground(BasicArchive):
                 entity_type = 'fragment'
             else:
                 entity_type = 'process'
-        if origin in self._catalog.foregrounds:
-            self._catalog.foreground(origin)  # initialize foreground
         try:
             return self._catalog.catalog_ref(origin, external_ref, entity_type=entity_type, **kwargs)
         except ForegroundNotSafe:
@@ -243,7 +241,10 @@ class LcForeground(BasicArchive):
             self._add_ext_ref_mapping(entity)
 
         #TODO: figure out how to specify which flows should NOT be merged (current: only flows with no context)
-        self._add_to_tm(entity)  # , merge_strategy='distinct')  # DWR!!! need to
+        try:
+            self._add_to_tm(entity)  # , merge_strategy='distinct')  # DWR!!! need to
+        except QueryIsDelayed:
+            pass
 
         if entity.entity_type == 'fragment':
             self._frags_with_flow[entity.flow].add(entity)

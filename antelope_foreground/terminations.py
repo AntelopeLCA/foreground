@@ -591,8 +591,21 @@ class FlowTermination(object):
                 that won't suffer from this problem- but unfortunately I can't think of anyway to track that state 
                 mid-traversal. 
                 
-                note: the obvious answer is that flow_refs with their "seen cfs" should be cleared more locally than 
-                via frag_flow_lcia
+                note: additionally, refreshing "seen cfs" and refreshing fragment unit scores are separate
+                tasks and should not use the same keyword argument.  In both cases, passing 'refresh' to a recursive
+                traversal results in highly duplicated computation.  
+                
+                The solution is to no longer support 'refresh' during traversal or any recursive operation.  However,
+                we retain it here because we still want to be able to do both of:
+                 - refresh seen cfs during calls to do_lcia() in compute_unit_score()
+                 - refresh cached LCI during calls to lci() in _unobserved_exchanges()
+                
+                As to the other uses:
+                 - individual termination scores can be refreshed using this method score_cache()
+                 - entire foreground scores can be refreshed using the clear_unit_scores() implementation method
+                 - flow CFs (apart from those included in specified terminations) can only be refreshed by manually 
+                    calling do_lcia() with an inventory that includes them.  This is obviously not ideal, and a new 
+                    solution should be sought.  
                 '''
                 res = self.compute_unit_score(quantity, refresh=refresh, **kwargs)
             except UnCachedScore:

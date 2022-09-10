@@ -207,10 +207,22 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         """
         return self._archive.frag(string, **kwargs)
 
-    def frags(self, string):
-        for k in self.knobs():
-            if k.external_ref.startswith(string):
-                yield k
+    def frags(self, string, knobs=True):
+        """
+        Show fragments whose names begin with
+        :param string:
+        :param knobs: [True] by default, only list named non-reference fragments (knobs).  If knobs=False,
+        list reference fragments
+        :return:
+        """
+        if knobs:
+            for k in self.knobs():
+                if k.external_ref.startswith(string):
+                    yield k
+        else:
+            for k in self.fragments():
+                if k.external_ref.startswith(string):
+                    yield k
 
     '''
     Create and modify fragments
@@ -367,9 +379,25 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         return self._archive.name_fragment(fragment, name, auto=auto, force=force)
     '''
 
-    def observe(self, fragment, exchange_value=None, termination=None, name=None, scenario=None,
-                units=None, auto=None, force=None,
-                accept_all=None, **kwargs):
+    def observe(self, fragment, exchange_value=None, units=None, scenario=None,
+                accept_all=None,
+                termination=None, term_flow=None, descend=None,
+                name=None, auto=None, force=None):
+        """
+        All-purpose method to manipulate fragments.
+        :param fragment:
+        :param exchange_value: default second positional param; exchange value being observed
+        :param units: optional, modifies exchange value
+        :param scenario: applies to exchange value and termination equially
+        :param accept_all: not allowed; caught and rejected
+        :param termination:
+        :param term_flow:
+        :param descend:
+        :param name: may not be used if a scenario is also supplied
+        :param auto:
+        :param force:
+        :return:
+        """
         if accept_all is not None:
             print('%s: cannot "accept all"' % fragment)
         if name is not None:
@@ -398,7 +426,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                                                                                               scenario))
         if termination is not None:
             term = self.find_term(termination)
-            fragment.terminate(term, scenario=scenario, **kwargs)
+            fragment.terminate(term, scenario=scenario, term_flow=term_flow, descend=descend)
 
         return fragment.link
 
@@ -737,11 +765,30 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                     if multi_flow:
                         continue  # cannot update terms in the multi-flow case
                     '''
-                    if term is None:
+                    '''# However: we should NOT update already-terminated flows with "first available"
+                    The current approach:
+                     - if no termination is specified, hunt for one
+                     - if a termination is supplied OR found in a hunt, go forward:
+                       - if the termination doesn't match the existing one, replace it! very destructive
+                    
+                    RESOLVED: we should NOT hunt for terminations on a fragment update. REASON:
+                     * fragments are built in an order selected by the modeler so as to determine which frags are found
+                       in a "hunt". If we start updating based on hunt results, we can terminate intentionally-cutoff
+                       frags.
+                    The proposed new workflow:
+                     = if a termination is specified:
+                       - if it differs from the existing termination:
+                         replace it!
+                       - else, nothing to do
+                     - else, do nothing. don't go hunting
+                    '''
+                    '''
+                    if term is None:  
                         try:
                             term = next(self.fragments_with_flow(c_up.flow, c_up.direction))
                         except StopIteration:
                             pass
+                    '''
 
                     # set term
                     if term is not None:
@@ -763,7 +810,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             c = self.new_fragment(flow, y.direction, value=y.value, units=y.unit, parent=parent, **y.args)
 
             if term is None:
-                try:
+                try:  # go hunting for a term in the local foreground
                     term = next(self.fragments_with_flow(c.flow, c.direction))
                 except StopIteration:
                     pass
