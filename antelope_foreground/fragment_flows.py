@@ -434,5 +434,24 @@ class GhostFragment(object):
         return '(%s) %s %.5s %s --:   [%s] %s' % (re, self.dirn, self.uuid, self.dirn,
                                                   self.flow.unit, self.flow['Name'])
 
+    def __eq__(self, other):
+        """
+        This replicates the LcEntity equality test
+        two entities are equal if their types, origins, and external references are the same.
+        internal refs do not need to be equal; reference entities do not need to be equal
+        :return:
+        """
+        if other is None:
+            return False
+        # if not isinstance(other, LcEntity):  # taking this out so that CatalogRefs and entities can be compared
+        #     return False
+        try:
+            is_eq = (self.external_ref == other.external_ref
+                     and self.origin == other.origin
+                     and self.entity_type == other.entity_type)
+        except AttributeError:
+            is_eq = False
+        return is_eq
+
     def __getitem__(self, item):
         return self.flow[item]

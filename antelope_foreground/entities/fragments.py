@@ -691,7 +691,7 @@ class LcFragment(LcEntity):
 
     def _match_scenario_ev(self, scenario):
         if isinstance(scenario, set):
-            match = [scen for scen in scenario if scen in self._exchange_values.keys()]
+            match = [scen for scen in filter(None, scenario) if scen in self._exchange_values.keys()]
             if len(match) == 0:
                 return None
             elif len(match) > 1:
@@ -705,7 +705,7 @@ class LcFragment(LcEntity):
         if scenario == 0 or scenario == '0' or scenario is None:
             return None
         if isinstance(scenario, set):
-            match = [scen for scen in scenario if scen in self._terminations.keys()]
+            match = [scen for scen in filter(None, scenario) if scen in self._terminations.keys()]
             if len(match) == 0:
                 return None
             elif len(match) > 1:
