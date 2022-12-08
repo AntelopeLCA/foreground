@@ -124,14 +124,17 @@ class FragmentFlow(object):
 
     @property
     def name(self):
-        if self.term.is_null:
-            name = self.fragment['Name']
-        elif self.term.is_context:
-            name = '%s, %s' % (self.term.term_flow['Name'], self.term.term_node.name)
-        else:
-            name = self.term.term_node.name
-        if len(name) > 80:
-            name = name[:62] + '....' + name[-14:]
+        return self.term.name
+
+    def screen_name(self, length=80):
+        """
+        auto-compact for display
+
+        :return:
+        """
+        name = self.name
+        if len(name) > length:
+            name = name[:(length - 18)] + '....' + name[-14:]
         return name
 
     def __str__(self):

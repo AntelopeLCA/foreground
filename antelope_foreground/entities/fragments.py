@@ -800,9 +800,9 @@ class LcFragment(LcEntity):
                 print('Flow conversion error: %5.5s: %s (%s)' % (self.uuid, self.flow.reference_entity, units))
                 value = 0.0
 
-        if scenario == 0 or scenario == '0' or scenario is None:
+        if scenario == 0 or scenario == '0' or scenario == 'cached' or scenario is None:
             self._exchange_values[0] = value
-        elif scenario == 1 or scenario == '1':
+        elif scenario == 1 or scenario == '1' or scenario == 'observed':
             self._exchange_values[1] = value
         else:
             self._exchange_values[scenario] = value
@@ -959,6 +959,9 @@ class LcFragment(LcEntity):
         :param kwargs: term_flow, descend
         :return:
         """
+        if scenario in ('cached', 'observed'):
+            raise ValueError('scenario cannot use reserved name: %s' % scenario)
+
         if direction is not None:
             raise NotImplementedError('Flow Termination Directions are not supposed to be specified by hand')
         if isinstance(scenario, tuple) or isinstance(scenario, set):

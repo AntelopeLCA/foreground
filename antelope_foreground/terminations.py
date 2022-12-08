@@ -11,6 +11,7 @@ from antelope import BackgroundRequired, check_direction, comp_dir, QuantityRequ
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
 from .lcia_dict import LciaResults
+from .models import Anchor, EntityRef
 
 
 # from lcatools.catalog_ref import NoCatalog
@@ -248,7 +249,7 @@ class FlowTermination(object):
     @property
     def valid(self):
         if self.is_null:
-            return False
+            return True  # cutoff fragment flows should not report zero node weight
         return self.term_node.validate()
 
     @direction.setter
@@ -422,6 +423,16 @@ class FlowTermination(object):
     @property
     def term_node(self):
         return self._term
+
+    @property
+    def name(self):
+        if self.is_null:
+            name = self._parent['Name']
+        elif self.is_context:
+            name = '%s, %s' % (self.term_flow['Name'], self.term_node.name)
+        else:
+            name = self.term_node.name
+        return name
 
     @property
     def term_ref(self):
@@ -693,6 +704,21 @@ class FlowTermination(object):
         if self._parent.is_background and save_unit_scores and len(self._score_cache) > 0:
             j['scoreCache'] = self._serialize_score_cache()
         return j
+
+    def to_anchor(self, save_unit_scores=False):
+        if self.is_null or self.term_node is self._parent:
+            return Anchor.null()
+        d = {'descend': self.descend}
+        if self._parent.is_background and save_unit_scores and len(self._score_cache) > 0:
+            d['score_cache'] = self._serialize_score_cache()
+        if self.is_context:
+            d['context'] = self.term_node.as_list()
+            return Anchor(**d)
+        else:
+            if self.term_flow != self._parent.flow:
+                d['anchor_flow'] = EntityRef.from_entity(self.term_flow)
+            d['node'] = EntityRef.from_entity(self.term_node)
+            return Anchor(**d)
 
     def __eq__(self, other):
         """
