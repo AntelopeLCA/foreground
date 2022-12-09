@@ -516,7 +516,10 @@ class LcFragment(LcEntity):
 
     @property
     def cached_ev(self):
-        return self._exchange_values[0]  # or 1.0  ## Why??? we need to allow zero values
+        ev = self._exchange_values[0]  # or 1.0  ## Why??? we need to allow zero values
+        if ev is None:
+            ev = 0.0
+        return ev
 
     @cached_ev.setter
     def cached_ev(self, value):
@@ -690,16 +693,23 @@ class LcFragment(LcEntity):
                 self._terminations.pop(s)
 
     def _match_scenario_ev(self, scenario):
+        """
+        If *any* scenario is specified, we return either a match or the observed ev.
+        :param scenario:
+        :return:
+        """
+        if scenario is None:
+            return None
         if isinstance(scenario, set):
             match = [scen for scen in filter(None, scenario) if scen in self._exchange_values.keys()]
             if len(match) == 0:
-                return None
+                return 1
             elif len(match) > 1:
                 raise ScenarioConflict('fragment: %s\nexchange value matches: %s' % (self, match))
             return match[0]
         if scenario in self._exchange_values.keys():
             return scenario
-        return None
+        return 1
 
     def _match_scenario_term(self, scenario):
         if scenario == 0 or scenario == '0' or scenario is None:
@@ -717,22 +727,24 @@ class LcFragment(LcEntity):
 
     def exchange_value(self, scenario=None, observed=False):
         """
-        # TODO: scenarios should be sets of strings, not tuples of strings (HARD! sets are not hashable)
 
         :param scenario: None, a string, or a tuple of strings. If tuple, raises error if more than one match.
         :param observed:
         :return:
         """
-        if scenario is not None:
-            observed = True
-        match = self._match_scenario_ev(scenario)
-        if match is None:
+        if scenario is None:
             if observed:
                 ev = self.observed_ev
             else:
                 ev = self.cached_ev
         else:
-            ev = self._exchange_values[match]
+            if isinstance(scenario, list) or isinstance(scenario, tuple):
+                scenario = set(scenario)
+            match = self._match_scenario_ev(scenario)
+            if match is None:
+                ev = self.observed_ev
+            else:
+                ev = self._exchange_values[match]
         if ev is None:
             return 0.0
         return ev
@@ -1187,12 +1199,10 @@ class LcFragment(LcEntity):
                     yield n
                     yds.add(n)
 
-    def tree(self, scenario=None, observed=False):
+    def tree(self):
         """
-        This is real simple- just a recursive enumeration of child flows, depth first, ignoring anchors
+        This is real simple- just a recursive enumeration of child flows, depth first
 
-        :param scenario:
-        :param observed:
         :return:
         """
         yield self
@@ -1321,14 +1331,21 @@ class LcFragment(LcEntity):
                                                      x.flow['Name'], x.value), reverse=True)
 
     def traverse(self, scenario=None, observed=False, frags_seen=None):
-        if isinstance(scenario, tuple) or isinstance(scenario, list):
-            scenario = set(scenario)
-        if scenario is not None:
-            observed = True
-        ffs, _ = self._traverse_node(1.0, scenario, observed=observed, frags_seen=frags_seen)
+        if isinstance(scenario, set):
+            scenarios = scenario
+        elif isinstance(scenario, tuple) or isinstance(scenario, list):
+            scenarios = set(scenario)
+        elif scenario is None:
+            if observed:
+                scenarios = {1}
+            else:
+                scenarios = None
+        else:
+            scenarios = {scenario}
+        ffs, _ = self._traverse_node(1.0, scenarios, frags_seen=frags_seen)
         return ffs
 
-    def _traverse_fg_node(self, ff, scenario, observed, frags_seen):
+    def _traverse_fg_node(self, ff, scenarios, frags_seen):
         """
         Handle foreground nodes and processes--> these can be quantity-conserving, but except for
         balancing flows the flow magnitudes are determined at the time of construction (or scenario specification).
@@ -1365,8 +1382,7 @@ class LcFragment(LcEntity):
         This also requires the modeler to specify a resolution order and cuts the need for elaborate error checking.
 
         :param ff: a FragmentFlow containing the foreground termination to recurse into
-        :param scenario:
-        :param observed:
+        :param scenarios:
         :param frags_seen:
         :return: a list of FragmentFlows in the order encountered, with input ff in position 0
         """
@@ -1376,7 +1392,7 @@ class LcFragment(LcEntity):
         if term.is_fg:
             if self.reference_entity is None:
                 # inbound exchange value w.r.t. term node's unit magnitude
-                stock = self.exchange_value(scenario, observed=observed)
+                stock = self.exchange_value(scenarios)
             else:
                 stock = 1.0  # balance measurement w.r.t. term node's unit magnitude
         else:
@@ -1393,7 +1409,7 @@ class LcFragment(LcEntity):
         for f in self.child_flows:
             try:
                 # traverse child, collecting conserved value if applicable
-                child_ff, cons = f._traverse_node(node_weight, scenario, observed=observed,
+                child_ff, cons = f._traverse_node(node_weight, scenarios,
                                                   frags_seen=frags_seen, conserved_qty=self.conserved_quantity)
                 if cons is None:
                     self.dbg_print('-- returned cons_value', level=3)
@@ -1417,13 +1433,13 @@ class LcFragment(LcEntity):
             else:
                 self.dbg_print('%.3s Output: maintaining balance value' % bal_f.uuid)
             self.dbg_print('%g balance value passed to %.3s' % (stock, bal_f.uuid))
-            bal_ff, _ = bal_f._traverse_node(node_weight, scenario, observed=observed,
+            bal_ff, _ = bal_f._traverse_node(node_weight, scenarios,
                                              frags_seen=set(frags_seen), conserved_qty=None, _balance=stock)
             ffs.extend(bal_ff)
 
         return ffs
 
-    def _traverse_subfragment(self, ff, scenario, observed, frags_seen):
+    def _traverse_subfragment(self, ff, scenarios, frags_seen):
         """
         handle sub-fragments, including background flows--
         for sub-fragments, the flow magnitudes are determined at the time of traversal and must be pushed out to
@@ -1444,8 +1460,7 @@ class LcFragment(LcEntity):
 
 
         :param ff: a FragmentFlow containing the non-fg subfragment termination to recurse into
-        :param scenario:
-        :param observed:
+        :param scenarios:
         :param frags_seen:
         :return:
         """
@@ -1466,7 +1481,7 @@ class LcFragment(LcEntity):
 
         # traverse the subfragment, match the driven flow, compute downstream node weight and normalized inventory
         try:
-            ffs, unit_inv, downstream_nw = _do_subfragment_traversal(ff, scenario, observed, frags_seen)
+            ffs, unit_inv, downstream_nw = _do_subfragment_traversal(ff, scenarios, frags_seen)
         except ZeroDivisionError:
             return [ff]
 
@@ -1487,7 +1502,7 @@ class LcFragment(LcEntity):
                 continue
 
             self.dbg_print('traversing with ev = %g' % ev, 4)
-            child_ff, _ = f._traverse_node(downstream_nw, scenario, observed=observed,
+            child_ff, _ = f._traverse_node(downstream_nw, scenarios,
                                            frags_seen=frags_seen, _balance=ev)
             ffs.extend(child_ff)
 
@@ -1498,8 +1513,8 @@ class LcFragment(LcEntity):
 
         return ffs
 
-    def _traverse_node(self, upstream_nw, scenario,
-                       observed=False, frags_seen=None, conserved_qty=None, _balance=None):
+    def _traverse_node(self, upstream_nw, scenarios,
+                       frags_seen=None, conserved_qty=None, _balance=None):
 
         """
         If the node has a non-null termination, use that; follow child flows.
@@ -1510,8 +1525,8 @@ class LcFragment(LcEntity):
         else: assume it is a null foreground node; follow child flows
 
         :param upstream_nw: upstream node weight
-        :param scenario: string or tuple of strings
-        :param observed: whether to use observed or cached evs (overridden by scenario specification)
+        :param scenarios: set of scenario values
+        #:param observed: whether to use observed or cached evs (overridden by scenario specification)
         :param frags_seen: carried along to catch recursion loops
         :param conserved_qty: in case the parent node is a conservation node
         :param _balance: used when flow magnitude is determined during traversal, i.e. for balance flows and
@@ -1532,10 +1547,10 @@ class LcFragment(LcEntity):
             frags_seen.add(self.uuid)
 
         if _balance is None:
-            _scen_ev = self._match_scenario_ev(scenario)
-            ev = self.exchange_value(_scen_ev, observed=observed)
+            _scen_ev = self._match_scenario_ev(scenarios)
+            ev = self.exchange_value(_scen_ev)
         else:
-            # _scen_ev = None
+            _scen_ev = None
             self.dbg_print('%g balance' % _balance, level=2)
             ev = _balance
             '''
@@ -1544,7 +1559,7 @@ class LcFragment(LcEntity):
             '''
 
         magnitude = upstream_nw * ev
-        _scen_term = self._match_scenario_term(scenario)
+        _scen_term = self._match_scenario_term(scenarios)
         term = self._terminations[_scen_term]
 
         if self.reference_entity is None:
@@ -1581,8 +1596,9 @@ class LcFragment(LcEntity):
             conserved = self.conserved
 
         # print('%6f %6f %s' % (magnitude, node_weight, self))
-        # TODO: figure out how to cache + propagate matched scenarios
-        ff = FragmentFlow(self, magnitude, node_weight, term, conserved)
+        # this is the only place a FragmentFlow is created
+        # TODO: figure out how to cache + propagate matched scenarios ... in progress
+        ff = FragmentFlow(self, magnitude, node_weight, term, conserved, match_ev=_scen_ev, match_term=_scen_term)
 
         '''
         now looking forward: is our termination a cutoff, background, foreground or subfragment?
@@ -1594,16 +1610,16 @@ class LcFragment(LcEntity):
 
         if term.is_fg or term.term_node.entity_type == 'process':
             self.dbg_print('fg')
-            ffs = self._traverse_fg_node(ff, scenario, observed, frags_seen)
+            ffs = self._traverse_fg_node(ff, scenarios, frags_seen)
 
         else:
             self.dbg_print('subfrag')
-            ffs = self._traverse_subfragment(ff, scenario, observed, frags_seen)
+            ffs = self._traverse_subfragment(ff, scenarios, frags_seen)
 
         return ffs, conserved_val
 
 
-def _do_subfragment_traversal(ff, scenario, observed, frags_seen):
+def _do_subfragment_traversal(ff, scenarios, frags_seen):
     """
     This turns out to be surprisingly complicated. So we now have:
      - LcFragment._traverse_node <-- which is called recursively
@@ -1629,15 +1645,14 @@ def _do_subfragment_traversal(ff, scenario, observed, frags_seen):
      - called from
 
     :param ff: The FragmentFlow whose subfragment is being traversed
-    :param scenario: to pass to subfragment
-    :param observed: to pass to subfragment
+    :param scenarios: to pass to subfragment
     :return: ffs [subfragment traversal appended], unit_inv [with reference flow removed], downstream node weight
     """
     term = ff.term  # note that we ignore term.direction in subfragment traversal
     node_weight = ff.node_weight
     self = ff.fragment
 
-    unit_inv, subfrags = term.term_node.unit_inventory(scenario=scenario, observed=observed, frags_seen=frags_seen)
+    unit_inv, subfrags = term.term_node.unit_inventory(scenario=scenarios, frags_seen=frags_seen)
 
     # find the inventory flow that matches us
     # use term_flow over term_node.flow because that allows client code to specify inverse traversal knowing
@@ -1681,7 +1696,7 @@ def _do_subfragment_traversal(ff, scenario, observed, frags_seen):
     else:
         # if aggregating, we are only setting unit scores- so don't scale
         self.dbg_print('aggregating', level=0)
-        ff.aggregate_subfragments(subfrags, scenario=scenario, observed=observed)  # include params to reproduce
+        ff.aggregate_subfragments(subfrags, scenarios=scenarios)  # include params to reproduce
         ff.node_weight = downstream_nw  # NOTE: this may be problematic; undone in lca_disclosures
         ffs = [ff]
 

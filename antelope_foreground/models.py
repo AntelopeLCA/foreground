@@ -80,7 +80,7 @@ class FragmentEntity(Entity):
 
     exchange_values: Dict[str, float]
 
-    anchors: Dict[str, Anchor]
+    anchors: Dict[str, Optional[Anchor]]
 
     @classmethod
     def from_entity(cls, fragment, save_unit_scores=False, **kwargs):
@@ -108,12 +108,14 @@ class FragmentBranch(ResponseModel):
     Used to construct a tree diagram. Reports exchange values only, can be null (if not observable), and no node weights
     (because no traversal)
     """
+    parent: Optional[str]
     node: FragmentRef
     name: str
     group: str  # this is the StageName, used for aggregation.. the backend must set / user specify / modeler constrain
     magnitude: Optional[float]
     unit: str
     anchor: Optional[Anchor]
+    is_cutoff: bool
     is_balance_flow: bool
 
     @classmethod
@@ -133,9 +135,20 @@ class FragmentBranch(ResponseModel):
             mag = None
         if fragment.is_balance:
             print(' ## Balance Flow ## %s' % fragment)
-        return cls(node=FragmentRef.from_fragment(fragment), name=fragment.term.name, group=fragment.get(group, ''),
+        if fragment.reference_entity is None:
+            parent = None
+        else:
+            parent = fragment.reference_entity.external_ref
+        term = fragment.termination(scenario)
+        anchor = term.to_anchor(save_unit_scores=save_unit_scores)
+        if anchor is None and len(list(fragment.child_flows)) == 0:
+            cutoff = True
+        else:
+            cutoff = False
+        return cls(parent=parent, node=FragmentRef.from_fragment(fragment), name=term.name,
+                   group=fragment.get(group, ''),
                    magnitude=mag, unit=fragment.flow.unit, is_balance_flow=fragment.is_balance,
-                   anchor=fragment.termination(scenario).to_anchor(save_unit_scores=save_unit_scores))
+                   anchor=anchor, is_cutoff=cutoff)
 
 
 class FragmentFlow(ResponseModel):
@@ -151,15 +164,16 @@ class FragmentFlow(ResponseModel):
     when doing operations.
 
     """
+    parent: Optional[str]
     node: FragmentRef
     name: str
     group: str  # this is the StageName, used for aggregation.. the backend must set / user specify / modeler constrain
     magnitude: float
-    # magnitude_scenario: str
+    scenario: Optional[str]
     unit: str
     node_weight: float
-    anchor: Anchor
-    # anchor_scenario: str
+    anchor: Optional[Anchor]
+    anchor_scenario: Optional[str]
     is_conserved: bool
 
     @classmethod
@@ -171,8 +185,15 @@ class FragmentFlow(ResponseModel):
         :param save_unit_scores: score_cache must generally not be returned unless some aggregation condition is met
         :return:
         """
-        return cls(node=FragmentRef.from_fragment(ff.fragment), name=ff.name, group=ff.fragment.get(group, ''),
-                   magnitude=ff.magnitude, unit=ff.fragment.flow.unit, node_weight=ff.node_weight,
+        if ff.fragment.reference_entity is None:
+            parent = None
+        else:
+            parent = ff.fragment.reference_entity.external_ref
+        scen, a_scen = ff.match_scenarios
+        if scen in (1, '1', True):
+            scen = 'observed'
+        return cls(parent=parent, node=FragmentRef.from_fragment(ff.fragment), name=ff.name,
+                   group=ff.fragment.get(group, ''),
+                   magnitude=ff.magnitude, scenario=scen, unit=ff.fragment.flow.unit, node_weight=ff.node_weight,
                    is_conserved=ff.is_conserved,
-                   anchor=ff.term.to_anchor(save_unit_scores=save_unit_scores))
-
+                   anchor=ff.term.to_anchor(save_unit_scores=save_unit_scores), anchor_scenario=a_scen)

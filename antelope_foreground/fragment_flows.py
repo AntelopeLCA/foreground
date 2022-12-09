@@ -84,7 +84,7 @@ class FragmentFlow(object):
         term = FlowTermination.null(fragment)
         return cls(fragment, magnitude, magnitude, term, is_conserved)
 
-    def __init__(self, fragment, magnitude, node_weight, term, is_conserved):
+    def __init__(self, fragment, magnitude, node_weight, term, is_conserved, match_ev=None, match_term=None):
         """
 
         :param fragment:
@@ -92,6 +92,8 @@ class FragmentFlow(object):
         :param node_weight:
         :param term:
         :param is_conserved:
+        :param match_ev:
+        :param match_term:
         """
         # TODO: figure out how to cache + propagate scenario applications through aggregation ops
         self.fragment = fragment
@@ -100,6 +102,7 @@ class FragmentFlow(object):
         self.term = term
         self.is_conserved = is_conserved
         self._subfrags_params = ()
+        self.match_scenarios = (match_ev, match_term)
 
     @property
     def subfragments(self):
@@ -111,12 +114,20 @@ class FragmentFlow(object):
         return []
 
     @property
-    def subfragment_params(self):
-        return {'scenario': self._subfrags_params[1],
-                'observed': self._subfrags_params[2]}
+    def subfragment_scenarios(self):
+        try:
+            return self._subfrags_params[1]
+        except IndexError:
+            return None
 
-    def aggregate_subfragments(self, subfrags, scenario=None, observed=False):
-        self._subfrags_params = (subfrags, scenario, observed)
+    def aggregate_subfragments(self, subfrags, scenarios=None):
+        """
+        We need to save the full traversal specification (
+        :param subfrags:
+        :param scenarios:
+        :return:
+        """
+        self._subfrags_params = (subfrags, scenarios)
 
     def scale(self, x):
         self.node_weight *= x
@@ -229,7 +240,7 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
 
     In cases A.2 and A.4, autoconsumption is nonsensical because it would require the induced amount to be modeled as
     the reference flow, but the induced amount cannot be induced by itself.  So these are automatically interpreted as
-    pass-through.
+    pass-through (i.e. A.2 is depletion of a passed-through flow; A.4 is accumulation of a passed-through flow).
 
     In cases A.1 and A.3 however, either could apply:
 
