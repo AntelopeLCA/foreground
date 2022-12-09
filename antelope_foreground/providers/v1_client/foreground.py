@@ -41,7 +41,7 @@ class AntelopeV1ForegroundImplementation(AntelopeForegroundImplementation):
         if scenario is None:
             scenario = '1'
 
-        qi = self._archive.make_interface('quantity)')
+        qi = self._archive.make_interface('quantity')
         lcia_q = qi.get_lcia_quantity(quantity_ref)
         endpoint = 'scenarios/%s/%s/%s/lciaresults' % (scenario, fragment, lcia_q.external_ref)
         lcia_r = self._archive.get_endpoint(endpoint, cache=False)

@@ -207,7 +207,7 @@ class FragmentTests(unittest.TestCase):
                x 
         '''
         # make an alternate energy supply fragment to test scenario terminations
-        cls.a2_alt = new_fragment(f3, 'Output', Name='An alternate energy conversion process')
+        cls.a2_alt = new_fragment(f3, 'Output', Name='An alternate energy conversion process', observe=True)
         new_fragment(f4, 'Input', parent=cls.a2_alt, value=a2_alt_fuel, observe=True)
         new_fragment(f8, 'Input', parent=cls.a2_alt, value=a2_alt_tx, observe=True)
         '''a2_alt

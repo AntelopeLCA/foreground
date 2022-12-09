@@ -20,11 +20,11 @@ from .quantity import AntelopeQuantityImplementation
 from .index import AntelopeIndexImplementation
 from .exceptions import AntelopeV1Error
 
+import requests
+
 
 ANTELOPE_ENTITY_TYPES = LC_ENTITY_TYPES + tuple(filter(lambda k: k not in LC_ENTITY_TYPES, FOREGROUND_ENTITY_TYPES))
 
-
-import requests
 
 try:
     # from urllib.request import urlopen, urljoin
@@ -41,6 +41,15 @@ def remote_ref(url):
         if len(k) > 0:
             ref = '.'.join([ref, k])
     return ref
+
+
+class GhostFragmentv1(GhostFragment):
+    def __init__(self, parent, top, flow, direction):
+        self._top = top
+        super(GhostFragmentv1, self).__init__(parent, flow, direction)
+
+    def top(self):
+        return self._top
 
 
 class AntelopeV1Query(BasicQuery, AntelopeForegroundInterface):
@@ -109,7 +118,7 @@ class AntelopeV1Client(BasicArchive):
         # print('Fetching all flow properties')  ## this makes the difference between a 20 sec test and a 55-sec test
         for fp in self.get_endpoint('flowproperties', cache=False):
             self._parse_and_save_entity(fp)
-        #print('done') ## super slow DiscountASP gotta get away
+        # print('done') ## super slow DiscountASP gotta get away
         self._fetched_all['flowproperty'] = True
 
     def _set_query(self):
@@ -298,8 +307,9 @@ class AntelopeV1Client(BasicArchive):
         dirn = ff['direction']
 
         if 'parentFragmentFlowID' in ff:
-            parent = 'fragments/%s/fragmentflows/%s' % (ff['fragmentID'], ff['parentFragmentFlowID'])
-            frag = GhostFragment(parent, flow, dirn)  # distinctly not reference
+            parent_ref = 'fragments/%s/fragmentflows/%s' % (ff['fragmentID'], ff['parentFragmentFlowID'])
+            top = self.query.get('fragments/%s' % ff['fragmentID'])
+            frag = GhostFragmentv1(parent_ref, top, flow, dirn)  # distinctly not reference
 
         else:
             frag = self.query.get('fragments/%s' % ff['fragmentID'])
@@ -327,7 +337,6 @@ class AntelopeV1Client(BasicArchive):
             conserved = ff['isConserved']
         else:
             conserved = False
-
 
         return FragmentFlow(frag, magnitude, nw, term, conserved)
 

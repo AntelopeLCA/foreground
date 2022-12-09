@@ -8,7 +8,7 @@ cat = LcCatalog.make_tester()
 ref = 'calrecycle.antelope'
 
 cat.new_resource(ref, 'http://www.antelope-lca.net/uo-lca/api/', 'AntelopeV1Client',
-                 store=False, interfaces=['index', 'inventory', 'quantity'], quiet=True)
+                 store=False, interfaces=['basic', 'index', 'inventory', 'quantity'], quiet=True)
 
 
 # @unittest.skip('"No Access to Entity" needs debugged')

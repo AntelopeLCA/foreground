@@ -706,8 +706,8 @@ class FlowTermination(object):
         return j
 
     def to_anchor(self, save_unit_scores=False):
-        if self.is_null:
-            return Anchor.null()
+        if self.is_null or self._parent is self.term_node:
+            return None
         d = {'descend': self.descend}
         if self._parent.is_background and save_unit_scores and len(self._score_cache) > 0:
             d['score_cache'] = self._serialize_score_cache()
