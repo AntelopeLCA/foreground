@@ -27,7 +27,7 @@ class Anchor(ResponseModel):
     anchor_flow: Optional[EntityRef]
     context: Optional[List[str]]
     descend: bool
-    score_cache: Optional[Dict[str: float]]
+    score_cache: Optional[Dict[str, float]]
 
     @property
     def type(self):
@@ -40,7 +40,7 @@ class Anchor(ResponseModel):
 
     @property
     def is_null(self):
-        return bool(self.node or self.context)
+        return not bool(self.node or self.context)
 
     @classmethod
     def null(cls):
@@ -78,9 +78,9 @@ class FragmentEntity(Entity):
 
     # entity_uuid: str  # we don't need uuid in cases where a fragment is named. we just don't.
 
-    exchange_values: Dict[str: float]
+    exchange_values: Dict[str, float]
 
-    anchors: Dict[str: Anchor]
+    anchors: Dict[str, Anchor]
 
     @classmethod
     def from_entity(cls, fragment, save_unit_scores=False, **kwargs):
@@ -89,7 +89,7 @@ class FragmentEntity(Entity):
         else:
             dirn = fragment.direction
         j = fragment.serialize(**kwargs)
-        evs = j.pop('exchange_values')
+        evs = j.pop('exchangeValues')
         evs['cached'] = evs.pop('0')
         evs['observed'] = evs.pop('1')
         terms = {}
@@ -98,7 +98,7 @@ class FragmentEntity(Entity):
                 k = 'default'
             terms[k] = v.to_anchor(save_unit_scores=save_unit_scores)
         return cls(origin=fragment.origin, entity_id=fragment.external_ref, properties=j.pop('tags'),
-                   flow=EntityRef.from_entity(fragment.flow), direction=dirn,
+                   flow=FlowEntity.from_flow(fragment.flow), direction=dirn,
                    parent=j.pop('parent'), is_balance_flow=j.pop('isBalanceFlow'),
                    exchange_values=evs, anchors=terms)
 
@@ -131,6 +131,8 @@ class FragmentBranch(ResponseModel):
             mag = fragment.exchange_value(scenario, observed)
         else:
             mag = None
+        if fragment.is_balance:
+            print(' ## Balance Flow ## %s' % fragment)
         return cls(node=FragmentRef.from_fragment(fragment), name=fragment.term.name, group=fragment.get(group, ''),
                    magnitude=mag, unit=fragment.flow.unit, is_balance_flow=fragment.is_balance,
                    anchor=fragment.termination(scenario).to_anchor(save_unit_scores=save_unit_scores))
@@ -138,19 +140,26 @@ class FragmentBranch(ResponseModel):
 
 class FragmentFlow(ResponseModel):
     """
-    A FragmentFlow is a record of a link in a traversal. Current controversy: whether a FragmentFlow needs
-    scenario information. Also: whether foreground nodes (anchor = self) actually have anchors (decision: no, the
-    'foreground is self' designation is actually a hack and is redundant. the relevant trait is whether it has
-    child flows, which can be known by the constructor)
+    A FragmentFlow is a record of a link in a traversal. Current controversy: when a flow magnitude or anchor is
+    determined by a scenario specification, the FragmentFlow needs to report that.
+
+    Also: whether foreground nodes (anchor = self) actually have anchors (decision: no, the 'foreground is self'
+    designation is actually a hack and is redundant. the relevant trait is whether it has child flows, which can be
+    known by the constructor)
+
+    hmm except all FragmentFlows have anchors. I think we need to preserve the anchor-is-self, and simply test for it
+    when doing operations.
 
     """
     node: FragmentRef
     name: str
     group: str  # this is the StageName, used for aggregation.. the backend must set / user specify / modeler constrain
     magnitude: float
+    # magnitude_scenario: str
     unit: str
     node_weight: float
-    anchor: Optional[Anchor]
+    anchor: Anchor
+    # anchor_scenario: str
     is_conserved: bool
 
     @classmethod
@@ -163,6 +172,7 @@ class FragmentFlow(ResponseModel):
         :return:
         """
         return cls(node=FragmentRef.from_fragment(ff.fragment), name=ff.name, group=ff.fragment.get(group, ''),
-                   magnitude=ff.magnitude, unit=ff.unit, node_weight=ff.node_weight, is_conserved=ff.is_conserved,
+                   magnitude=ff.magnitude, unit=ff.fragment.flow.unit, node_weight=ff.node_weight,
+                   is_conserved=ff.is_conserved,
                    anchor=ff.term.to_anchor(save_unit_scores=save_unit_scores))
 

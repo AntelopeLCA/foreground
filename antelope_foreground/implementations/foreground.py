@@ -567,6 +567,16 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         self._archive.save(save_unit_scores=save_unit_scores)
         return True
 
+    def tree(self, fragment, **kwargs):
+        """
+
+        :param fragment:
+        :param kwargs:
+        :return:
+        """
+        frag = self._archive.retrieve_or_fetch_entity(fragment)
+        return frag.tree()
+
     def traverse(self, fragment, scenario=None, **kwargs):
         frag = self._archive.retrieve_or_fetch_entity(fragment)
         return frag.traverse(scenario, observed=True)

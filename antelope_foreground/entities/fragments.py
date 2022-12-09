@@ -1187,6 +1187,19 @@ class LcFragment(LcEntity):
                     yield n
                     yds.add(n)
 
+    def tree(self, scenario=None, observed=False):
+        """
+        This is real simple- just a recursive enumeration of child flows, depth first, ignoring anchors
+
+        :param scenario:
+        :param observed:
+        :return:
+        """
+        yield self
+        for c in self.child_flows:
+            for b in c.tree():
+                yield b
+
     def fragment_lcia(self, quantity_ref, scenario=None, observed=True, **kwargs):
         """
         Fragments don't have access to a qdb, so this piggybacks on the quantity_ref.
