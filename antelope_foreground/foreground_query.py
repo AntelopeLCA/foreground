@@ -19,7 +19,6 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
     pass
 
 
-
 class QueryIsDelayed(InvalidQuery):
     pass
 

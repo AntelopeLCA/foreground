@@ -245,7 +245,7 @@ class ForegroundCatalog(LcCatalog):
                 self._queries[origin] = ForegroundQuery(origin, catalog=self, **kwargs)
             return self._queries[origin]
 
-        return super(ForegroundCatalog, self).query(origin, strict=strict, **kwargs)
+        return super(ForegroundCatalog, self).query(origin, strict=strict, refresh=refresh, **kwargs)
 
     def catalog_ref(self, origin, external_ref, entity_type=None, **kwargs):
         if origin in self.foregrounds:

@@ -240,7 +240,7 @@ class LcForeground(BasicArchive):
         if entity.origin == self.ref and entity.external_ref != entity.uuid:
             self._add_ext_ref_mapping(entity)
 
-        #TODO: figure out how to specify which flows should NOT be merged (current: only flows with no context)
+        # TODO: figure out how to specify which flows should NOT be merged (current: only flows with no context)
         try:
             self._add_to_tm(entity)  # , merge_strategy='distinct')  # DWR!!! need to
         except QueryIsDelayed:
@@ -289,7 +289,6 @@ class LcForeground(BasicArchive):
         This function is complicated because we have so many dicts:
          _entities maps link to entity
          _ext_ref_mapping maps custom name to link
-         _uuid_map maps UUID to a set of links that share the uuid
          _ents_by_type keeps a set of links by entity type
 
         So, when we name a fragment, we want to do the following:
@@ -297,7 +296,6 @@ class LcForeground(BasicArchive):
          - ensure the name is not already taken
          - set the fragment entity's name
          * pop the old link and replace its object with the new link in _entities
-         * remove the old link and replace it with the new link in the uuid map
          * remove the old link and replace it with the new link in ents_by_type['fragment']
          * add the name with the new link to the ext_ref_mapping
         :param frag:
@@ -307,7 +305,6 @@ class LcForeground(BasicArchive):
          This requires:
            - first de-naming the prior fragment,
            - then swapping its _entities entry
-           - then swapping its _uuid_map entry
            - then swapping its _ents_by_type entry
            - then removing its duplicate ext_ref_mapping
            = then proceeding to normally rename the new frag
@@ -513,7 +510,6 @@ class LcForeground(BasicArchive):
          _entities
          _ents_by_type
          _ext_ref_mapping
-         _uuid_map
          _frags_with_flow
         and correct _counter.
         The fragment is not destroyed- and can be re-added. Deleting child fragments is left to interface code (why?)

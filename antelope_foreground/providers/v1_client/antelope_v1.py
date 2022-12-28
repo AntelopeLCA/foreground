@@ -124,10 +124,6 @@ class AntelopeV1Client(BasicArchive):
     def _set_query(self):
         self._query = AntelopeV1Query(self)
 
-    @property
-    def query(self):
-        return self._query
-
     def make_interface(self, iface):
         if iface == 'index':
             return AntelopeIndexImplementation(self)

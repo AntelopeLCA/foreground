@@ -6,7 +6,8 @@ as a ProductFlow in lca-matrix, plus features to compute LCIA.  It should be eas
 other.
 """
 
-from antelope import BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences, NoReference
+from antelope import (BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences,
+                      NoReference, ConversionReferenceMismatch)
 
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
@@ -445,7 +446,19 @@ class FlowTermination(object):
     @property
     def flow_conversion(self):
         """
-        express the parent's flow in terms of the quantity of the term flow
+        express the parent's flow in terms of the quantity of the term flow.
+        There are two ways to do this, each case involving the quantity relation on either the parent flow or the
+        term flow, between the two quantities (parent flow's r.q. is the reference quantity; term flow's r.q. is the
+        query quantity).
+
+        In each case, we want the flow's native term manager to perform the conversion using ITS OWN canonical
+        quantities.  The assumption is that the parent flow's r.q. is tied to our local LciaEngine, while the
+        term flow's r.q. could be either local or remote.
+
+        The QuantityRef.quantity_relation() implicitly assumes that the invoking quantity is the QUERY quantity, so
+        the "forward" (natural parent->node) direction uses the remote flow's r.q. - but we do the "reverse" direction
+        first because it's local.
+
         how to deal with scenario cfs? tbd
         problem is, the term doesn't know its own scenario
         :return: float = amount in term_flow ref qty that corresponds to a unit of fragment flow's ref qty
@@ -455,20 +468,21 @@ class FlowTermination(object):
         if self.term_flow.reference_entity == self._parent.flow.reference_entity:
             return 1.0
         try:
-            fwd_cf = self.term_flow.reference_entity.cf(self._parent.flow, dist=3)
-        except QuantityRequired:
-            fwd_cf = 0.0
-        if fwd_cf == 0.0:
+            rev_qr = self._parent.flow.reference_entity.quantity_relation(self._parent.flow.name,
+                                                                          self.term_flow.reference_entity.external_ref,
+                                                                          None,
+                                                                          dist=3)  # we're punting on locale for now
+            rev_cf = rev_qr.value
+        except (QuantityRequired, ConversionReferenceMismatch):
             try:
-                rev_cf = self._parent.flow.reference_entity.cf(self.term_flow, dist=3)
+                fwd_qr = self.term_flow.cf(self._parent.flow.reference_entity, dist=3)
+                fwd_cf = fwd_qr.value
             except QuantityRequired:
-                rev_cf = 0.0
-            if rev_cf == 0.0:
+                fwd_cf = 0.0
+            if fwd_cf == 0.0:
                 raise FlowConversionError('Zero CF found relating %s to %s' % (self.term_flow, self._parent.flow))
-            else:
-                return 1.0 / rev_cf
-        else:
-            return fwd_cf
+            return 1.0 / fwd_cf  # we invert because we are using cf instead of quantity_relation, bc it's more compact
+        return 1.0 / rev_cf
 
     @property
     def id(self):

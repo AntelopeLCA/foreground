@@ -92,6 +92,7 @@ def new_fragment(*args, **kwargs):
     # self._archive.add_entity_and_children(frag)
     return frag
 
+
 f4_mj_kg = 35
 f7_mass = 0.0123
 
@@ -115,7 +116,7 @@ fp = new_flow('A private flow', 'price')
 
 # parameters
 
-#a1
+# a1
 a1_vol = 10
 a1_mj_in = 19
 a1_addl = 0.88
@@ -134,7 +135,7 @@ a2_item = 0.003
 a2_eff_waste_heat = 3.5
 a2_eff_private = 49
 
-#a2_alt
+# a2_alt
 a2_alt_fuel = 1.1 / f4_mj_kg
 a2_alt_tx = 2.6
 
@@ -168,7 +169,6 @@ class FragmentTests(unittest.TestCase):
         aq = new_fragment(f4, 'Input', parent=cls.a1, value=a1_addl)
         aq.observe(value=a1_addl_obs)
         aq.observe(a1_surplus_addl, scenario='surplus')
-
 
         '''a1
            -<--O   70a01 [       1 kg] A Production Process
