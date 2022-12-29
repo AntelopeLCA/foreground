@@ -475,8 +475,7 @@ class FlowTermination(object):
             rev_cf = rev_qr.value
         except (QuantityRequired, ConversionReferenceMismatch):
             try:
-                fwd_qr = self.term_flow.cf(self._parent.flow.reference_entity, dist=3)
-                fwd_cf = fwd_qr.value
+                fwd_cf = self.term_flow.cf(self._parent.flow.reference_entity, dist=3)
             except QuantityRequired:
                 fwd_cf = 0.0
             if fwd_cf == 0.0:
