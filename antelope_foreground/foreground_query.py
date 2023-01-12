@@ -40,6 +40,11 @@ class DelayedQuery(ForegroundQuery):
             return NullContext
         return cx
 
+    def validate(self):
+        if self._catalog.is_in_queue(self._home):
+            return False
+        return super(DelayedQuery, self).validate()
+
     def _perform_query(self, itype, attrname, exc, *args, strict=False, **kwargs):
         if self._catalog.is_in_queue(self._home):
             raise QueryIsDelayed(self.origin, self._home)

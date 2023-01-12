@@ -467,5 +467,14 @@ class GhostFragment(object):
             is_eq = False
         return is_eq
 
+    def get(self, item, default=None):
+        try:
+            return self.__getitem__(item)
+        except KeyError:
+            return default
+
     def __getitem__(self, item):
-        return self.flow[item]
+        if self._parent is None:
+            return self.flow[item]
+        else:
+            return self._parent[item]

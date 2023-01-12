@@ -74,7 +74,7 @@ def new_flow(name, ref_quantity, context=None, **kwargs):
     if CONTEXT_STATUS_ == 'compat':
         if context is not None and 'compartment' not in kwargs:
             kwargs['compartment'] = str(context)
-    ref_q = qdb.tm.get_canonical(ref_quantity)
+    ref_q = qi.get_canonical(ref_quantity)
     f = LcFlow.new(name, ref_qty=ref_q, origin=origin, **kwargs)
     # self._archive.add_entity_and_children(f)
     return f

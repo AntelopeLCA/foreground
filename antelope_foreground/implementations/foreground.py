@@ -1,11 +1,10 @@
 from antelope import CONTEXT_STATUS_, EntityNotFound, comp_dir  # , BackgroundRequired
 from ..interfaces.iforeground import AntelopeForegroundInterface
 from antelope_core.implementations import BasicImplementation
+from antelope_core.implementations.quantity import UnknownRefQuantity
 
 from antelope_core.entities.xlsx_editor import XlsxArchiveUpdater
-from antelope_core.entities.quantities import new_quantity
 from antelope_core.contexts import NullContext
-from antelope_core.entities.flows import new_flow
 from ..entities.fragments import InvalidParentChild
 from ..entities.fragment_editor import create_fragment, clone_fragment, _fork_fragment, interpose
 
@@ -15,10 +14,6 @@ class NotForeground(Exception):
 
 
 class UnknownFlow(Exception):
-    pass
-
-
-class UnknownRefQuantity(Exception):
     pass
 
 
@@ -235,9 +230,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param kwargs:
         :return:
         """
-        q = new_quantity(name, ref_unit, **kwargs)
-        self._archive.add(q)
-        return q
+        return self._archive.query.new_quantity(name, ref_unit=ref_unit, **kwargs)
 
     def add_entity_and_children(self, *args, **kwargs):
         """
@@ -270,7 +263,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             if strict:
                 if t.entity_type == 'flow':
                     if t.reference_entity != self.get_canonical(reference):
-                        raise TypeError("ref quantity (%s) doesn't match supplied (%s)" % (t.reference_entity, reference))
+                        raise TypeError("ref quantity (%s) doesn't match supplied (%s)" % (t.reference_entity,
+                                                                                           reference))
                 elif t.entity_type == 'quantity':
                     if t.unit != reference:
                         raise TypeError("ref unit (%s) doesn't match supplied (%s)" % (t.unit, reference))
@@ -285,27 +279,15 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 # assume reference is a unit string specification
                 return self.new_quantity(name, ref_unit=reference, external_ref=external_ref, group=group, **kwargs)
 
-    def new_flow(self, name, ref_quantity=None, context=None, **kwargs):
+    def new_flow(self, name, ref_quantity=None, **kwargs):
         """
 
         :param name:
         :param ref_quantity: defaults to "Number of items"
-        :param context: [None] pending context refactor
         :param kwargs:
         :return:
         """
-        if CONTEXT_STATUS_ == 'compat':
-            if context is not None and 'compartment' not in kwargs:
-                kwargs['compartment'] = str(context)
-        if ref_quantity is None:
-            ref_quantity = 'Number of items'
-        try:
-            ref_q = self.get_canonical(ref_quantity)
-        except EntityNotFound:
-            raise UnknownRefQuantity(ref_quantity)
-        f = new_flow(name, ref_q, context=context, **kwargs)
-        self._archive.add_entity_and_children(f)
-        return self.get(f.link)
+        return self._archive.query.new_flow(name, ref_quantity=ref_quantity, **kwargs)
 
     def find_term(self, term_ref, origin=None, **kwargs):
         """
@@ -627,8 +609,6 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         self.fragment_from_exchanges(process.inventory(ref_flow=term.term_flow), parent=fragment, scenario=scenario,
                                      include_context=include_context,
                                      **kwargs)
-
-
 
     '''
     def extend_process_model(self, fragment, include_elementary=False, terminate=True, **kwargs):

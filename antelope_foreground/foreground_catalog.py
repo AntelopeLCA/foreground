@@ -136,7 +136,7 @@ class ForegroundCatalog(LcCatalog):
 
         try:
             res = next(self._resolver.resolve(ref, interfaces='foreground'))
-        except UnknownOrigin:
+        except (UnknownOrigin, StopIteration):
             raise NoSuchForeground(ref)
 
         if reset:

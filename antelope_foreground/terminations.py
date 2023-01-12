@@ -177,8 +177,9 @@ class FlowTermination(object):
                 term_flow = entity.flow
                 _direction = entity.direction
                 entity = entity.process
-            elif entity.entity_type not in ('context', 'process', 'fragment'):
-                raise TypeError('Inappropriate termination type: %s' % entity.entity_type)
+            elif entity.entity_type not in ('context', 'process', 'fragment', 'term'):
+                raise TypeError('%s: term %s Inappropriate termination type: %s' % (fragment.link, entity.link,
+                                                                                    entity.entity_type))
 
             # check for recursive loops
             if entity.entity_type == 'fragment' and entity is not fragment:
@@ -194,6 +195,10 @@ class FlowTermination(object):
         self.term_flow = term_flow
         self.direction = _direction
         self.descend = descend
+
+    @property
+    def term_node(self):
+        return self._term
 
     @property
     def term_flow(self):
@@ -240,7 +245,7 @@ class FlowTermination(object):
                     self._term_flow = term_flow
                 else:
                     raise MissingFlow(term_flow)
-        if self.valid and self.node_weight_multiplier == 0:
+        if self.valid and self.term_flow.validate() and self.node_weight_multiplier == 0:
             print('Warning: 0 node weight multiplier for term of %s' % self._parent.external_ref)
 
     @property
@@ -422,10 +427,6 @@ class FlowTermination(object):
             raise ValueError('Descend setting must be True or False')
 
     @property
-    def term_node(self):
-        return self._term
-
-    @property
     def name(self):
         if self.is_null:
             name = self._parent['Name']
@@ -463,25 +464,57 @@ class FlowTermination(object):
         problem is, the term doesn't know its own scenario
         :return: float = amount in term_flow ref qty that corresponds to a unit of fragment flow's ref qty
         """
+        '''
+        What are all the possibilities?
+         the parent quantity knows a characterization for the parent flow w.r.t. the term quantity
+         the parent quantity knows a characterization for the term flow w.r.t. the term quantity
+         the term quantity knows a characterization for the parent flow w.r.t. the parent quantity
+         the term quantity knows a characterization for the term flow w.r.t. the parent quantity
+
+        "hey look at me, net calorific value. see that mass flow f4- a unit of it is worth 35 of me"
+        is how the database is constructed.
+        
+        but each call to quantity_relation should check for both forward and reverse matches
+        '''
         if not self.valid:
             return 0.0
         if self.term_flow.reference_entity == self._parent.flow.reference_entity:
             return 1.0
+        parent_q = self._parent.flow.reference_entity
+        term_q = self.term_flow.reference_entity
+
         try:
-            rev_qr = self._parent.flow.reference_entity.quantity_relation(self._parent.flow.name,
-                                                                          self.term_flow.reference_entity.external_ref,
-                                                                          None,
-                                                                          dist=3)  # we're punting on locale for now
-            rev_cf = rev_qr.value
-        except (QuantityRequired, ConversionReferenceMismatch):
-            try:
-                fwd_cf = self.term_flow.cf(self._parent.flow.reference_entity, dist=3)
-            except QuantityRequired:
-                fwd_cf = 0.0
-            if fwd_cf == 0.0:
-                raise FlowConversionError('Zero CF found relating %s to %s' % (self.term_flow, self._parent.flow))
-            return 1.0 / fwd_cf  # we invert because we are using cf instead of quantity_relation, bc it's more compact
-        return 1.0 / rev_cf
+            rev = parent_q.quantity_relation(self._parent.flow, term_q, None, dist=3)
+        except (QuantityRequired, NotImplementedError, ConversionReferenceMismatch):
+            rev = None
+
+        if rev:
+            return 1.0 / rev.value
+
+        try:
+            rev_c = parent_q.quantity_relation(self.term_flow, term_q, None, dist=3)
+        except (QuantityRequired, NotImplementedError, ConversionReferenceMismatch):
+            rev_c = None
+
+        if rev_c:
+            return 1.0 / rev_c.value
+
+        try:
+            fwd = term_q.quantity_relation(self._parent.flow, parent_q, None, dist=3)
+        except (QuantityRequired, NotImplementedError, ConversionReferenceMismatch):
+            fwd = None
+
+        if fwd:
+            return fwd.value
+
+        try:
+            fwd_c = term_q.quantity_relation(self.term_flow, parent_q, None, dist=3)
+        except (QuantityRequired, NotImplementedError, ConversionReferenceMismatch):
+            fwd_c = None
+
+        if fwd_c:
+            return fwd_c.value
+        raise FlowConversionError('Zero CF found relating %s to %s' % (self.term_flow, self._parent.flow))
 
     @property
     def id(self):
@@ -767,6 +800,7 @@ class FlowTermination(object):
           '-#::' - sub-fragment (descend)
           '-B ' - terminated background
           '--C ' - cut-off background
+          '--? ' - ungrounded catalog ref
         """
         if self.is_null:
             term = '---:'  # fragment IO
@@ -795,6 +829,8 @@ class FlowTermination(object):
                     term = '-#::'
                 else:
                     term = '-#  '
+        elif self.term_node.entity_type == 'term':
+            term = '--? '
         else:
             raise TypeError('I Do not understand this term for frag %.7s' % self._parent.uuid)
         return term

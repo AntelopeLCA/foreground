@@ -197,3 +197,79 @@ class FragmentFlow(ResponseModel):
                    magnitude=ff.magnitude, scenario=scen, unit=ff.fragment.flow.unit, node_weight=ff.node_weight,
                    is_conserved=ff.is_conserved,
                    anchor=ff.term.to_anchor(save_unit_scores=save_unit_scores), anchor_scenario=a_scen)
+
+
+"""
+Foreground serialization
+
+1- foreground serialization has shown to be sufficient to reproduce models
+2- thus, formalize the serialization
+
+
+"""
+
+
+class MicroCf(ResponseModel):
+    ref_quantity: str
+    value: Dict[str, float]  # locale, CF
+
+
+class Compartment(ResponseModel):
+    name: str
+    parent: Optional[str]
+    sense: Optional[str]
+    synonyms: List[str]
+
+
+class Flowable(ResponseModel):
+    name: str
+    synonyms: List[str]
+
+
+class TermManager(ResponseModel):
+    Characterizations: Dict[str, Dict[str, Dict[str, MicroCf]]]  # query qty, flowable, compartment
+    Compartments: List[Compartment]
+    Flowables: List[Flowable]
+
+
+class LcTermination(ResponseModel):
+    """
+    these became anchors
+    """
+    externalId: str
+    origin: str
+    direction: Optional[str]
+    termFlow: Optional[str]
+    descend: Optional[str]
+    context: Optional[str]
+
+
+class LcFragment(ResponseModel):
+    entityType: str = 'fragment'
+    entityId: str
+    externalId: str
+    flow: str
+    direction: str
+    exchangeValues: Dict
+    isBackground: bool
+    isBalanceFlow: bool
+    isPrivate: bool
+    parent: Optional[str]
+    tags: Dict
+    terminations: Dict[str, Dict]  # I suspect a formal model will break on a null termination
+
+
+class LcModel(ResponseModel):
+    fragments: List[LcFragment]
+
+
+class LcForeground(ResponseModel):
+
+    catalogNames: Dict[str, List[str]]
+    dataSource: str
+    dataSourceType: str
+    flows: List[Dict]
+    initArgs: Dict
+    quantities: List[Dict]
+    termManager: Optional[TermManager]
+    models: List[LcModel]

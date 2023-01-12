@@ -143,11 +143,21 @@ class LcForeground(BasicArchive):
         self.load_all()
 
     def catalog_ref(self, origin, external_ref, entity_type=None, **kwargs):
+        """
+
+        :param origin:
+        :param external_ref:
+        :param entity_type:
+        :param kwargs:
+        :return:
+        """
+        '''#this is totally immaterial
         if entity_type == 'term':
             if origin in self._catalog.foregrounds:
                 entity_type = 'fragment'
             else:
                 entity_type = 'process'
+        '''
         try:
             return self._catalog.catalog_ref(origin, external_ref, entity_type=entity_type, **kwargs)
         except ForegroundNotSafe:
