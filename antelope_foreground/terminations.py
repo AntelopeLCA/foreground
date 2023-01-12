@@ -429,7 +429,7 @@ class FlowTermination(object):
     @property
     def name(self):
         if self.is_null:
-            name = self._parent['Name']
+            name = self.term_flow['Name']
         elif self.is_context:
             name = '%s, %s' % (self.term_flow['Name'], self.term_node.name)
         else:

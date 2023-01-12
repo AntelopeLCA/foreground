@@ -1483,6 +1483,7 @@ class LcFragment(LcEntity):
         try:
             ffs, unit_inv, downstream_nw = _do_subfragment_traversal(ff, scenarios, frags_seen)
         except ZeroDivisionError:
+            self.dbg_print('subfragment divide by zero', 1)
             return [ff]
 
         # next we traverse our own child flows, determining the exchange values from the normalized unit inventory
@@ -1499,6 +1500,7 @@ class LcFragment(LcEntity):
                     ev -= m.magnitude
                 unit_inv.remove(m)
             except StopIteration:
+                self.dbg_print('  no driving flows found')
                 continue
 
             self.dbg_print('traversing with ev = %g' % ev, 4)
