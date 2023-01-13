@@ -1389,7 +1389,7 @@ class LcFragment(LcEntity):
         term = ff.term
         node_weight = ff.node_weight
         ffs = [ff]
-        if term.is_fg:
+        if term.is_fg or not term.valid:
             if self.reference_entity is None:
                 # inbound exchange value w.r.t. term node's unit magnitude
                 stock = self.exchange_value(scenarios)
@@ -1610,7 +1610,7 @@ class LcFragment(LcEntity):
             self.dbg_print('cutoff or bg')
             return [ff], conserved_val
 
-        if term.is_fg or term.term_node.entity_type == 'process':
+        if term.is_fg or term.is_process or not term.valid:
             self.dbg_print('fg')
             ffs = self._traverse_fg_node(ff, scenarios, frags_seen)
 

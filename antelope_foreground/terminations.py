@@ -34,6 +34,10 @@ class SubFragmentAggregation(Exception):
     pass
 
 
+class UnresolvedAnchor(Exception):
+    pass
+
+
 class NonConfigurableInboundEV(Exception):
     """
     only foreground terminations may have their inbound exchange values explicitly specified
@@ -221,10 +225,10 @@ class FlowTermination(object):
         if term_flow is None:
             if self.is_process:
                 try:
-                    self._term_flow = self._term.reference().flow
+                    self._term_flow = self.term_node.reference().flow
                 except MultipleReferences as e:
                     try:
-                        self._term_flow = self._term.reference(self._parent.flow).flow
+                        self._term_flow = self.term_node.reference(self._parent.flow).flow
                     except KeyError:
                         raise e
 
@@ -235,13 +239,13 @@ class FlowTermination(object):
         else:
             if self.is_process:
                 try:
-                    self._term_flow = self._term.reference(term_flow).flow
+                    self._term_flow = self.term_node.reference(term_flow).flow
                 except NoReference:  # we need to allow processes with no reference to be used as term nodes
                     self._term_flow = term_flow
                 except KeyError:
                     raise MissingFlow(term_flow)
             elif self.is_frag:
-                if term_flow in (x.flow for x in self._term.inventory()):
+                if term_flow in (x.flow for x in self.term_node.inventory()):
                     self._term_flow = term_flow
                 else:
                     raise MissingFlow(term_flow)
@@ -262,7 +266,7 @@ class FlowTermination(object):
     def direction(self, value):
         if value is None:
             # this is the default: should set the direction by the reference.  Only non-none if from_json
-            if self.is_process and self.valid:
+            if self.is_process:
                 rx = self.term_node.reference(self.term_flow)
                 value = rx.direction
             else:
@@ -343,7 +347,7 @@ class FlowTermination(object):
         termination is a process
         :return:
         """
-        return (not self.is_null) and (self.term_node.entity_type == 'process')
+        return (not self.is_null) and (self.term_node.entity_type == 'process') and self.valid
 
     @property
     def is_emission(self):
@@ -477,7 +481,9 @@ class FlowTermination(object):
         but each call to quantity_relation should check for both forward and reverse matches
         '''
         if not self.valid:
-            return 0.0
+            return 1.0
+        if not self.term_flow.validate():
+            return 1.0
         if self.term_flow.reference_entity == self._parent.flow.reference_entity:
             return 1.0
         parent_q = self._parent.flow.reference_entity
@@ -521,7 +527,7 @@ class FlowTermination(object):
         if self.is_null:
             return None
         else:
-            return self._term.external_ref
+            return self.term_node.external_ref
 
     @property
     def inbound_exchange_value(self):
@@ -633,6 +639,10 @@ class FlowTermination(object):
                     raise SubFragmentAggregation  # to be caught- subfrag needs to be queried w/scenario
                 return LciaResult(quantity)  # otherwise, subfragment terminations have no impacts
             # if we are still just a foreground fragment, go ahead and check the cache
+
+        if not self.valid:
+            raise UnresolvedAnchor
+
         if refresh:
             self._score_cache.pop(quantity, None)
 
@@ -726,12 +736,12 @@ class FlowTermination(object):
         if self.is_context:
             j = {
                 'origin': 'foreground',
-                'context': self._term.name
+                'context': self.term_node.name
             }
         else:
             j = {
-                'origin': self._term.origin,
-                'externalId': self._term.external_ref
+                'origin': self.term_node.origin,
+                'externalId': self.term_node.external_ref
             }
             if self.is_local:
                 j['origin'] = 'foreground'  # override

@@ -42,7 +42,7 @@ class DelayedQuery(ForegroundQuery):
 
     def validate(self):
         if self._catalog.is_in_queue(self._home):
-            return False
+            return True  # this has to be true in order for the ref to operate while it is delayed
         return super(DelayedQuery, self).validate()
 
     def _perform_query(self, itype, attrname, exc, *args, strict=False, **kwargs):

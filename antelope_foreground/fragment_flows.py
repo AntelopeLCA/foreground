@@ -1,6 +1,6 @@
 from antelope import comp_dir
 
-from .terminations import FlowTermination, SubFragmentAggregation
+from .terminations import FlowTermination, SubFragmentAggregation, UnresolvedAnchor
 from antelope_core.lcia_results import LciaResult, DetailedLciaResult, SummaryLciaResult
 
 from collections import defaultdict
@@ -381,6 +381,10 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, ignore_uncached=T
                 v = ff.term.term_node.fragment_lcia(quantity_ref, scenario=scenario, **kwargs)
             else:
                 v = frag_flow_lcia(ff.subfragments, quantity_ref, **kwargs)
+        except UnresolvedAnchor:
+            result.add_missing(ff.fragment.uuid, ff.term.term_node, node_weight)
+            continue
+
         if v.is_null:
             continue
 
