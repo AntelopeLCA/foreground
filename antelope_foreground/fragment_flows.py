@@ -266,7 +266,9 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
     :param passthru_threshold: [0.33] smaller than this is treated as autoconsumption / induced load
     :return: [list of grouped IO flows], [list of internal non-null flows]
     """
-    out = defaultdict(float)
+    out = defaultdict(float)  # accumulates net total
+    pos_mag = defaultdict(float)  # accumulates +ve
+    neg_mag = defaultdict(float) # accumulates -ve
     dirs = dict()
     # cons = dict()
     internal = []
@@ -291,6 +293,10 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
             '''
 
             out[ff.fragment.flow] += magnitude
+            if magnitude > 0:  # separate test from above because we are ignoring relative-directions
+                pos_mag[ff.fragment.flow] += magnitude  # positive
+            else:
+                neg_mag[ff.fragment.flow] -= magnitude  # positive
         else:
             internal.append(ff)
 
@@ -326,6 +332,10 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
                         out[ref_frag.flow] += ref_mag
                     else:
                         out[ref_frag.flow] -= ref_mag
+                    if ref_mag > 0:
+                        pos_mag[ref_frag.flow] += ref_mag
+                    else:
+                        neg_mag[ref_frag.flow] -= ref_mag
 
                 else:
                     # A.1.a, A.3.a, A.2, A.4
@@ -347,6 +357,14 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
 
     for flow, value in out.items():
         direction = dirs[flow]
+        abs_mag = max([pos_mag[flow], neg_mag[flow]])
+        if value != 0:
+            if abs_mag == 0:  # we'd hate to get a ZeroDivisionError-- but this should be impossible
+                print('group_ios weird zero abs_mag %.5s (%s: %g, %g)' % (ref_frag.uuid, flow, value, abs_mag))
+            elif abs(value) / abs_mag < 1e-12:
+                print('Quashing group_ios flow < 1e-12 magnitude (%s: %g, %g)' % (flow, value, abs_mag))
+                # ref_frag.dbg_print('Quashing balance flow < 1e-12 magnitude (%s: %g, %g)' % (flow, value, abs_mag))
+                value = 0.0
         if value < 0:
             direction = comp_dir(direction)
         external.append(FragmentFlow.cutoff(parent, flow, direction, abs(value))) #, is_conserved=cons[flow]))

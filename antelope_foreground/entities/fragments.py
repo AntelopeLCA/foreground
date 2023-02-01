@@ -42,6 +42,10 @@ class DependentFragment(Exception):
     pass
 
 
+class ZeroInboundExchange(Exception):
+    pass
+
+
 def _new_evs():
     d = dict()  # should be a LowerDict? should scenario names be case sensitive?
     d[0] = 1.0
@@ -887,6 +891,10 @@ class LcFragment(LcEntity):
 
     @property
     def balance_magnitude(self):
+        """
+        The cf of the current flow in balanced units (if a balance flow exists)
+        :return:
+        """
         if self._balance_child is None:
             return None
         else:
@@ -1389,6 +1397,8 @@ class LcFragment(LcEntity):
         term = ff.term
         node_weight = ff.node_weight
         ffs = [ff]
+        stock_inflow = stock_outflow = 0.0  # keep track of total inflows to detect+quash near-zero (floating-point-tolerance) balances
+
         if term.is_fg or not term.valid:
             if self.reference_entity is None:
                 # inbound exchange value w.r.t. term node's unit magnitude
@@ -1401,13 +1411,18 @@ class LcFragment(LcEntity):
         if self.is_conserved_parent:
             stock *= self.balance_magnitude
             if self.direction == 'Input':  # convention: inputs to self are positive
+                #  direction w.r.t. parent so self.direction == 'Input' is an input to parent = output from node
                 stock *= -1
             self.dbg_print('%g inbound-balance' % stock, level=2)
 
+        if stock > 0:
+            stock_inflow += stock
+        else:
+            stock_outflow -= stock
         # TODO: Handle auto-consumption!  test child flows for flow identity and null term; cumulate; scale node_weight
 
         for f in self.child_flows:
-            try:
+            try:  # now that we are storing _balance_child we can just skip it instead of try-catch. but whatever.
                 # traverse child, collecting conserved value if applicable
                 child_ff, cons = f._traverse_node(node_weight, scenarios,
                                                   frags_seen=frags_seen, conserved_qty=self.conserved_quantity)
@@ -1416,6 +1431,10 @@ class LcFragment(LcEntity):
                 else:
                     self.dbg_print('%g returned cons_value' % cons, level=2)
                     stock += cons
+                    if cons > 0:
+                        stock_inflow += cons
+                    else:
+                        stock_outflow -= cons
             except FoundBalanceFlow:
                 self.dbg_print('%g bal magnitude on %.3s' % (stock, f.uuid), level=3)
                 bal_f = f
@@ -1423,10 +1442,15 @@ class LcFragment(LcEntity):
 
             ffs.extend(child_ff)
 
+        stock_max = max([abs(stock_inflow), abs(stock_outflow)])
+
         if bal_f is not None:
             # balance reports net inflows; positive value is more coming in than out
             # if balance flow is an input, its exchange must be the negative of the balance
             # if it is an output, its exchange must equal the balance
+            if stock != 0 and (abs(stock) / stock_max < 1e-10):
+                self.dbg_print('Quashing <1e-10 balance flow (%g vs %g)' % (stock, stock_inflow), level=1)
+                stock = 0.0
             if bal_f.direction == 'Input':
                 stock *= -1
                 self.dbg_print('%.3s Input: negating balance value' % bal_f.uuid)
@@ -1482,7 +1506,7 @@ class LcFragment(LcEntity):
         # traverse the subfragment, match the driven flow, compute downstream node weight and normalized inventory
         try:
             ffs, unit_inv, downstream_nw = _do_subfragment_traversal(ff, scenarios, frags_seen)
-        except ZeroDivisionError:
+        except ZeroInboundExchange:
             self.dbg_print('subfragment divide by zero', 1)
             return [ff]
 
@@ -1605,7 +1629,11 @@ class LcFragment(LcEntity):
         '''
         now looking forward: is our termination a cutoff, background, foreground or subfragment?
         '''
-        if term.is_null or term.is_context or magnitude == 0:
+        if magnitude == 0:
+            # no flow to follow
+            self.dbg_print('zero magnitude')
+            return [ff], conserved_val
+        elif term.is_null or term.is_context:
             # cutoff /context and background end traversal
             self.dbg_print('cutoff or bg')
             return [ff], conserved_val
@@ -1678,7 +1706,7 @@ def _do_subfragment_traversal(ff, scenarios, frags_seen):
     if in_ex == 0:
         # this indicates a non-consumptive pass-thru fragment.
         print('Frag %.5s: Zero inbound exchange' % self.uuid)
-        raise ZeroDivisionError
+        raise ZeroInboundExchange
     if match.fragment.direction == self.direction:  # match direction is w.r.t. subfragment
         # self is driving subfragment in reverse
         self.dbg_print('reverse-driven subfragment %.3s' % match.fragment.uuid)
