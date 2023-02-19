@@ -1180,10 +1180,11 @@ class LcFragment(LcEntity):
             if match is not None:
                 self._exchange_values[match] = _balance
     '''
-    def nodes(self, scenario=None):
+    def nodes(self, scenario=None, descend=True):
         """
         Report proximal terminal nodes for the fragment (recurse until a nondescend is reached)
         :param scenario: [None]
+        :param descend: [True] if False, yield subfragments as nodes
         :return: generator of terminal nodes
         """
         term = self.termination(scenario)
@@ -1193,8 +1194,8 @@ class LcFragment(LcEntity):
                 yield term.term_node
                 yds.add(term.term_node)
         elif term.is_subfrag:
-            if term.descend:
-                for n in term.term_node.nodes(scenario):
+            if term.descend and descend:
+                for n in term.term_node.nodes(scenario, descend=descend):
                     if n not in yds:
                         yield n
                         yds.add(n)
@@ -1202,7 +1203,7 @@ class LcFragment(LcEntity):
                 yield term.term_node
             # foreground, null: do nothing
         for c in self.child_flows:
-            for n in c.nodes(scenario):
+            for n in c.nodes(scenario, descend=descend):
                 if n not in yds:
                     yield n
                     yds.add(n)

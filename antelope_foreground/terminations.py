@@ -633,6 +633,9 @@ class FlowTermination(object):
         if quantity is None:
             return self._score_cache
 
+        if self.is_null:
+            return LciaResult(quantity)
+
         if self.is_frag:
             if self.is_subfrag:
                 if not self.descend:

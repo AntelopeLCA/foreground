@@ -71,10 +71,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param item:
         :return:
         """
-        value = super(AntelopeForegroundImplementation, self).__getitem__(item)
-        if value is None:
-            raise EntityNotFound
-        return value
+        return self.get_local(item)
     '''
 
     def __init__(self, *args, **kwargs):
@@ -110,7 +107,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param kwargs:
         :return:
         """
-        e = self._fetch(external_ref, **kwargs)  # not sure what this does exactly
+        e = self._fetch(external_ref, **kwargs)  # this just tries _archive.__getitem__ then retrieve_or_fetch
         if e is not None:
             return e
         if origin is None:
