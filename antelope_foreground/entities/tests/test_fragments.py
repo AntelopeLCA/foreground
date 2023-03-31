@@ -245,15 +245,28 @@ class FragmentTests(unittest.TestCase):
         A routine to test whether a set of traversal results includes the expected set of flows, directions, and
         magnitudes.
 
+        With our change in which we no longer include subfragments in traversal, the easiest way to maintain integrity
+        of the test is to replicate the old behavior, which means extracting in-line subfragments, but scaling magnitude
+
         :param ffs: a list of fragment flows
         :param flow: a flow entity to look for
         :param direction: the direction to look for
         :param magnitudes: a sequence of positional args indicating the magnitudes expected to be found in the traversal
         :return:
         """
-        filt_list = [ff for ff in ffs if ff.fragment.flow == flow and ff.fragment.direction == direction]
+        filt_list = []
+        filt_mag = []
+        for ff in ffs:
+            if ff.fragment.flow == flow and ff.fragment.direction == direction:
+                filt_list.append(ff)
+                filt_mag.append(ff.magnitude)
+            if ff.term.descend:
+                for k in ff.subfragments:
+                    if k.fragment.flow == flow and k.fragment.direction == direction:
+                        filt_list.append(k)
+                        filt_mag.append(k.magnitude * ff.node_weight)
         self.assertEqual(len(filt_list), len(magnitudes))
-        self.assertSetEqual(set([f.magnitude for f in filt_list]), set(magnitudes))
+        self.assertSetEqual(set(filt_mag), set(magnitudes))
 
     def test_af_traversal(self):
         """
@@ -288,8 +301,9 @@ class FragmentTests(unittest.TestCase):
         self.assertEqual(self.a6.term.flow_conversion, 1.0 / f4_mj_kg)
         proper_kg = (a2_mj + a2_waste_heat) / f4_mj_kg
         ff = self.a2.traverse(None)
-        mag = next(f.magnitude for f in ff if f.fragment.flow == f4)
-        self.assertEqual(mag, proper_kg)
+        # we can no longer filter on traversal because subfragments are hidden
+        ff_a6 = next(f for f in ff if f.fragment is self.a6)
+        self.assertEqual(ff_a6.node_weight, proper_kg)
 
     def test_subfragment_child(self):
         """
@@ -317,13 +331,16 @@ class FragmentTests(unittest.TestCase):
 
         :return:
         """
-        ffuobs = [ff for ff in self.a1.traverse() if ff.fragment.reference_entity is self.a1]
+        ffuobs = self.a1.traverse()
+        bal = self.a1.exchange_value() - a1_addl
         for c in self.a1.child_flows:
+            ff = next(f for f in ffuobs if f.fragment is c)
             if c.is_balance:
-                bal = self.a1.exchange_value() - a1_addl
-                self._check_fragmentflows(ffuobs, c.flow, c.direction, bal)
+                self.assertEqual(ff.magnitude, bal)
+                # self._check_fragmentflows(ffuobs, c.flow, c.direction, bal)
             else:
-                self._check_fragmentflows(ffuobs, c.flow, c.direction, c.cached_ev)
+                self.assertEqual(ff.magnitude, c.cached_ev)
+                # self._check_fragmentflows(ffuobs, c.flow, c.direction, c.cached_ev)
 
     def test_unobservable_balance(self):
         for f in self.a1.child_flows:
@@ -371,8 +388,8 @@ class FragmentTests(unittest.TestCase):
     def test_scenario_termination(self):
         default = self.a1.traverse()
         improved = self.a1.traverse('improvement')
-        self.assertIn(self.a2_alt, [f.fragment for f in improved])
-        self.assertNotIn(self.a2_alt, [f.fragment for f in default])
+        self.assertIn(self.a2_alt, [f.term.term_node for f in improved])
+        self.assertNotIn(self.a2_alt, [f.term.term_node for f in default])
         self._check_fragmentflows(default, f8, 'Input')  # not present
         self._check_fragmentflows(improved, f8, 'Input', a1_mj_in * a2_alt_tx)  # present
 

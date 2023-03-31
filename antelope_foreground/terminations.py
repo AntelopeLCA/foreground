@@ -575,22 +575,17 @@ class FlowTermination(object):
                               value=self.node_weight_multiplier)  # TODO: need to figure out how we are handling locales
             yield x
         elif self.is_frag:  # fragments can have unobserved exchanges too! (CAN THEY?)
+            # this code is unreachable because self.is_frag returns a null LciaResult in compute_unit_score()
             for x in []:
                 yield x
         else:
-            try:
-                if self.is_bg or len(list(self._parent.child_flows)) == 0:
-                    # ok we're bringing it back but only because it is efficient to cache lci
-                    for x in self.term_node.lci(ref_flow=self.term_flow, refresh=refresh):
-                        yield x
-                else:
-                    for x in self.term_node.unobserved_lci(self._parent.child_flows, ref_flow=self.term_flow):
-                        yield x  # this should forward out any cutoff exchanges
-            except (BackgroundRequired, NotImplementedError):
-                child_flows = set((k.flow.external_ref, k.direction) for k in self._parent.child_flows)
-                for x in self.term_node.inventory(ref_flow=self.term_flow):
-                    if (x.flow.external_ref, x.direction) not in child_flows:
-                        yield x  # this should forward out any cutoff exchanges
+            if self.is_bg:  # or len(list(self._parent.child_flows)) == 0:
+                # ok we're bringing it back but only because it is efficient to cache lci
+                for x in self.term_node.lci(ref_flow=self.term_flow, refresh=refresh):
+                    yield x
+            else:
+                for x in self.term_node.unobserved_lci(self._parent.child_flows, ref_flow=self.term_flow):
+                    yield x  # this should forward out any cutoff exchanges
 
     def compute_unit_score(self, quantity_ref, refresh=False, **kwargs):
         """
@@ -604,25 +599,43 @@ class FlowTermination(object):
         :param refresh:
         :return:
         """
-        if self.is_frag:
-            return LciaResult(quantity_ref)
-
-        try:
-            if self.is_context:
+        if self.is_context:
+            try:
                 locale = self._parent['SpatialScope']
-            else:
+            except KeyError:
+                locale = 'GLO'
+            x = ExchangeValue(self._parent, self.term_flow, self._parent.direction, termination=self.term_node,
+                              value=self.node_weight_multiplier)  # TODO: need to figure out how we are handling locales
+            res = quantity_ref.do_lcia([x], locale=locale, refresh=refresh, **kwargs)
+
+        else:
+            # OK, so we are not frag and we are not context and we are not null-- we are process!
+            try:
                 locale = self.term_node['SpatialScope']
-        except KeyError:
-            locale = 'GLO'
-        # just go ahead and fail if we ever encounter a PrivateArchive
-        res = quantity_ref.do_lcia(self._unobserved_exchanges(refresh=refresh), locale=locale, refresh=refresh, **kwargs)
+            except KeyError:
+                locale = 'GLO'
+
+            try:
+                res = self.term_node.bg_lcia(quantity_ref, observed=self._parent.child_flows, ref_flow=self.term_flow,
+                                             refresh=refresh, locale=locale, **kwargs)
+            except QuantityRequired:
+                try:
+                    res = quantity_ref.do_lcia(self._unobserved_exchanges(refresh=refresh), locale=locale,
+                                               refresh=refresh, **kwargs)
+                except (BackgroundRequired, NotImplementedError):
+                    child_flows = set((k.flow.external_ref, k.direction) for k in self._parent.child_flows)
+                    inv = [x for x in self.term_node.inventory(ref_flow=self.term_flow)
+                           if (x.flow.external_ref, x.direction) not in child_flows]
+                    res = quantity_ref.do_lcia(inv, locale=locale, ref_flow=self.term_flow, **kwargs)
 
         res.scale_result(self.inbound_exchange_value)
         return res
 
-    def score_cache(self, quantity=None, ignore_uncached=False, refresh=False, **kwargs):
+    def score_cache(self, quantity=None, refresh=False, **kwargs):
         """
         only process-terminations are cached
+        remote fragments that come back via the API can have cached scores as well, but local subfragments should not
+        get cached.
 
         :param quantity:
         :param ignore_uncached:
@@ -633,15 +646,8 @@ class FlowTermination(object):
         if quantity is None:
             return self._score_cache
 
-        if self.is_null:
+        if self.is_null or self.is_fg:
             return LciaResult(quantity)
-
-        if self.is_frag:
-            if self.is_subfrag:
-                if not self.descend:
-                    raise SubFragmentAggregation  # to be caught- subfrag needs to be queried w/scenario
-                return LciaResult(quantity)  # otherwise, subfragment terminations have no impacts
-            # if we are still just a foreground fragment, go ahead and check the cache
 
         if not self.valid:
             raise UnresolvedAnchor
@@ -652,7 +658,9 @@ class FlowTermination(object):
         if quantity in self._score_cache:
             return self._score_cache[quantity]
         else:
-            try:
+            if self.is_frag:  # but not fg, ergo subfrag
+                raise UnCachedScore(quantity)
+            else:
                 '''
                 # This refresh situation is a problem.  On the one hand, if we don't pass refresh on to do_lcia,
                 then there's no way to clear "seen cfs" on flow refs.  On the other hand, passing it through recursively
@@ -678,11 +686,6 @@ class FlowTermination(object):
                     solution should be sought.  
                 '''
                 res = self.compute_unit_score(quantity, refresh=refresh, **kwargs)
-            except UnCachedScore:
-                if ignore_uncached:
-                    res = LciaResult(quantity)
-                else:
-                    raise
             self._score_cache[quantity] = res
             return res
 
@@ -800,7 +803,7 @@ class FlowTermination(object):
         return (self.term_node.external_ref == other.term_node.external_ref and
                 self.term_flow == other.term_flow and
                 self.direction == other.direction and
-                self.descend == other.descend)
+                self.descend == other.descend)  # probably want to remove this
 
     def __str__(self):
         """

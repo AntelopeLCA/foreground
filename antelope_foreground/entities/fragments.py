@@ -1716,6 +1716,7 @@ def _do_subfragment_traversal(ff, scenarios, frags_seen):
     # node weight for the driven [downstream] fragment
     downstream_nw = node_weight / in_ex
 
+    '''
     # then we add the results of the subfragment, either in aggregated or disaggregated form
     if term.descend:
         # if appending, we are traversing in situ, so do scale
@@ -1730,5 +1731,12 @@ def _do_subfragment_traversal(ff, scenarios, frags_seen):
         ff.aggregate_subfragments(subfrags, scenarios=scenarios)  # include params to reproduce
         ff.node_weight = downstream_nw  # NOTE: this may be problematic; undone in lca_disclosures
         ffs = [ff]
+    '''
+    # now, we abolish descend as a traversal parameter and make it only an LCIA parameter
+    # therefore, we retain subfragments always, we just have to decide how to scale them
+    self.dbg_print('%d subfrags resulting from this traversal' % len(subfrags), 1)
+    ff.aggregate_subfragments(subfrags, scenarios=scenarios)
+    ff.node_weight = downstream_nw
+    ffs = [ff]
 
     return ffs, unit_inv, downstream_nw

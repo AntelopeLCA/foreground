@@ -56,7 +56,7 @@ class FlowTerminationTestCase(BasicEntityTest):
 
     def _frag_with_child(self):
         frag = self._petro_frag()
-        frag.terminate(self.petro, term_flow=frag.flow)
+        frag.terminate(self.petro.make_ref(self.A.query), term_flow=frag.flow)
         lead = next(x for x in self.petro.inventory(frag.flow) if x.flow['Name'].startswith('Lead'))
         c = create_fragment(flow=lead.flow, direction=lead.direction, parent=frag, value=lead.value)
         c.terminate(self.A.tm[lead.flow.context])

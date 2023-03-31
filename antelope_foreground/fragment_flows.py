@@ -1,6 +1,6 @@
 from antelope import comp_dir
 
-from .terminations import FlowTermination, SubFragmentAggregation, UnresolvedAnchor
+from .terminations import FlowTermination, UnCachedScore, UnresolvedAnchor
 from antelope_core.lcia_results import LciaResult, DetailedLciaResult, SummaryLciaResult
 
 from collections import defaultdict
@@ -106,7 +106,7 @@ class FragmentFlow(object):
 
     @property
     def subfragments(self):
-        if self.term.is_subfrag and (self.term.descend is False):
+        if self.term.is_subfrag:  # and (self.term.descend is False):
             try:
                 return self._subfrags_params[0]
             except IndexError:
@@ -372,7 +372,7 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
     return external, internal
 
 
-def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, ignore_uncached=True, **kwargs):
+def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, **kwargs):
     """
     Recursive function to compute LCIA of a traversal record contained in a set of Fragment Flows.
     Note: refresh is no longer supported during traversal
@@ -383,7 +383,9 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, ignore_uncached=T
     :return:
     """
     result = LciaResult(quantity_ref, scenario=str(scenario))
+    _first_ff = True
     for ff in fragmentflows:
+        _recursive_remote = False
         if ff.term.is_null:
             continue
 
@@ -391,26 +393,46 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, ignore_uncached=T
         if node_weight == 0:
             continue
 
-        try:
-            v = ff.term.score_cache(quantity=quantity_ref, ignore_uncached=ignore_uncached, **kwargs)
-        except SubFragmentAggregation:
-            # if we were given interior fragments, recurse on them. otherwise ask remote.
-            if len(ff.subfragments) == 0:
-                v = ff.term.term_node.fragment_lcia(quantity_ref, scenario=scenario, **kwargs)
-            else:
-                v = frag_flow_lcia(ff.subfragments, quantity_ref, **kwargs)
-        except UnresolvedAnchor:
-            result.add_missing(ff.fragment.uuid, ff.term.term_node, node_weight)
-            continue
-
-        if v.is_null:
-            continue
-
         if ff.term.direction == ff.fragment.direction:
             # if the directions collide (rather than complement), the term is getting run in reverse
             node_weight *= -1
 
-        result.add_summary(ff.fragment.uuid, ff, node_weight, v)
+        # if we have subfragments, use them
+        if len(ff.subfragments) == 0:  # always true for: contexts, processes, remote subfragments
+            try:
+                v = ff.term.score_cache(quantity=quantity_ref, **kwargs)
+
+                # if we reach here, then we have successfully retrieved a cached unit score and we are done
+                if not v.is_null:
+                    result.add_summary(ff.fragment.uuid, ff, node_weight, v)
+
+                _first_ff = False
+                continue
+
+            except UnresolvedAnchor:
+                result.add_missing(ff.fragment.uuid, ff.term.term_node, node_weight)
+                _first_ff = False
+                continue
+
+            except UnCachedScore:
+                # a subfragment with no stored subfragments and no cached score: we gotta ask
+                v = ff.term.term_node.fragment_lcia(quantity_ref, scenario=scenario)
+                _recursive_remote = True
+
+        else:
+            v = frag_flow_lcia(ff.subfragments, quantity_ref, scenario=ff.subfragment_scenarios, **kwargs)
+
+        # if we arrive here, we have a unit score from a subfragment
+
+        if ff.term.descend:
+            for c in v.components():
+                result.add_summary(c.entity.fragment.uuid, c.entity, node_weight, c.cumulative_result)
+        else:
+            result.add_summary(ff.fragment.uuid, ff, node_weight, v)
+
+        if _first_ff and _recursive_remote:
+            return result  # bail out
+        _first_ff = False
     return result
 
 
