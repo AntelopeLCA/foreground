@@ -425,8 +425,12 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, **kwargs):
         # if we arrive here, we have a unit score from a subfragment
 
         if ff.term.descend:
-            for c in v.components():
-                result.add_summary(c.entity.fragment.uuid, c.entity, node_weight, c.cumulative_result)
+            if v.has_summaries:
+                for k in v.keys():
+                    c = v[k]
+                    result.add_summary(k, c.entity, c.node_weight * node_weight, c.internal_result)
+            else:
+                result.add_summary(ff.fragment.uuid, ff, node_weight, v)
         else:
             result.add_summary(ff.fragment.uuid, ff, node_weight, v)
 

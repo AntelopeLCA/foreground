@@ -618,7 +618,7 @@ class FlowTermination(object):
             try:
                 res = self.term_node.bg_lcia(quantity_ref, observed=self._parent.child_flows, ref_flow=self.term_flow,
                                              refresh=refresh, locale=locale, **kwargs)
-            except QuantityRequired:
+            except (QuantityRequired, NotImplementedError):
                 try:
                     res = quantity_ref.do_lcia(self._unobserved_exchanges(refresh=refresh), locale=locale,
                                                refresh=refresh, **kwargs)
@@ -626,7 +626,7 @@ class FlowTermination(object):
                     child_flows = set((k.flow.external_ref, k.direction) for k in self._parent.child_flows)
                     inv = [x for x in self.term_node.inventory(ref_flow=self.term_flow)
                            if (x.flow.external_ref, x.direction) not in child_flows]
-                    res = quantity_ref.do_lcia(inv, locale=locale, ref_flow=self.term_flow, **kwargs)
+                    res = quantity_ref.do_lcia(inv, locale=locale, **kwargs)
 
         res.scale_result(self.inbound_exchange_value)
         return res
