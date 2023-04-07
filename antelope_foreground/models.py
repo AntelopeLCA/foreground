@@ -12,7 +12,7 @@ and that's probably it
 
 """
 from typing import Dict, Optional, List
-from antelope_core.models import ResponseModel, EntityRef, Entity, FlowEntity
+from antelope.models import ResponseModel, EntityRef, Entity, FlowEntity
 from antelope import comp_dir
 
 
