@@ -7,7 +7,7 @@ other.
 """
 
 from antelope import (BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences,
-                      NoReference, ConversionReferenceMismatch)
+                      NoReference, ConversionReferenceMismatch, EntityNotFound)
 
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
@@ -618,7 +618,7 @@ class FlowTermination(object):
             try:
                 res = self.term_node.bg_lcia(quantity_ref, observed=self._parent.child_flows, ref_flow=self.term_flow,
                                              refresh=refresh, locale=locale, **kwargs)
-            except (QuantityRequired, NotImplementedError):
+            except (QuantityRequired, EntityNotFound, NotImplementedError):
                 try:
                     res = quantity_ref.do_lcia(self._unobserved_exchanges(refresh=refresh), locale=locale,
                                                refresh=refresh, **kwargs)
@@ -628,7 +628,10 @@ class FlowTermination(object):
                            if (x.flow.external_ref, x.direction) not in child_flows]
                     res = quantity_ref.do_lcia(inv, locale=locale, **kwargs)
 
-        res.scale_result(self.inbound_exchange_value)
+        if isinstance(res, list):
+            [k.scale_result(self.inbound_exchange_value) for k in res]
+        else:
+            res.scale_result(self.inbound_exchange_value)
         return res
 
     def score_cache(self, quantity=None, refresh=False, **kwargs):
@@ -687,7 +690,10 @@ class FlowTermination(object):
                 '''
                 res = self.compute_unit_score(quantity, refresh=refresh, **kwargs)
             self._score_cache[quantity] = res
-            return res
+            if isinstance(res, list):
+                for k in res:
+                    self._score_cache[k.quantity] = k  # if singleton list, override the list with the quantity
+            return self._score_cache[quantity]
 
     def score_cache_items(self):
         return self._score_cache.items()
