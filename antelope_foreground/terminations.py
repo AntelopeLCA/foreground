@@ -689,10 +689,11 @@ class FlowTermination(object):
                     solution should be sought.  
                 '''
                 res = self.compute_unit_score(quantity, refresh=refresh, **kwargs)
-            self._score_cache[quantity] = res
             if isinstance(res, list):
                 for k in res:
-                    self._score_cache[k.quantity] = k  # if singleton list, override the list with the quantity
+                    self._score_cache[k.quantity] = k
+            else:
+                self._score_cache[quantity] = res
             return self._score_cache[quantity]
 
     def score_cache_items(self):
