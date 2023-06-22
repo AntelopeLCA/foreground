@@ -362,8 +362,9 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
             if abs_mag == 0:  # we'd hate to get a ZeroDivisionError-- but this should be impossible
                 print('group_ios weird zero abs_mag %.5s (%s: %g, %g)' % (ref_frag.uuid, flow, value, abs_mag))
             elif abs(value) / abs_mag < 1e-12:
-                print('Quashing group_ios flow < 1e-12 magnitude (%s: %g, %g)' % (flow, value, abs_mag))
-                # ref_frag.dbg_print('Quashing balance flow < 1e-12 magnitude (%s: %g, %g)' % (flow, value, abs_mag))
+                # these have never been controversial-- stop cluttering the console
+                # print('Quashing group_ios flow < 1e-12 magnitude (%s: %g, %g)' % (flow, value, abs_mag))
+                ref_frag.dbg_print('Quashing balance flow < 1e-12 magnitude (%s: %g, %g)' % (flow, value, abs_mag))
                 value = 0.0
         if value < 0:
             direction = comp_dir(direction)
@@ -421,6 +422,8 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, **kwargs):
 
         else:
             v = frag_flow_lcia(ff.subfragments, quantity_ref, scenario=ff.subfragment_scenarios, **kwargs)
+            if v.is_null:
+                continue
 
         # if we arrive here, we have a unit score from a subfragment
 
