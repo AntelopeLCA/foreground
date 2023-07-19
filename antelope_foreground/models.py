@@ -13,6 +13,7 @@ and that's probably it
 """
 from typing import Dict, Optional, List
 from antelope.models import ResponseModel, EntityRef, Entity, FlowEntity
+from antelope.xdb_tokens import ResourceSpec
 from antelope import comp_dir
 
 
@@ -46,6 +47,38 @@ class Anchor(ResponseModel):
     def null(cls):
         return cls(descend=True)
 
+    def _term_flow_block(self):
+        if self.anchor_flow:
+            if self.anchor_flow.origin == self.node.origin:
+                return self.anchor_flow.entity_id
+            else:
+                return {
+                    'origin': self.anchor_flow.origin,
+                    'externalId': self.anchor_flow.entity_id
+                }
+
+    def serialize(self):
+        """
+        emulates FlowTermination.serialize()
+        :return:
+        """
+        if self.context:
+            j = {
+                'origin': 'foreground',
+                'context': self.context[-1]
+            }
+        else:
+            j = {
+                'origin': self.node.origin,
+                'externalId': self.node.entity_id
+            }
+        j['descend'] = self.descend
+        tfb = self._term_flow_block()
+        if tfb:
+            j['termFlow'] = tfb
+        j['scoreCache'] = self.score_cache
+        return j
+
 
 class FragmentRef(EntityRef):
     """
@@ -76,7 +109,7 @@ class FragmentEntity(Entity):
     parent: Optional[str]
     is_balance_flow: bool
 
-    # entity_uuid: str  # we don't need uuid in cases where a fragment is named. we just don't.
+    entity_uuid: str  # we need uuid for consistency since we are running the same LcForeground on the backend
 
     exchange_values: Dict[str, float]
 
@@ -98,9 +131,48 @@ class FragmentEntity(Entity):
                 k = 'default'
             terms[k] = v.to_anchor(save_unit_scores=save_unit_scores)
         return cls(origin=fragment.origin, entity_id=fragment.external_ref, properties=j.pop('tags'),
+                   entity_uuid=fragment.uuid,
                    flow=FlowEntity.from_flow(fragment.flow), direction=dirn,
                    parent=j.pop('parent'), is_balance_flow=j.pop('isBalanceFlow'),
                    exchange_values=evs, anchors=terms)
+
+    def _serialize_evs(self):
+        d = dict(**self.exchange_values)
+        d["0"] = d.pop('cached')
+        d["1"] = d.pop('observed')
+        return d
+
+    def _serialize_terms(self):
+        terms = dict()
+        for k, v in self.anchors.items():
+            if v is None:
+                terms[k] = {}
+            else:
+                terms[k] = v.serialize()
+        return terms
+
+    def serialize(self):
+        """
+        This emulates LcFragment.serialize()
+        :return:
+        """
+        j = {
+            'entityType': self.entity_type,
+            'externalId': self.entity_id,
+            'entityId': self.entity_uuid,
+            'parent': self.parent
+        }
+        if self.flow.origin == self.origin:
+            j['flow'] = self.flow.entity_id
+        else:
+            j['flow'] = '%s/%s' % (self.flow.origin, self.flow.entity_id)
+        j['direction'] = self.direction
+        j['isPrivate'] = False
+        j['isBalanceFlow'] = self.is_balance_flow,
+        j['exchangeValues'] = self._serialize_evs(),
+        j['terminations'] = self._serialize_terms(),
+        j['tags'] = dict(**self.properties)
+        return j
 
 
 class FragmentBranch(ResponseModel):
@@ -232,6 +304,7 @@ class TermManager(ResponseModel):
     Flowables: List[Flowable]
 
 
+'''
 class LcTermination(ResponseModel):
     """
     these became anchors
@@ -242,25 +315,38 @@ class LcTermination(ResponseModel):
     termFlow: Optional[str]
     descend: Optional[str]
     context: Optional[str]
-
-
-class LcFragment(ResponseModel):
-    entityType: str = 'fragment'
-    entityId: str
-    externalId: str
-    flow: str
-    direction: str
-    exchangeValues: Dict
-    isBackground: bool
-    isBalanceFlow: bool
-    isPrivate: bool
-    parent: Optional[str]
-    tags: Dict
-    terminations: Dict[str, Dict]  # I suspect a formal model will break on a null termination
+'''
 
 
 class LcModel(ResponseModel):
-    fragments: List[LcFragment]
+    fragments: List[FragmentEntity]
+
+    @classmethod
+    def from_reference_fragment(cls, fragment, save_unit_scores=False):
+        """
+        Replicates the save_fragments method of the LcForeground provider
+        for packing prior to transmission over HTTP
+        """
+        def _recurse_frags(f):
+            _r = [f]
+            for _x in f.child_flows:  # child flows are already ordered
+                _r.extend(_recurse_frags(_x))
+            return _r
+
+        fragments = [FragmentEntity.from_entity(k, save_unit_scores=save_unit_scores) for k in _recurse_frags(fragment)]
+        return cls(fragments=fragments)
+
+    def serialize(self):
+        """
+        Replicates the LcFragment.serialize() operation
+        for unpacking and storing upon receipt over HTTP
+        :return:
+        """
+        return {
+            'fragments': [
+                k.serialize() for k in self.fragments
+            ]
+        }
 
 
 class LcForeground(ResponseModel):
@@ -273,3 +359,14 @@ class LcForeground(ResponseModel):
     quantities: List[Dict]
     termManager: Optional[TermManager]
     models: List[LcModel]
+    resources: List[ResourceSpec]
+
+    @classmethod
+    def from_foreground_archive(cls, ar):
+        """
+        An elaborate function to construct a serialized foreground for transmission to an oryx server
+        :param ar: an LcForeground archive
+        :return: an LcForeground model
+        """
+        pass
+        # names =

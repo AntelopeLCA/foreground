@@ -140,8 +140,7 @@ class ForegroundCatalog(LcCatalog):
             raise NoSuchForeground(ref)
 
         if reset:
-            res.remove_archive()
-            self._queries.pop(ref, None)
+            self.purge_resource_archive(res)
 
         return self._check_resource(res)
 

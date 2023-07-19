@@ -89,7 +89,7 @@ class LcFragment(LcEntity):
             except ValueError:
                 print('%s: Flow %s not found in foreground %s' % (j['entityId'], j['flow'], fg.ref))
                 flow = LcFlow(j['flow'], Name=j['tags']['Name'], Compartment=['Intermediate Flows', 'Fragments'],
-                              referenceQuantity=fg.get_canonical('mass'))
+                              referenceQuantity=fg._catalog.get_canonical('mass'))
                 fg.add(flow)
         frag = cls(j['entityId'], flow, j['direction'], origin=fg.ref, parent=parent,
                    exchange_value=j['exchangeValues'].pop('0'),
