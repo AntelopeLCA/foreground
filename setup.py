@@ -1,11 +1,13 @@
 from setuptools import setup, find_packages
 
 requires = [
-    'antelope_core>=0.1.7'
+    'antelope_core>=0.2.1'
 ]
 
 """
 Revision history
+
+0.2.1 - 21 Jul 2023 - Subfrags comes home-- complete changes throughout the system, impossible to recount.
 
 0.1.7 - 11 Aug 2021 - TRAVIS release
 

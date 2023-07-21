@@ -249,6 +249,8 @@ class FlowTermination(object):
                     self._term_flow = term_flow
                 else:
                     raise MissingFlow(term_flow)
+            else:
+                self._term_flow = term_flow
         if self.valid and self.term_flow.validate() and self.node_weight_multiplier == 0:
             print('Warning: 0 node weight multiplier for term of %s' % self._parent.external_ref)
 
