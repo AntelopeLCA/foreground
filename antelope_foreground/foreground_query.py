@@ -45,7 +45,7 @@ class DelayedQuery(ForegroundQuery):
             return True  # this has to be true in order for the ref to operate while it is delayed
         return super(DelayedQuery, self).validate()
 
-    def _perform_query(self, itype, attrname, exc, *args, strict=False, **kwargs):
+    def _perform_query(self, itype, attrname, exc, *args, **kwargs):
         if self._catalog.is_in_queue(self._home):
             raise QueryIsDelayed(self.origin, self._home)
-        return super(DelayedQuery, self)._perform_query(itype, attrname, exc, *args, strict=strict, **kwargs)
+        return super(DelayedQuery, self)._perform_query(itype, attrname, exc, *args, **kwargs)

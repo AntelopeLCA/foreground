@@ -1,5 +1,7 @@
 from setuptools import setup, find_packages
 
+VERSION = '0.2.1'
+
 requires = [
     'antelope_core>=0.2.1'
 ]
@@ -16,7 +18,7 @@ Revision history
 
 setup(
     name="antelope_foreground",
-    version="0.1.7",
+    version=VERSION,
     author="Brandon Kuczenski",
     author_email="bkuczenski@ucsb.edu",
     install_requires=requires,
