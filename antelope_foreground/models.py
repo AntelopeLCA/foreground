@@ -84,7 +84,7 @@ class FragmentRef(EntityRef):
     """
     From EntityRef, inherits: origin, entity_id (<-external_ref), optional entity_type
     """
-    entity_type = 'fragment'
+    entity_type: str = 'fragment'
     flow: EntityRef
     direction: str
     name: str
@@ -103,7 +103,7 @@ class FragmentEntity(Entity):
     """
     From Entity, inherits: origin, entity_id (<- external_ref), entity_type, properties
     """
-    entity_type = 'fragment'
+    entity_type: str = 'fragment'
     flow: FlowEntity  # should be full entity or just a ref? this is a full return, it should be full
     direction: str
     parent: Optional[str]
@@ -351,22 +351,24 @@ class LcModel(ResponseModel):
 
 class LcForeground(ResponseModel):
 
-    catalogNames: Dict[str, List[str]]
-    dataSource: str
-    dataSourceType: str
-    flows: List[Dict]
-    initArgs: Dict
-    quantities: List[Dict]
-    termManager: Optional[TermManager]
+    catalogNames: Dict[str, List[str]]  #
+    dataSource: str  #
+    dataSourceType: str  #
+    flows: List[Dict]  #
+    initArgs: Dict  #
+    quantities: List[Dict]  #
+    termManager: Optional[TermManager]  #
     models: List[LcModel]
     resources: List[ResourceSpec]
 
     @classmethod
-    def from_foreground_archive(cls, ar):
+    def from_foreground_archive(cls, ar, save_unit_scores=False):
         """
-        An elaborate function to construct a serialized foreground for transmission to an oryx server
+        A simple function to construct a serialized foreground for transmission to an oryx server
         :param ar: an LcForeground archive
         :return: an LcForeground model
         """
-        pass
-        # names =
+        j = ar.serialize(characterizations=True, values=True)
+        ms = [LcModel.from_reference_fragment(f, save_unit_scores=save_unit_scores) for f in ar.fragments()]
+        rs = []
+        return cls(resources=rs, models=ms, **j)
