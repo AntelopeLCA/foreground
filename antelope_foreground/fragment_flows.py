@@ -1,4 +1,4 @@
-from antelope import comp_dir
+from antelope import comp_dir, ExchangeRef
 
 from .terminations import FlowTermination, UnCachedScore, UnresolvedAnchor
 from antelope_core.lcia_results import LciaResult, DetailedLciaResult, SummaryLciaResult
@@ -301,8 +301,8 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
             internal.append(ff)
 
     # now deal with reference flow-- trivial fragment should wind up with two equal-and-opposite [pass-through] flows
+    ref_frag = parent.top()
     if include_ref_flow:
-        ref_frag = parent.top()
         # ref_cons = ref_frag.is_conserved_parent
         ref_mag = ffs[0].magnitude
         if ref_frag.flow in out:  # either pass through or autoconsumption
@@ -371,6 +371,20 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
         external.append(FragmentFlow.cutoff(parent, flow, direction, abs(value))) #, is_conserved=cons[flow]))
 
     return external, internal
+
+
+def ios_exchanges(ios, ref=None, scale=1.0):
+    if ref is None:
+        ref = ios[0].fragment
+    frag_exchs = []
+    for f in ios:
+        if f.magnitude == 0:
+            continue
+        is_ref = (f.fragment.flow == ref.flow and f.fragment.direction == comp_dir(ref.direction))
+
+        xv = ExchangeRef(ref, f.fragment.flow, f.fragment.direction, value=f.magnitude * scale, is_reference=is_ref)
+        frag_exchs.append(xv)
+    return sorted(frag_exchs, key=lambda x: (x.direction == 'Input', x.value), reverse=True)
 
 
 def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, **kwargs):

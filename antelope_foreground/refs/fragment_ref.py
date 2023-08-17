@@ -1,6 +1,6 @@
 from antelope.refs.base import EntityRef
 from antelope import ExchangeRef, comp_dir
-from ..fragment_flows import group_ios
+from ..fragment_flows import group_ios, ios_exchanges
 """
 Not sure what to do about Fragment Refs, whether they belong in the main interface. I'd like to think no, but
 for now we will just deprecate them and remove functionality,
@@ -84,17 +84,8 @@ class FragmentRef(EntityRef):
     Process compatibility
     '''
     def inventory(self, scenario=None, **kwargs):
-        ffs = self.traverse(scenario=scenario)  # in the future, may want to cache this
-        ios, nodes = group_ios(self, ffs, **kwargs)
-        frag_exchs = []
-        for f in ios:
-            is_ref = (f.fragment.flow == self.flow and f.fragment.direction == comp_dir(self.direction))
-
-            xv = ExchangeRef(self, f.fragment.flow, f.fragment.direction, value=f.magnitude, is_reference=is_ref)
-            frag_exchs.append(xv)
-            if scenario is None:
-                self._ref_vals[xv.flow.external_ref] = f.magnitude
-        return sorted(frag_exchs, key=lambda x: (x.direction == 'Input', x.value), reverse=True)
+        ios, _ = self.unit_inventory(scenario=scenario, **kwargs)  # in the future, may want to cache this
+        return ios_exchanges(ios, ref=self)
 
     def reference_value(self, flow):
         return self._ref_vals[flow.external_ref]

@@ -8,7 +8,7 @@ import uuid
 
 from antelope import comp_dir, check_direction, PropertyExists, CatalogRef, RxRef
 
-from ..fragment_flows import group_ios, FragmentFlow, frag_flow_lcia
+from ..fragment_flows import group_ios, FragmentFlow, ios_exchanges, frag_flow_lcia
 from antelope_core.entities import LcEntity, LcFlow
 from antelope_core.exchanges import ExchangeValue
 # from lcatools.interact import ifinput, parse_math
@@ -1254,16 +1254,8 @@ class LcFragment(LcEntity):
         :param observed:
         :return:
         """
-        io, _ = self.unit_inventory(scenario=scenario, observed=observed)
-        frag_exchs = []
-        for f in io:
-            if f.magnitude == 0:
-                continue
-            xv = ExchangeValue(self, f.fragment.flow, f.fragment.direction, value=f.magnitude * scale)
-            if f.fragment.flow == self.flow and f.fragment.direction == comp_dir(self.direction):
-                xv.set_ref(self)
-            frag_exchs.append(xv)
-        return sorted(frag_exchs, key=lambda x: (x.direction == 'Input', x.value), reverse=True)
+        ios, _ = self.unit_inventory(scenario=scenario, observed=observed)
+        return ios_exchanges(ios, ref=self)
 
     def exchanges(self, scenario=None):
         """
