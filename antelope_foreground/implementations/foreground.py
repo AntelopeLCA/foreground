@@ -686,6 +686,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         _children = list(parent.child_flows)
 
         for y in _xg:
+            """
+            Determine flow specification
+            """
             if hasattr(y.flow, 'entity_type') and y.flow.entity_type == 'flow':
                 try:
                     flow = self._grounded_entity(y.flow)
@@ -722,6 +725,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             elif term == y.process:
                 # TODO: figure out why tuple(CatalogRef()) hangs
                 term = None  # don't terminate self-term
+
+            """
+            Try and match the flow+direction spec to the ordered list of child flows 
+            """
             if _children:
                 try:
                     c_up = next(g for g in _children if g.flow == flow and g.direction == y.direction)
@@ -787,6 +794,13 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                             if term.entity_type == 'process' and set_background:
                                 c_up.set_background()
                             '''
+
+                    """
+                    Propagate properties
+                    """
+                    for k, v in y.args.items():
+                        c_up[k] = v
+
                     _children.remove(c_up)
                     continue
 
