@@ -256,7 +256,11 @@ class FlowTermination(object):
 
     @property
     def direction(self):
-        return self._direction
+        if self.is_frag:
+            return self.term_node.direction
+        elif self.is_process:
+            return self._direction
+        return comp_dir(self._parent.direction)
 
     @property
     def valid(self):
@@ -270,11 +274,10 @@ class FlowTermination(object):
             # this is the default: should set the direction by the reference.  Only non-none if from_json
             if self.is_process:
                 rx = self.term_node.reference(self.term_flow)
-                value = rx.direction
-            else:
+                self._direction = rx.direction
                 # for fg, invert direction doesn't make sense. for subfragments, direction is ignored
-                value = comp_dir(self._parent.direction)
-        self._direction = check_direction(value)
+        else:
+            self._direction = check_direction(value)
 
     '''
     def matches(self, exchange):
