@@ -25,10 +25,10 @@ class Anchor(ResponseModel):
     Use FlowTermination.to_anchor(term, ..) to produce
     """
     node: Optional[EntityRef]
-    anchor_flow: Optional[EntityRef]
-    context: Optional[List[str]]
+    anchor_flow: Optional[EntityRef] = None
+    context: Optional[List[str]] = None
     descend: bool
-    score_cache: Optional[Dict[str, float]]
+    score_cache: Optional[Dict[str, float]] = None
 
     @property
     def type(self):
@@ -259,7 +259,7 @@ class FragmentFlow(ResponseModel):
     is_conserved: bool
 
     @classmethod
-    def from_fragment_flow(cls, ff, group='StageName', save_unit_scores=False):
+    def from_fragment_flow(cls, ff, group=None, save_unit_scores=False):
         """
         The ff is a FragmentFlow generated during a traversal (or tree crawl)
         :param ff:
@@ -274,6 +274,8 @@ class FragmentFlow(ResponseModel):
         scen, a_scen = ff.match_scenarios
         if scen in (1, '1', True):
             scen = 'observed'
+        if group is None:
+            group = 'StageName'
         return cls(parent=parent, node=FragmentRef.from_fragment(ff.fragment), name=ff.name,
                    group=ff.fragment.get(group, ''),
                    magnitude=ff.magnitude, scenario=scen, unit=ff.fragment.flow.unit, node_weight=ff.node_weight,

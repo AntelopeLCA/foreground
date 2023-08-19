@@ -81,6 +81,8 @@ class LcFragment(LcEntity):
             parent = None
         else:
             parent = fg[j['parent']]
+            if parent is None:
+                print('warning: parent %s returned None' % j['parent'])
         flow = fg[j['flow']]
         if flow is None:
             try:
