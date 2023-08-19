@@ -3,7 +3,7 @@ Client for the oryx Foreground server
 
 This is to be the same as the XdbServer, just with different methods defined
 """
-from antelope_core.providers.xdb_client import XdbClient
+from antelope_core.providers.xdb_client import XdbClient, _ref
 from antelope_core.providers.xdb_client.xdb_entities import XdbEntity
 from antelope_core.implementations import BasicImplementation
 from antelope.models import OriginCount
@@ -46,17 +46,6 @@ class OryxClient(XdbClient):
         if iface == 'foreground':
             return OryxFgImplementation(self)
         return super(OryxClient, self).make_interface(iface)
-
-
-def _ref(obj):
-    """
-    URL-ize input argument
-    :param obj:
-    :return:
-    """
-    if hasattr(obj, 'external_ref'):
-        return obj.external_ref
-    return str(obj)
 
 
 class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
