@@ -256,9 +256,7 @@ class FlowTermination(object):
 
     @property
     def direction(self):
-        if self.is_frag:
-            return self.term_node.direction
-        elif self.is_process:
+        if self.is_process:
             return self._direction
         return comp_dir(self._parent.direction)
 

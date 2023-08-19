@@ -21,6 +21,16 @@ class AntelopeV1ForegroundImplementation(AntelopeForegroundImplementation):
     def inventory(self, process, ref_flow=None, **kwargs):
         pass
     '''
+    def top(self, fragment, **kwargs):
+        """
+        a neutered top() here just returns self
+        :param fragment:
+        :param kwargs:
+        :return:
+        """
+        if hasattr(fragment, 'external_ref'):
+            fragment = fragment.external_ref
+        return self._archive.retrieve_or_fetch_entity(fragment)
 
     def traverse(self, fragment, scenario=None, **kwargs):
         if scenario is not None:
