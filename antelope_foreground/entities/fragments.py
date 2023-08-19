@@ -268,9 +268,18 @@ class LcFragment(LcEntity):
         return rx
 
     def make_ref(self, query):
+        """
+        We do NOT want to make local fragments into refs-- but we DO want to make remote fragments into refs. so
+        we simply neuter the workhorse function here.
+        :param query:
+        :return:
+        """
+        '''
         ref = super(LcFragment, self).make_ref(query)
         ref.set_config(self.flow.make_ref(query.cascade(self.flow.origin)), self.direction)
         return ref
+        '''
+        return self
 
     def top(self):
         if self.reference_entity is None:
