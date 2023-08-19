@@ -22,42 +22,28 @@ class FragmentRef(EntityRef):
     def dbg_print(self, *args):
         pass
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, flow=None, direction=None, **kwargs):
         super(FragmentRef, self).__init__(*args, **kwargs)
-        self._direction = None
-        self._flow = None
-        self._isset = False
-        self._ref_vals = dict()
-
-    def set_config(self, flow, direction):
-        if self._isset:
-            raise AttributeError('Fragment Ref is already specified!')
-        self._isset = True
-        self._flow = flow
         self._direction = direction
-
-    def _retrieve_config(self):
-        rx = self.reference_entity[0]
-        self.set_config(rx.flow, comp_dir(rx.direction))
+        self._flow = flow
+        self._ref_vals = dict()
 
     @property
     def direction(self):
-        if not self._isset:
-            self._retrieve_config()
         return self._direction
 
+    '''
     @property
     def is_background(self):
         """
         Can't figure out whether it ever makes sense for a fragment ref to be regarded 'background'
         :return:
         """
-        return False
+        return T
+    '''
 
     @property
     def flow(self):
-        if not self._isset:
-            self._retrieve_config()
         return self._flow
 
     @property
@@ -66,16 +52,14 @@ class FragmentRef(EntityRef):
 
     @property
     def name(self):
-        if self.external_ref is None:
-            return self['Name']
-        return self.external_ref
+        return self['Name']
 
     @property
     def is_conserved_parent(self):
         return None
 
     def top(self):
-        return self
+        return self._query.top(self)
 
     def set_name(self, name, **kwargs):
         return self._query.name_fragment(self, name, **kwargs)

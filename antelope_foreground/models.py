@@ -76,27 +76,37 @@ class Anchor(ResponseModel):
         tfb = self._term_flow_block()
         if tfb:
             j['termFlow'] = tfb
-        j['scoreCache'] = self.score_cache
+        if self.score_cache:
+            j['scoreCache'] = self.score_cache
         return j
 
 
-class FragmentRef(EntityRef):
+class FragmentRef(Entity):
     """
-    From EntityRef, inherits: origin, entity_id (<-external_ref), optional entity_type
+    From EntityRef, inherits: origin, entity_id (<-external_ref), entity_type, properties
+    we ensure put a "name" field because we want users to be able to see what they're getting
     """
     entity_type: str = 'fragment'
     flow: EntityRef
     direction: str
-    name: str
 
     @classmethod
-    def from_fragment(cls, fragment):
+    def from_fragment(cls, fragment, **kwargs):
         if fragment.reference_entity is None:
             dirn = comp_dir(fragment.direction)
         else:
             dirn = fragment.direction
-        return cls(origin=fragment.origin, entity_id=fragment.external_ref,
-                   flow=EntityRef.from_entity(fragment.flow), direction=dirn, name=fragment['name'])
+
+        obj = cls(origin=fragment.origin, entity_id=fragment.external_ref,
+                  flow=EntityRef.from_entity(fragment.flow), direction=dirn, properties=dict())
+        obj.properties['name'] = fragment['name']
+
+        for key, val in kwargs.items():
+            try:
+                obj.properties[key] = fragment[key]
+            except KeyError:
+                pass
+        return obj
 
 
 class FragmentEntity(Entity):
@@ -168,9 +178,9 @@ class FragmentEntity(Entity):
             j['flow'] = '%s/%s' % (self.flow.origin, self.flow.entity_id)
         j['direction'] = self.direction
         j['isPrivate'] = False
-        j['isBalanceFlow'] = self.is_balance_flow,
-        j['exchangeValues'] = self._serialize_evs(),
-        j['terminations'] = self._serialize_terms(),
+        j['isBalanceFlow'] = self.is_balance_flow
+        j['exchangeValues'] = self._serialize_evs()
+        j['terminations'] = self._serialize_terms()
         j['tags'] = dict(**self.properties)
         return j
 

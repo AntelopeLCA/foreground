@@ -39,6 +39,15 @@ class AntelopeForegroundInterface(ForegroundInterface):
                                      **kwargs):
             yield self.make_ref(i)
 
+    def top(self, fragment, **kwargs):
+        """
+        Return the reference fragment that is top parent of named fragment
+        :param fragment:
+        :param kwargs:
+        :return:
+        """
+        return self.make_ref(self._perform_query(_interface, 'top', ForegroundRequired, fragment, **kwargs))
+
     def frag(self, string, many=False, **kwargs):
         """
         Return the unique fragment whose ID starts with string.

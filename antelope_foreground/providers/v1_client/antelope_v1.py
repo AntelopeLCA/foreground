@@ -430,7 +430,6 @@ class AntelopeV1Client(BasicArchive):
         j['Name'] = j.pop('name')
         dirn = j.pop('direction')
         flow = self.retrieve_or_fetch_entity('flows/%s' % j.pop('termFlowID'))
-        ref = self._make_ref(ext_ref, 'fragment', **j)
-        ref.set_config(flow, dirn)
+        ref = self._make_ref(ext_ref, 'fragment', flow=flow, direction=dirn, **j)
         self._cached['fragments'][frag_id] = ref
         return ref

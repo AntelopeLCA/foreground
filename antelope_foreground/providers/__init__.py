@@ -1,7 +1,8 @@
 from .lc_foreground import LcForeground, FOREGROUND_ENTITY_TYPES
 from .v1_client import AntelopeV1Client
+from .oryx_client import OryxClient
 
-PROVIDERS = ['AntelopeV1Client', 'LcForeground']
+PROVIDERS = ['AntelopeV1Client', 'LcForeground', 'OryxClient']
 
 
 def init_fcn(source, ref=None, **kwargs):

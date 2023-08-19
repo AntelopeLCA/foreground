@@ -86,7 +86,7 @@ class ForegroundCatalog(LcCatalog):
                 self._fg_queue.remove(origin)
                 '''
                 try:
-                    yield self._check_resource(res)
+                    yield self._check_resource(res, interface=itype)
                 except InterfaceError:
                     continue
 
@@ -144,21 +144,21 @@ class ForegroundCatalog(LcCatalog):
 
         return self._check_resource(res)
 
-    def _check_resource(self, res, delete=False):
+    def _check_resource(self, res, delete=False, interface='foreground'):
         """
         finish foreground activation + return interface
         :param res:
         :return:
         """
         if delete:
-            os.rename()
+            print("I ain't deleting shit")
         ref = res.origin
 
         self._fg_queue.add(ref)
         res.check(self)
         self._fg_queue.remove(ref)
 
-        fg = res.make_interface('foreground')
+        fg = res.make_interface(interface)
         if ref not in self._queries:
             self._queries[ref] = ForegroundQuery(ref, catalog=self)
 

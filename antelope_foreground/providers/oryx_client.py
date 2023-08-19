@@ -21,17 +21,26 @@ class OryxEntity(XdbEntity):
 
         if self.entity_type == 'fragment':
             args = {k: v for k, v in self._model.properties.items()}
-            ref = FragmentRef(self.external_ref, query, reference_entity=self._model.parent, **args)
-            ref.set_config(query.get(self._model.flow.external_ref), self._model.direction)
+            ref = FragmentRef(self.external_ref, query,
+                              flow=query.get(self._model.flow.entity_id), direction=self._model.direction, **args)
             self._ref = ref
             return ref
         return super(OryxEntity, self).make_ref(query)
 
 
-
 class OryxClient(XdbClient):
 
     _base_type = OryxEntity
+
+    def __init__(self, *args, catalog=None, **kwargs):
+        """
+        Not sure we need the catalog yet, but LcResource gives it to us, so let's hold on to it
+        :param args:
+        :param catalog:
+        :param kwargs:
+        """
+        self._catalog = catalog
+        super(OryxClient, self).__init__(*args, **kwargs)
 
     def make_interface(self, iface):
         if iface == 'foreground':
@@ -61,6 +70,18 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
     def post_foreground(self, fg, save_unit_scores=False):
         pydantic_fg = LcForeground.from_foreground_archive(fg.archive, save_unit_scores=save_unit_scores)
         return self._archive.r.post_return_one(pydantic_fg.dict(), OriginCount, 'post_foreground')
+
+    def save(self):
+        return self._archive.r.post_return_one(bool, 'save_foreground')
+
+    def get_reference(self, key):
+        parent = self._archive.r.get_one(FragmentRefModel, _ref(key), 'reference')
+        if _ref(parent) == _ref(key):
+            return None
+        return self._archive.get_or_make(parent)
+
+    def top(self, key, **kwargs):
+        return self._archive.get_or_make(self._archive.r.get_one(FragmentRefModel, _ref(key), 'top'))
 
     def traverse(self, fragment, scenario=None, **kwargs):
         return self._archive.r.get_many(FragmentFlow, _ref(fragment), 'traverse', scenario=scenario, **kwargs)
