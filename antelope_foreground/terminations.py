@@ -9,10 +9,11 @@ other.
 from antelope import (BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences,
                       NoReference, ConversionReferenceMismatch, EntityNotFound)
 
+from antelope_core.contexts import NullContext
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
 from .lcia_dict import LciaResults
-from .models import Anchor, EntityRef
+from .models import Anchor, EntityRef, UNRESOLVED_ANCHOR_TYPE
 
 
 # from lcatools.catalog_ref import NoCatalog
@@ -116,7 +117,7 @@ class FlowTermination(object):
             if origin == fg.ref:
                 term_node = fg[external_ref]
             else:
-                term_node = fg.catalog_ref(origin, external_ref, entity_type='term')  # need to lookup type
+                term_node = fg.catalog_ref(origin, external_ref, entity_type=UNRESOLVED_ANCHOR_TYPE)  # need to lookup type
 
         direction = j.pop('direction', None)
         descend = j.pop('descend', True)
@@ -181,7 +182,7 @@ class FlowTermination(object):
                 term_flow = entity.flow
                 _direction = entity.direction
                 entity = entity.process
-            elif entity.entity_type not in ('context', 'process', 'fragment', 'term'):
+            elif entity.entity_type not in ('context', 'process', 'fragment', UNRESOLVED_ANCHOR_TYPE):
                 raise TypeError('%s: term %s Inappropriate termination type: %s' % (fragment.link, entity.link,
                                                                                     entity.entity_type))
 
@@ -778,7 +779,7 @@ class FlowTermination(object):
         return j
 
     def to_anchor(self, save_unit_scores=False):
-        if self.is_null or self._parent is self.term_node:
+        if self.is_null:
             return None
         d = {'descend': self.descend}
         if self._parent.is_background and save_unit_scores and len(self._score_cache) > 0:
@@ -835,6 +836,8 @@ class FlowTermination(object):
         elif self.is_context:
             if self.is_emission:
                 term = '-== '
+            elif self.term_node is NullContext:
+                term = '-)  '
             else:
                 # TODO: intermediate contexts don't present as cutoffs (because is_null is False)
                 term = '-cx '
@@ -844,18 +847,11 @@ class FlowTermination(object):
             else:
                 term = '-*  '
         elif self.term_node.entity_type == 'fragment':
-            if self.term_is_bg:
-                # TODO: Broken! needs to be scenario-aware
-                if self.term_node.term.is_null:
-                    term = '--C '
-                else:
-                    term = '-#B  '
+            if self.descend:
+                term = '-#::'
             else:
-                if self.descend:
-                    term = '-#::'
-                else:
-                    term = '-#  '
-        elif self.term_node.entity_type == 'term':
+                term = '-#  '
+        elif self.term_node.entity_type == UNRESOLVED_ANCHOR_TYPE:
             term = '--? '
         else:
             raise TypeError('I Do not understand this term for frag %.7s' % self._parent.uuid)

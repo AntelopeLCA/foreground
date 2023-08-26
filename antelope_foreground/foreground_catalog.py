@@ -1,7 +1,7 @@
 from antelope import UnknownOrigin
 from antelope_core.archives import InterfaceError
 from antelope_core.catalog import LcCatalog
-from .foreground_query import ForegroundQuery, ForegroundNotSafe
+from .foreground_query import ForegroundQuery, ForegroundNotSafe, MissingResource
 
 from itertools import chain
 from shutil import rmtree
@@ -25,12 +25,39 @@ class NoSuchForeground(Exception):
 class ForegroundCatalog(LcCatalog):
     """
     Adds the ability to create (and manage?) foreground resources
+
+    Maintains two different lists of resources that have been encountered but not yet resolved:
+
+     _fg_queue is a set of foregrounds (that may reference one another)- they can be added to the queue
+      when referenced, and their queries will resolve once the queue is processed, which will happen within
+      a single query evaluation
+
+     _missing_o is a set of (origin, interface) 2-tuples that have been requested but are not found. They must
+      be removed from the set when a resource is added to fulfill them.
     """
 
     '''
     ForegroundCatalog
     '''
-    _fg_queue = set()  # fgs we are *currently* opening
+    def __init__(self, *args, **kwargs):
+        self._fg_queue = set()  # fgs we are *currently* opening
+        self._missing_o = set()  # references we have encountered that we cannot resolve
+        super(ForegroundCatalog, self).__init__(*args, **kwargs)
+
+    def _check_missing_o(self, res):
+        for iface in res.interfaces:
+            key = (res.origin, iface)
+            if key in self._missing_o:
+                self._missing_o.remove(key)
+
+    def new_resource(self, reference, source, ds_type, store=True, **kwargs):
+        res = super(ForegroundCatalog, self).new_resource(reference, source, ds_type, store=store, **kwargs)
+        self._check_missing_o(res)
+        return res
+
+    def add_resource(self, resource, store=True):
+        super(ForegroundCatalog, self).add_resource(resource, store=store)
+        self._check_missing_o(resource)
 
     def is_in_queue(self, home):
         """
@@ -39,6 +66,20 @@ class ForegroundCatalog(LcCatalog):
         :return:
         """
         return home in self._fg_queue
+
+    def is_missing(self, origin, interface):
+        """
+        This tells us whether the named origin, interface tuple is in our list of missing references
+        :param origin:
+        :param interface:
+        :return:
+        """
+        return origin, interface in self._missing_o
+
+    @property
+    def missing_resources(self):
+        for k in self._missing_o:
+            yield k
 
     '''
     def delete_foreground(self, ref):
@@ -86,13 +127,20 @@ class ForegroundCatalog(LcCatalog):
                 self._fg_queue.remove(origin)
                 '''
                 try:
-                    yield self._check_resource(res, interface=itype)
+                    yield self._check_foreground(res, interface=itype)
                 except InterfaceError:
                     continue
 
+        elif (origin, itype) in self._missing_o:
+            raise MissingResource(origin, itype)
+
         else:
-            for k in super(ForegroundCatalog, self).gen_interfaces(origin, itype=itype, strict=strict):
-                yield k
+            try:
+                for k in super(ForegroundCatalog, self).gen_interfaces(origin, itype=itype, strict=strict):
+                    yield k
+            except UnknownOrigin:
+                self._missing_o.add((origin, itype))
+                raise MissingResource(origin, itype)
 
     def create_foreground(self, ref, path=None, quiet=True, delete=False):
         """
@@ -122,7 +170,7 @@ class ForegroundCatalog(LcCatalog):
                                 interfaces=['basic', 'index', 'foreground', 'quantity'],
                                 quiet=quiet)
 
-        return self._check_resource(res)
+        return self._check_foreground(res)
 
     def foreground(self, ref, reset=False):
         """
@@ -142,9 +190,9 @@ class ForegroundCatalog(LcCatalog):
         if reset:
             self.purge_resource_archive(res)
 
-        return self._check_resource(res)
+        return self._check_foreground(res)
 
-    def _check_resource(self, res, delete=False, interface='foreground'):
+    def _check_foreground(self, res, delete=False, interface='foreground'):
         """
         finish foreground activation + return interface
         :param res:
@@ -158,9 +206,10 @@ class ForegroundCatalog(LcCatalog):
         res.check(self)
         self._fg_queue.remove(ref)
 
-        fg = res.make_interface(interface)
         if ref not in self._queries:
-            self._queries[ref] = ForegroundQuery(ref, catalog=self)
+            self._seed_fg_query(ref)
+
+        fg = res.make_interface(interface)
 
         return fg
 
@@ -232,7 +281,10 @@ class ForegroundCatalog(LcCatalog):
                 rmtree(del_path)
 
             os.rename(abs_src, del_path)
-            
+
+    def _seed_fg_query(self, origin, **kwargs):
+        self._queries[origin] = ForegroundQuery(origin, catalog=self, **kwargs)
+
     def query(self, origin, strict=False, refresh=False, **kwargs):
         if origin in self.foregrounds:
             if origin not in self._queries:
@@ -241,17 +293,17 @@ class ForegroundCatalog(LcCatalog):
             if origin in self._fg_queue:
                 raise BackReference(origin)
             if refresh or (origin not in self._queries):
-                self._queries[origin] = ForegroundQuery(origin, catalog=self, **kwargs)
+                self._seed_fg_query(origin, **kwargs)
             return self._queries[origin]
 
         return super(ForegroundCatalog, self).query(origin, strict=strict, refresh=refresh, **kwargs)
 
     def catalog_ref(self, origin, external_ref, entity_type=None, **kwargs):
-        if origin in self.foregrounds:
-            if origin not in self._queries:
-                raise ForegroundNotSafe(origin)
-        return super(ForegroundCatalog, self).catalog_ref(origin, external_ref, entity_type=entity_type, **kwargs)
-
+        try:
+            return self.query(origin).get(external_ref)
+        except UnknownOrigin:
+            self._missing_o.add((origin, 'basic'))
+            raise MissingResource(origin, 'basic')
 
     '''
     Parameterization

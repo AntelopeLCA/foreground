@@ -54,6 +54,7 @@ from ..fragment_editor import create_fragment
 from ...terminations import MissingFlow, FlowConversionError
 from antelope_core.entities import LcFlow
 from antelope_core.archives import Qdb
+from antelope_core.contexts import NullContext
 from antelope import CONTEXT_STATUS_
 
 origin = 'test.origin'
@@ -157,7 +158,7 @@ class FragmentTests(unittest.TestCase):
         cls.aa = new_fragment(f7, 'Output', Name='An auto-consumption process', observe=True)
 
         afg = new_fragment(f4, 'Input', parent=cls.af, balance=True, Name='Internal fuel supply')
-        afg.to_foreground()  # in the wild, this would be terminated and not show up as an IO-- fg emulates that
+        afg.terminate(NullContext)  # this is the replacement for to_foreground()
 
         new_fragment(f2, 'Input', parent=cls.a1, value=a1_vol)  # not observed
         a3 = new_fragment(f3, 'Input', parent=cls.a1, value=a1_mj_in, observe=True)
@@ -186,7 +187,7 @@ class FragmentTests(unittest.TestCase):
 
         a3w = new_fragment(f3w, 'Output', parent=cls.a2, value=a2_waste_heat, observe=True)
         a3w.set_exchange_value('efficiency', a2_eff_waste_heat)
-        a3w.to_foreground()
+        a3w.terminate(NullContext)  # this is the replacement for to_foreground()
 
         cls.a6 = new_fragment(f6, 'Input', parent=cls.a2, balance=True)
         cls.a6.terminate(cls.af, term_flow=f4)
@@ -286,8 +287,8 @@ class FragmentTests(unittest.TestCase):
         io, ff = self.af.unit_inventory()
         self._check_fragmentflows(io, f4, 'Output', 1)
         self.assertEqual(len(ff), 2)
-        # foreground <=> term is self
-        self.assertSetEqual({True}, {f.term.term_node is f.fragment for f in ff})
+        # foreground <=> term is self -- to_foreground() replaced with termination to NullContext
+        self.assertSetEqual({self.af, NullContext}, {f.term.term_node for f in ff})
 
     def test_unit_conversion_on_fragment_creation(self):
         self.assertEqual(self.a2.exchange_value(), a2_mj)

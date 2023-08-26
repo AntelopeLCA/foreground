@@ -7,11 +7,11 @@ import re
 
 from collections import defaultdict
 
-from ..foreground_query import DelayedQuery, ForegroundNotSafe, QueryIsDelayed
+from ..foreground_query import DelayedQuery, ForegroundNotSafe, QueryIsDelayed, MissingResource
 from ..refs.fragment_ref import FragmentRef
 from ..implementations import AntelopeForegroundImplementation, AntelopeBasicImplementation
 
-from antelope import PropertyExists, CatalogRef
+from antelope import PropertyExists, CatalogRef, EntityNotFound
 from antelope_core.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES
 from ..entities.fragments import LcFragment
 
@@ -160,12 +160,24 @@ class LcForeground(BasicArchive):
         '''
         try:
             return self._catalog.catalog_ref(origin, external_ref, entity_type=entity_type, **kwargs)
-        except ForegroundNotSafe:
+        except (ForegroundNotSafe, MissingResource):
             print('{%s} Creating delayed ref %s/%s [%s]' % (self.ref, origin, external_ref, entity_type))
             dq = DelayedQuery(origin, self._catalog, self.ref)
             if entity_type == 'fragment':
                 return FragmentRef(external_ref, dq, **kwargs)
+            self._counter['delayed'] += 1
             return CatalogRef.from_query(external_ref, query=dq, etype=entity_type, **kwargs)
+        except EntityNotFound:
+            print('{%s} entity %s/%s not found' % (self.ref, origin, external_ref))
+            return CatalogRef(origin, external_ref, entity_type=entity_type, **kwargs)
+
+    @property
+    def delayed(self):
+        return self._counter['delayed']
+
+    @property
+    def unresolved(self):
+        return self._counter['unresolved']
 
     def catalog_query(self, origin, **kwargs):
         return self._catalog.query(origin, **kwargs)
@@ -198,7 +210,8 @@ class LcForeground(BasicArchive):
 
     def _flow_ref_from_json(self, e, external_ref):
         origin = e.pop('origin')
-        ref = self.catalog_ref(origin, external_ref, entity_type='flow')
+        r_q = self[e.pop('referenceQuantity', None)]  # quantity must have been loaded
+        ref = self.catalog_ref(origin, external_ref, entity_type='flow', reference_entity=r_q, **e)
         if not ref.resolved and self._frags_loaded:  # not found
             try:
                 ref_qty_uu = e.pop('referenceQuantity')
@@ -215,7 +228,8 @@ class LcForeground(BasicArchive):
             if etype == 'flow':
                 return self._flow_ref_from_json(e, ext_ref)
             elif etype == 'quantity':
-                return self.catalog_ref(e.pop('origin'), ext_ref, entity_type='quantity', **e)
+                unit = e.pop('referenceUnit', None)
+                return self.catalog_ref(e.pop('origin'), ext_ref, entity_type='quantity', reference_entity=unit, **e)
         return super(LcForeground, self)._make_entity(e, etype, ext_ref)
 
     def add(self, entity):
@@ -234,6 +248,8 @@ class LcForeground(BasicArchive):
             #     enew[p] = entity[p]  ...
         try:
             self._add(entity, entity.link)
+            if not entity.is_entity and not entity.resolved:
+                self._counter['unresolved'] += 1
         except EntityExists:
             if entity is self[entity.link]:
                 pass
@@ -323,6 +339,8 @@ class LcForeground(BasicArchive):
         """
         if frag.external_ref == name:
             return  # nothing to do-- fragment is already assigned that name
+        if name.find('/') >= 0:
+            raise ValueError('Fragment name cannot include forward slash')
         current = self[frag.link]
         if current is not frag:
             if current is None:

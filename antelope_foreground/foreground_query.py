@@ -20,6 +20,18 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
 
 
 class QueryIsDelayed(InvalidQuery):
+    """
+    This indicates a foreground that has been queued for initialization (recursively)-- should become initialized
+    before the current operation is concluded, thus allowing the DelayedQuery to function
+    """
+    pass
+
+
+class MissingResource(InvalidQuery):
+    """
+    This indicates an UnknownOrigin exception was encountered when attempting to resolve a reference-- requires
+    intervention from the user to supply a resource to fulfill the DelayedQuery
+    """
     pass
 
 
@@ -43,7 +55,10 @@ class DelayedQuery(ForegroundQuery):
     def validate(self):
         if self._catalog.is_in_queue(self._home):
             return True  # this has to be true in order for the ref to operate while it is delayed
-        return super(DelayedQuery, self).validate()
+        try:
+            return super(DelayedQuery, self).validate()
+        except MissingResource:
+            return True  # likewise
 
     def _perform_query(self, itype, attrname, exc, *args, **kwargs):
         if self._catalog.is_in_queue(self._home):

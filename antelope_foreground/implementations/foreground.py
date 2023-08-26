@@ -81,6 +81,14 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     '''
     Add some useful functions from other interfaces to the foreground
     '''
+    @property
+    def delayed(self):
+        return self._archive.delayed
+
+    @property
+    def unresolved(self):
+        return self._archive.unresolved
+
     def catalog_ref(self, *args, **kwargs):
         return self._archive.catalog_ref(*args, **kwargs)
     

@@ -6,14 +6,14 @@
 import uuid
 # from collections import defaultdict
 
-from antelope import comp_dir, check_direction, PropertyExists, CatalogRef, RxRef
+from antelope import comp_dir, check_direction, PropertyExists, CatalogRef, RxRef, QuantityRequired
 
 from ..fragment_flows import group_ios, FragmentFlow, ios_exchanges, frag_flow_lcia
 from antelope_core.entities import LcEntity, LcFlow
 from antelope_core.exchanges import ExchangeValue
 # from lcatools.interact import ifinput, parse_math
 from ..terminations import FlowTermination, MissingFlow
-
+from ..foreground_query import MissingResource
 
 class InvalidParentChild(Exception):
     pass
@@ -332,6 +332,8 @@ class LcFragment(LcEntity):
         #     raise InvalidParentChild('Fragment should list parent as reference entity')
         if child not in self._child_flows:
             self._child_flows.append(child)
+        if self.term.is_null:  # formerly to_foreground()
+            self.terminate(self)
         for term in self._terminations.values():
             term.clear_score_cache()
 
@@ -344,6 +346,9 @@ class LcFragment(LcEntity):
         if child.reference_entity is not self:
             raise InvalidParentChild('Fragment is not a child')
         self._child_flows.remove(child)
+        if len(self._child_flows) == 0:
+            if self.term.term_node is self:
+                self.clear_termination()
         for term in self._terminations.values():
             term.clear_score_cache()
 
@@ -909,7 +914,10 @@ class LcFragment(LcEntity):
         if self._balance_child is None:
             return None
         else:
-            return self._balance_child.flow.reference_entity.cf(self.flow)
+            try:
+                return self._balance_child.flow.reference_entity.cf(self.flow)
+            except (QuantityRequired, MissingResource):
+                return 0.0
 
     '''
     def balance(self, scenario=None, observed=False):
@@ -1027,6 +1035,7 @@ class LcFragment(LcEntity):
     def clear_termination(self, scenario=None):
         self._terminations[scenario] = FlowTermination.null(self)
 
+    '''
     def to_foreground(self, scenario=None):
         """
         make the fragment a foreground node. This is done by setting the termination to self (only if the term is
@@ -1040,6 +1049,7 @@ class LcFragment(LcEntity):
         # self.unset_background()
         if self.termination(scenario).is_null:
             self.terminate(self, scenario=scenario)
+    '''
 
     '''
     def unset_background(self):

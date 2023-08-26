@@ -12,9 +12,21 @@ and that's probably it
 
 """
 from typing import Dict, Optional, List
-from antelope.models import ResponseModel, EntityRef, Entity, FlowEntity
+from antelope.models import ResponseModel, EntityRef, Entity, FlowEntity, OriginMeta
 from antelope.xdb_tokens import ResourceSpec
-from antelope import comp_dir
+
+
+UNRESOLVED_ANCHOR_TYPE = 'term'  # this is used when an anchor node's origin cannot be resolved
+
+
+class ForegroundMeta(OriginMeta):
+    delayed: Optional[int] = 0
+    unresolved: Optional[int] = 0
+
+
+class MissingResource(ResponseModel):
+    origin: str
+    interface: str
 
 
 class Anchor(ResponseModel):
@@ -29,6 +41,40 @@ class Anchor(ResponseModel):
     context: Optional[List[str]] = None
     descend: bool
     score_cache: Optional[Dict[str, float]] = None
+
+    def __str__(self):
+        """
+        Replicate FlowTermination
+
+        :return:
+          '---:' = fragment I/O
+          '-O  ' = foreground node
+          '-*  ' = process
+          '-#  ' - sub-fragment (aggregate)
+          '-#::' - sub-fragment (descend)
+          '-B ' - terminated background
+          '--C ' - cut-off background
+          '--? ' - ungrounded catalog ref
+
+        :return:
+        """
+        if self.node:
+            if self.node.entity_type == 'process':
+                return '-*  '
+            elif self.node.entity_type == UNRESOLVED_ANCHOR_TYPE:
+                return '--? '
+            else:
+                if self.descend:
+                    return '-#::'
+                else:
+                    return '-#  '
+        elif self.context:
+            if self.context == ['None']:
+                return '-)  '
+            else:
+                return '-== '
+        else:
+            return '---:'
 
     @property
     def type(self):
@@ -80,6 +126,14 @@ class Anchor(ResponseModel):
             j['scoreCache'] = self.score_cache
         return j
 
+    def masquerade(self, masq):
+        if self.node:
+            if self.node.origin in masq:
+                self.node.origin = masq[self.node.origin]
+        if self.anchor_flow:
+            if self.anchor_flow.origin in masq:
+                self.anchor_flow.origin = masq[self.anchor_flow.origin]
+
 
 class FragmentRef(Entity):
     """
@@ -92,14 +146,25 @@ class FragmentRef(Entity):
 
     @classmethod
     def from_fragment(cls, fragment, **kwargs):
+        """
+
+        :param fragment:
+        :param kwargs:
+        :return:
+        """
+        ''' # we don't want this
         if fragment.reference_entity is None:
             dirn = comp_dir(fragment.direction)
         else:
             dirn = fragment.direction
+        '''
+        dirn = fragment.direction
 
         obj = cls(origin=fragment.origin, entity_id=fragment.external_ref,
                   flow=EntityRef.from_entity(fragment.flow), direction=dirn, properties=dict())
         obj.properties['name'] = fragment['name']
+        obj.properties['flow'] = obj.flow
+        obj.properties['direction'] = obj.direction
 
         for key, val in kwargs.items():
             try:
@@ -107,6 +172,12 @@ class FragmentRef(Entity):
             except KeyError:
                 pass
         return obj
+
+    def masquerade(self, masq):
+        if self.origin in masq:
+            self.origin = masq[self.origin]
+        if self.flow.origin in masq:
+            self.flow.origin = masq[self.flow.origin]
 
 
 class FragmentEntity(Entity):
@@ -127,10 +198,19 @@ class FragmentEntity(Entity):
 
     @classmethod
     def from_entity(cls, fragment, save_unit_scores=False, **kwargs):
+        """
+        :param fragment:
+        :param save_unit_scores:
+        :param kwargs:
+        :return:
+        """
+        ''' # we don't want this
         if fragment.reference_entity is None:
             dirn = comp_dir(fragment.direction)
         else:
             dirn = fragment.direction
+        '''
+        dirn = fragment.direction
         j = fragment.serialize(**kwargs)
         evs = j.pop('exchangeValues')
         evs['cached'] = evs.pop('0')
@@ -139,7 +219,8 @@ class FragmentEntity(Entity):
         for k, v in fragment.terminations():
             if k is None:
                 k = 'default'
-            terms[k] = v.to_anchor(save_unit_scores=save_unit_scores)
+            a = v.to_anchor(save_unit_scores=save_unit_scores)
+            terms[k] = a
         return cls(origin=fragment.origin, entity_id=fragment.external_ref, properties=j.pop('tags'),
                    entity_uuid=fragment.uuid,
                    flow=FlowEntity.from_flow(fragment.flow), direction=dirn,
@@ -183,6 +264,15 @@ class FragmentEntity(Entity):
         j['terminations'] = self._serialize_terms()
         j['tags'] = dict(**self.properties)
         return j
+
+    def masquerade(self, masq):
+        # I wonder if there is a better way to do this-- surely with a decorator of some sort
+        if self.origin in masq:
+            self.origin = masq[self.origin]
+        if self.flow.origin in masq:
+            self.flow.origin = masq[self.flow.origin]
+        for a in self.anchors.values():
+            a.masquerade(masq)
 
 
 class FragmentBranch(ResponseModel):
@@ -232,8 +322,13 @@ class FragmentBranch(ResponseModel):
                    magnitude=mag, unit=fragment.flow.unit, is_balance_flow=fragment.is_balance,
                    anchor=anchor, is_cutoff=cutoff)
 
+    def masquerade(self, masq):
+        self.node.masquerade(masq)
+        if self.anchor:
+            self.anchor.masquerade(masq)
 
-class FragmentFlow(ResponseModel):
+
+class FragmentFlow(FragmentBranch):
     """
     A FragmentFlow is a record of a link in a traversal. Current controversy: when a flow magnitude or anchor is
     determined by a scenario specification, the FragmentFlow needs to report that.
@@ -246,17 +341,30 @@ class FragmentFlow(ResponseModel):
     when doing operations.
 
     """
-    parent: Optional[str]
-    node: FragmentRef
-    name: str
-    group: str  # this is the StageName, used for aggregation.. the backend must set / user specify / modeler constrain
     magnitude: float
     scenario: Optional[str]
-    unit: str
     node_weight: float
-    anchor: Optional[Anchor]
     anchor_scenario: Optional[str]
     is_conserved: bool
+
+    def __str__(self):
+        """
+        Replicate the FragmentFlow behavior
+                return '%.5s  %10.3g [%6s] %s %s' % (self.fragment.uuid, self.magnitude, self.fragment.direction,
+                                             self.term, self.name)
+
+        :return:
+        """
+        if self.anchor is None:
+            anc = '---:'
+        else:
+            anc = str(self.anchor)
+            if self.anchor.node:
+                if self.anchor.node.entity_id == self.node.entity_id:
+                    anc = '-O  '
+
+        return '%.5s  %10.3g [%6s] %s %s' % (self.node.entity_id, self.magnitude, self.node.direction,
+                                             anc, self.name)
 
     @classmethod
     def from_fragment_flow(cls, ff, group=None, save_unit_scores=False):
@@ -276,11 +384,15 @@ class FragmentFlow(ResponseModel):
             scen = 'observed'
         if group is None:
             group = 'StageName'
-        return cls(parent=parent, node=FragmentRef.from_fragment(ff.fragment), name=ff.name,
+        node = FragmentRef.from_fragment(ff.fragment)
+        anchor = ff.term.to_anchor(save_unit_scores=save_unit_scores)
+        return cls(parent=parent, node=node, name=ff.name,
                    group=ff.fragment.get(group, ''),
                    magnitude=ff.magnitude, scenario=scen, unit=ff.fragment.flow.unit, node_weight=ff.node_weight,
+                   is_balance_flow=ff.fragment.is_balance,
+                   is_cutoff=anchor is None,
                    is_conserved=ff.is_conserved,
-                   anchor=ff.term.to_anchor(save_unit_scores=save_unit_scores), anchor_scenario=a_scen)
+                   anchor=anchor, anchor_scenario=a_scen)
 
 
 """

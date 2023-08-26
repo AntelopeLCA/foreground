@@ -65,8 +65,8 @@ def _create_fragment(flow, direction, uuid=None, parent=None, name=None, comment
             frag = LcFragment(uuid, flow, direction, Comment=comment, exchange_value=value, Name=name,
                               **kwargs)
     else:
-        if parent.term.is_null:
-            parent.to_foreground()
+        # if parent.term.is_null:
+        #     parent.to_foreground()  # this is now accomplished inside fragment constructor, via set_parent
         # else:
         #     parent.unset_background()
         if balance or parent.term.is_subfrag:
@@ -126,8 +126,8 @@ def clone_fragment(frag, tag='copy', comment=None, _parent=None, origin=None):
     _transfer_evs(frag, new)  # this obviates the need for observation
 
     for t_scen, term in frag.terminations():
-        if term.term_node is frag:
-            new.to_foreground(scenario=t_scen)
+        if term.term_node is frag or term.is_null:
+            new.terminate(None)
         else:
             new.terminate(term.term_node, term_flow=term.term_flow, descend=term.descend,
                           scenario=t_scen)
@@ -167,8 +167,8 @@ def interpose(fragment):
     """
     interp = _fork_fragment(fragment, comment='Interposed node')
 
-    interp.to_foreground()
-    fragment.set_parent(interp)
+    # interp.to_foreground()
+    fragment.set_parent(interp)  # set_parent calls parent.add_child() which includes parent.to_foreground()
 
     return interp
 
