@@ -12,16 +12,11 @@ and that's probably it
 
 """
 from typing import Dict, Optional, List
-from antelope.models import ResponseModel, EntityRef, Entity, FlowEntity, OriginMeta
+from antelope.models import ResponseModel, EntityRef, Entity, FlowEntity
 from antelope.xdb_tokens import ResourceSpec
 
 
 UNRESOLVED_ANCHOR_TYPE = 'term'  # this is used when an anchor node's origin cannot be resolved
-
-
-class ForegroundMeta(OriginMeta):
-    delayed: Optional[int] = 0
-    unresolved: Optional[int] = 0
 
 
 class MissingResource(ResponseModel):
@@ -426,6 +421,10 @@ class TermManager(ResponseModel):
     Characterizations: Dict[str, Dict[str, Dict[str, MicroCf]]]  # query qty, flowable, compartment
     Compartments: List[Compartment]
     Flowables: List[Flowable]
+
+    @classmethod
+    def null(cls):
+        return cls(Characterizations=dict(), Compartments=[], Flowables=[])
 
 
 '''

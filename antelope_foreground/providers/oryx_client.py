@@ -6,7 +6,7 @@ This is to be the same as the XdbServer, just with different methods defined
 from antelope_core.providers.xdb_client import XdbClient, _ref
 from antelope_core.providers.xdb_client.xdb_entities import XdbEntity
 from antelope_core.implementations import BasicImplementation
-from antelope.models import OriginCount
+from antelope.models import OriginCount, LciaResult as LciaResultModel
 
 from ..interfaces import AntelopeForegroundInterface
 from ..refs.fragment_ref import FragmentRef
@@ -117,3 +117,7 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
 
     def traverse(self, fragment, scenario=None, **kwargs):
         return self._archive.r.get_many(FragmentFlow, _ref(fragment), 'traverse', scenario=scenario, **kwargs)
+
+    def fragment_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+        return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'fragment_lcia',
+                                        _ref(quantity_ref), scenario=scenario, **kwargs)

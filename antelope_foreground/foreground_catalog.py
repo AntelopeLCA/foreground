@@ -138,7 +138,7 @@ class ForegroundCatalog(LcCatalog):
             try:
                 for k in super(ForegroundCatalog, self).gen_interfaces(origin, itype=itype, strict=strict):
                     yield k
-            except UnknownOrigin:
+            except (UnknownOrigin, InterfaceError):
                 self._missing_o.add((origin, itype))
                 raise MissingResource(origin, itype)
 
