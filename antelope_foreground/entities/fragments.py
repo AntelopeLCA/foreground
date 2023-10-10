@@ -715,6 +715,12 @@ class LcFragment(LcEntity):
     def _match_scenario_ev(self, scenario):
         """
         If *any* scenario is specified, we return either a match or the observed ev.
+
+        Special case: if the matched scenario begins with 'norm' AND the current fragment is a reference fragment,
+        then interpret the scenario as a normalization factor and REMOVE it from subsequent traversals to prevent
+        double-norming. Not totally convinced this is a good idea, but it is useful for some select circumstances.
+
+        Plus, double-norming (in recursive descent) is objectively wrong-- there is no circumstance when it is right.
         :param scenario:
         :return:
         """
@@ -726,7 +732,12 @@ class LcFragment(LcEntity):
                 return 1
             elif len(match) > 1:
                 raise ScenarioConflict('fragment: %s\nexchange value matches: %s' % (self, match))
-            return match[0]
+            m = match[0]
+            if str(m).startswith('norm') and self.parent is None:
+                print('Applying and removing one-time normalization scenario %s' % m)
+                # self.dbg_print('Applying and removing one-time normalization scenario %s' % m, level=0)
+                scenario.remove(m)
+            return m
         if scenario in self._exchange_values.keys():
             return scenario
         return 1
@@ -1354,7 +1365,7 @@ class LcFragment(LcEntity):
 
     def traverse(self, scenario=None, observed=False, frags_seen=None):
         if isinstance(scenario, set):
-            scenarios = scenario
+            scenarios = set(scenario)
         elif isinstance(scenario, tuple) or isinstance(scenario, list):
             scenarios = set(scenario)
         elif scenario is None:

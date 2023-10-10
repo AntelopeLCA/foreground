@@ -340,7 +340,7 @@ class LcForeground(BasicArchive):
         if frag.external_ref == name:
             return  # nothing to do-- fragment is already assigned that name
         if name.find('/') >= 0:
-            raise ValueError('Fragment name cannot include forward slash')
+            raise ValueError('"%s": Fragment name cannot include forward slash' % name)
         current = self[frag.link]
         if current is not frag:
             if current is None:
