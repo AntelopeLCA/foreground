@@ -127,7 +127,8 @@ class ForegroundCatalog(LcCatalog):
                 self._fg_queue.remove(origin)
                 '''
                 try:
-                    yield self._check_foreground(res, interface=itype)
+                    self._check_foreground(res, interface=itype)
+                    yield res.make_interface(itype)
                 except InterfaceError:
                     continue
 
@@ -174,7 +175,7 @@ class ForegroundCatalog(LcCatalog):
 
     def foreground(self, ref, reset=False):
         """
-        activates a foreground resource and returns an interface to that resource.
+        activates a foreground resource and returns a query interface to that resource.
         :param ref:
         :param reset: re-load the foreground from the saved files
         :return:
@@ -194,7 +195,7 @@ class ForegroundCatalog(LcCatalog):
 
     def _check_foreground(self, res, delete=False, interface='foreground'):
         """
-        finish foreground activation + return interface
+        finish foreground activation + return QUERY interface
         :param res:
         :return:
         """
@@ -209,9 +210,7 @@ class ForegroundCatalog(LcCatalog):
         if ref not in self._queries:
             self._seed_fg_query(ref)
 
-        fg = res.make_interface(interface)
-
-        return fg
+        return self._queries[ref]
 
     @property
     def foregrounds(self):

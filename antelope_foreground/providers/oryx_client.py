@@ -16,22 +16,40 @@ from ..models import LcForeground, FragmentFlow, FragmentRef as FragmentRefModel
 from requests.exceptions import HTTPError
 
 
+class MalformedOryxEntity(Exception):
+    """
+    something is wrong with the entity model
+    """
+    pass
+
+
 class OryxEntity(XdbEntity):
     def make_ref(self, query):
         if self._ref is not None:
             return self._ref
 
         if self.entity_type == 'fragment':
+            """
+            This is complicated because there are a couple different possibilities for the model type.
+            If the model is a FragmentEntity, then it contains a 'flow' attribute which is actually a FlowEntity,
+            but if the model is a FragmentRef, then its flow and direction are stored along with other 
+            entity properties, and they will not be converted into pydantic types but kept as dicts
+            """
             args = {k: v for k, v in self._model.properties.items()}
-            if hasattr(self._model, 'flow'):
-                flow = self._model.flow
-                direction = self._model.direction
+            f = args.pop('flow', None)
+            d = args.pop('direction', None)
+            if f is None:
+                if hasattr(self._model, 'flow'):
+                    flow = query.get(self._model.flow.entity_id)
+                    direction = self._model.direction
+                else:
+                    raise MalformedOryxEntity(self.link)
             else:
-                flow = args.pop('flow')
-                direction = args.pop('direction')
+                flow = query.get(f['entity_id'])
+                direction = d
 
             ref = FragmentRef(self.external_ref, query,
-                              flow=query.get(flow['entity_id']), direction=direction, **args)
+                              flow=flow, direction=direction, **args)
 
             self._ref = ref
             return ref

@@ -31,7 +31,7 @@ class Anchor(ResponseModel):
 
     Use FlowTermination.to_anchor(term, ..) to produce
     """
-    node: Optional[EntityRef]
+    node: Optional[EntityRef] = None
     anchor_flow: Optional[EntityRef] = None
     context: Optional[List[str]] = None
     descend: bool
