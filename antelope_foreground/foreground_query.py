@@ -16,7 +16,10 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
     """
     Add foreground interface to query object
     """
-    pass
+
+    def fragment_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+        ress = super(ForegroundQuery, self).fragment_lcia(fragment, quantity_ref, scenario=scenario, **kwargs)
+        return self._cycle_through_ress(ress, fragment, quantity_ref)
 
 
 class QueryIsDelayed(InvalidQuery):

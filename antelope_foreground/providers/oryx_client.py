@@ -3,10 +3,12 @@ Client for the oryx Foreground server
 
 This is to be the same as the XdbServer, just with different methods defined
 """
+from typing import List
+
 from antelope_core.providers.xdb_client import XdbClient, _ref
 from antelope_core.providers.xdb_client.xdb_entities import XdbEntity
 from antelope_core.implementations import BasicImplementation
-from antelope.models import OriginCount, LciaResult as LciaResultModel
+from antelope.models import OriginCount, LciaResult as LciaResultModel, EntityRef
 
 from ..interfaces import AntelopeForegroundInterface
 from ..refs.fragment_ref import FragmentRef
@@ -103,6 +105,9 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
     def post_foreground(self, fg, save_unit_scores=False):
         pydantic_fg = LcForeground.from_foreground_archive(fg.archive, save_unit_scores=save_unit_scores)
         return self._archive.r.post_return_one(pydantic_fg.dict(), OriginCount, 'post_foreground')
+
+    def post_entity_refs(self, post_ents: List[EntityRef]):
+        return self._archive.r.post_return_one([p.dict() for p in post_ents], OriginCount, 'entity_refs')
 
     def save(self):
         return self._archive.r.post_return_one(None, bool, 'save_foreground')
