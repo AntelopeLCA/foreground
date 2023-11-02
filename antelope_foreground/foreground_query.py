@@ -21,6 +21,9 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
         ress = super(ForegroundQuery, self).fragment_lcia(fragment, quantity_ref, scenario=scenario, **kwargs)
         return self._cycle_through_ress(ress, fragment, quantity_ref)
 
+    def __getitem__(self, item):
+        return self.get(item)
+
 
 class QueryIsDelayed(InvalidQuery):
     """

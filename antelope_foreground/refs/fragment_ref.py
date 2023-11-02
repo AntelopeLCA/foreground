@@ -86,8 +86,16 @@ class FragmentRef(EntityRef):
         """
         raise NotImplementedError
 
-    def fragment_lcia(self, lcia_qty, scenario=None, **kwargs):
-        return self._query.fragment_lcia(self.external_ref, lcia_qty, scenario=scenario, **kwargs)
+    def fragment_lcia(self, lcia_qty, scenario=None, mode=None, **kwargs):
+        """
+
+        :param lcia_qty:
+        :param scenario:
+        :param mode: None, 'detailed', 'flat', 'stage', 'anchor'
+        :param kwargs:
+        :return:
+        """
+        return self._query.fragment_lcia(self.external_ref, lcia_qty, scenario=scenario, mode=mode, **kwargs)
 
     def bg_lcia(self, lcia_qty, scenario=None, **kwargs):
         return self.fragment_lcia(self.external_ref, lcia_qty, scenario=scenario, **kwargs)

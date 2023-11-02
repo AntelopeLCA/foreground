@@ -575,9 +575,16 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for f in self._archive.entities_by_type('fragment'):
             f.clear_scenarios(terminations=terminations)
 
-    def fragment_lcia(self, fragment, quantity_ref, scenario=None, refresh=False, **kwargs):
+    def fragment_lcia(self, fragment, quantity_ref, scenario=None, refresh=False, mode=None, **kwargs):
         frag = self._archive.retrieve_or_fetch_entity(fragment)
-        return frag.top().fragment_lcia(quantity_ref, scenario=scenario, refresh=refresh, **kwargs)
+        res = frag.top().fragment_lcia(quantity_ref, scenario=scenario, refresh=refresh, **kwargs)
+        if mode == 'flat':  # 'detailed' doesn't make any sense when run locally
+            return res.flatten()
+        elif mode == 'stage':
+            return res.aggregate()
+        elif mode == 'anchor':
+            return res.terminal_nodes()
+        return res
 
     def create_process_model(self, process, ref_flow=None, set_background=None, **kwargs):
         """

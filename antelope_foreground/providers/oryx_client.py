@@ -13,7 +13,8 @@ from antelope.models import OriginCount, LciaResult as LciaResultModel, EntityRe
 from ..interfaces import AntelopeForegroundInterface
 from ..refs.fragment_ref import FragmentRef
 
-from ..models import LcForeground, FragmentFlow, FragmentRef as FragmentRefModel, MissingResource, FragmentEntity
+from ..models import (LcForeground, FragmentFlow, FragmentRef as FragmentRefModel, MissingResource,
+                      FragmentBranch, FragmentEntity)
 
 from requests.exceptions import HTTPError
 
@@ -141,6 +142,33 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
     def traverse(self, fragment, scenario=None, **kwargs):
         return self._archive.r.get_many(FragmentFlow, _ref(fragment), 'traverse', scenario=scenario, **kwargs)
 
-    def fragment_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+    def tree(self, fragment, scenario=None, **kwargs):
+        return self._archive.r.get_many(FragmentBranch, _ref(fragment), 'tree', scenario=scenario, **kwargs)
+
+    def fragment_lcia(self, fragment, quantity_ref, scenario=None, mode=None, **kwargs):
+        if mode == 'detailed':
+            return self.detailed_lcia(fragment,quantity_ref, scenario=scenario, **kwargs)
+        elif mode == 'flat':
+            return self.flat_lcia(fragment, quantity_ref, scenario=scenario, **kwargs)
+        elif mode == 'stage':
+            return self.stage_lcia(fragment, quantity_ref, scenario=scenario, **kwargs)
+        elif mode == 'anchor':
+            return self.anchor_lcia(fragment, quantity_ref, scenario=scenario, **kwargs)
         return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'fragment_lcia',
+                                        _ref(quantity_ref), scenario=scenario, **kwargs)
+
+    def detailed_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+        return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'detailed_lcia',
+                                        _ref(quantity_ref), scenario=scenario, **kwargs)
+
+    def flat_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+        return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'lcia',
+                                        _ref(quantity_ref), scenario=scenario, **kwargs)
+
+    def stage_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+        return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'stage_lcia',
+                                        _ref(quantity_ref), scenario=scenario, **kwargs)
+
+    def anchor_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+        return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'anchor_lcia',
                                         _ref(quantity_ref), scenario=scenario, **kwargs)
