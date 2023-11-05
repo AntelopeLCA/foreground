@@ -1,4 +1,4 @@
-from antelope import InvalidQuery
+from antelope import InvalidQuery, EntityNotFound
 from antelope_core.catalog_query import CatalogQuery
 from antelope_core.contexts import NullContext
 
@@ -21,9 +21,15 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
         ress = super(ForegroundQuery, self).fragment_lcia(fragment, quantity_ref, scenario=scenario, **kwargs)
         return self._cycle_through_ress(ress, fragment, quantity_ref)
 
-    def __getitem__(self, item):
-        return self.get(item)
+    def flowable(self, item):
+        return self._tm.get_flowable(item)
 
+    def __getitem__(self, item):
+        try:
+            return self.get(item)
+        except EntityNotFound:
+            return None  # I know, it's so bad. Plan is to break this and use downstream errors to expunge the practice
+        
 
 class QueryIsDelayed(InvalidQuery):
     """

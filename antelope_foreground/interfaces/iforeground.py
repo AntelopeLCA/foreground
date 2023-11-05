@@ -61,6 +61,14 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'frag', ForegroundRequired,
                                    string, many=many, **kwargs)
 
+    def frags(self, string, **kwargs):
+        """
+        Among only named fragments, return fragments whose names (external_ref) begin with string
+        :param string:
+        """
+        return self._perform_query(_interface, 'frags', ForegroundRequired,
+                                   string, **kwargs)
+
     '''
     def name_fragment(self, fragment, name, auto=None, force=None, **kwargs):
         """
@@ -100,6 +108,19 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'find_or_create_term', ForegroundRequired,
                                    exchange, background=background)
     '''
+    def add_or_retrieve(self, external_ref, reference, name, **kwargs):
+        """
+        Gets an entity with the given external_ref if it exists, , and creates it if it doesn't exist from the args.
+
+        Note that the full spec is mandatory so it could be done by tuple.
+        :param external_ref:
+        :param reference:
+        :param name:
+        :param kwargs:
+        :return:
+        """
+        return self._perform_query(_interface, 'add_or_retrieve', ForegroundRequired,
+                                   external_ref, reference, name, **kwargs)
 
     def create_fragment_from_node(self, process_ref, ref_flow=None, include_elementary=False):
         """

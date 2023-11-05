@@ -1247,7 +1247,7 @@ class LcFragment(LcEntity):
         :return:
         """
         yield self
-        for c in self.child_flows:
+        for c in sorted(self.child_flows, key=lambda x: (x['StageName'], not x.term.is_null, x.term.is_bg)):
             for b in c.tree():
                 yield b
 

@@ -81,6 +81,16 @@ class Anchor(ResponseModel):
             return 'cutoff'
 
     @property
+    def unit(self):
+        if self.is_null:
+            return '--'
+        if self.node:
+            if self.node.entity_type == 'fragment':
+                return '####'
+            return '****'
+        return '::::'
+
+    @property
     def is_null(self):
         return not bool(self.node or self.context)
 
@@ -138,6 +148,14 @@ class FragmentRef(Entity):
     entity_type: str = 'fragment'
     flow: EntityRef
     direction: str
+    entity_uuid: str
+
+    @property
+    def dirn(self):
+        return {
+            'Input': '-<-',
+            'Output': '=>='
+        }[self.direction]
 
     @classmethod
     def from_fragment(cls, fragment, **kwargs):
@@ -155,7 +173,7 @@ class FragmentRef(Entity):
         '''
         dirn = fragment.direction
 
-        obj = cls(origin=fragment.origin, entity_id=fragment.external_ref,
+        obj = cls(origin=fragment.origin, entity_id=fragment.external_ref, entity_uuid=fragment.uuid,
                   flow=EntityRef.from_entity(fragment.flow), direction=dirn, properties=dict())
         obj.properties['name'] = fragment['name']
         obj.properties['flow'] = obj.flow
@@ -284,6 +302,18 @@ class FragmentBranch(ResponseModel):
     anchor: Optional[Anchor]
     is_cutoff: bool
     is_balance_flow: bool
+
+    @property
+    def term(self):
+        return self.anchor
+
+    @property
+    def term_str(self):
+        if self.anchor and self.anchor.node:
+            if self.node.entity_id == self.anchor.node.entity_id:
+                return '-O  '
+            return str(self.anchor)
+        return '---:'
 
     @classmethod
     def from_fragment(cls, fragment, scenario=None, observed=False, group='StageName', save_unit_scores=False):

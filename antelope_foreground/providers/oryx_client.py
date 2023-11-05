@@ -43,12 +43,12 @@ class OryxEntity(XdbEntity):
             d = args.pop('direction', None)
             if f is None:
                 if hasattr(self._model, 'flow'):
-                    flow = query.get(self._model.flow.entity_id)
+                    flow = query.cascade(self._model.flow.origin).get(self._model.flow.entity_id)
                     direction = self._model.direction
                 else:
                     raise MalformedOryxEntity(self.link)
             else:
-                flow = query.get(f['entity_id'])
+                flow = query.cascade(f['origin']).get(f['entity_id'])
                 direction = d
 
             ref = FragmentRef(self.external_ref, query,
@@ -138,6 +138,9 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
 
     def top(self, key, **kwargs):
         return self._archive.get_or_make(self._archive.r.get_one(FragmentRefModel, _ref(key), 'top'))
+
+    def scenarios(self, fragment, **kwargs):
+        return self._archive.r.get_many(str, _ref(fragment), 'scenarios', **kwargs)
 
     def traverse(self, fragment, scenario=None, **kwargs):
         return self._archive.r.get_many(FragmentFlow, _ref(fragment), 'traverse', scenario=scenario, **kwargs)
