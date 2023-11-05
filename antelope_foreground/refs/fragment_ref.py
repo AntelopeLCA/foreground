@@ -74,6 +74,61 @@ class FragmentRef(EntityRef):
     def reference_value(self, flow):
         return self._ref_vals[flow.external_ref]
 
+    def tree(self, scenario=None, observed=False):
+        return self._query.tree(self.external_ref, scenario=scenario, observed=observed)
+
+    def show_tree(self, scenario=None, observed=False):
+        """
+        The old show_tree finally gets properly re-implemented.
+        :param scenario:
+        :param observed:
+        :return:
+        """
+        tree = self.tree(scenario=scenario, observed=observed)  # these come already sorted
+        pnts = []
+        cur_stage = ''
+
+        if observed:
+            delim = '[]'
+        else:
+            delim = '()'
+
+        def _pfx():
+            return '    | ' * len(pnts)
+
+        def _print_branch(_brnch, _cur_stage):
+            if _brnch.group != _cur_stage:
+                _cur_stage = _brnch.group
+                print('   %s %5s Stage: %s' % (_pfx(), ' ', _cur_stage))
+            print('   %s%s%s %.5s %s %7.3g %s%s %s' % (_pfx(), _brnch.node.dirn, _brnch.term_str,
+                                                       _brnch.node.entity_uuid,
+                                                       delim[0], _brnch.magnitude, _brnch.unit, delim[1], _brnch.name))
+            return _cur_stage
+
+        for branch in tree:
+            if branch.parent is None:
+                # print first round
+                if len(pnts) > 0:
+                    raise ValueError(pnts)
+                cur_stage = _print_branch(branch, cur_stage)
+                pnts.append(branch.node.entity_id)
+            else:
+                # handle parents and print subsequent rounds
+                if branch.parent != pnts[-1]:  # either up or down
+                    if branch.parent in pnts:
+                        while branch.parent != pnts[-1]:
+                            pnts.pop()
+                            print('   %s    x ' % _pfx())  # end cap
+                    else:
+                        print('   %s [%s]' % (_pfx(), branch.anchor.unit))  # new generation
+                        pnts.append(branch.parent)
+                cur_stage = _print_branch(branch, cur_stage)
+
+        # finish up by capping off remaining levels
+        while len(pnts) > 0:
+            pnts.pop()
+            print('   %s    x ' % _pfx())  # end cap
+
     def traverse(self, scenario=None, **kwargs):
         return self._query.traverse(self.external_ref, scenario=scenario, **kwargs)
 
