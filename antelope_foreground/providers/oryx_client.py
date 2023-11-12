@@ -86,7 +86,31 @@ class OryxClient(XdbClient):
 class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
     """
     We don't need to REimplement anything in XdbClient because oryx server should behave the same to the same routes
+    (but that means we need to reimplement everything in OryxServer)
     """
+    def _o(self, obj=None):
+        """
+        Key difference between the Xdb implementation is: the xdb implementation is strongly tied to its origin,
+        but the foreground can refer to entities with various origins.
+
+        To handle this, we *masquerade* the query (to the primary origin) with the entity's authentic origin (just as
+        we do with local.qdb). this happens in catalog query through the use of _grounded_query()
+
+        then in our requester we unset_origin() and issue origin, ref explicitly.
+
+        _o is the mechanism for this.
+
+        Implies that client code is expected to supply a true entity and not a string ref-- this is potentially a
+        problem
+
+        returns either the object's origin, if it is an object, or the archive's ref
+
+        :param obj:
+        :return:
+        """
+        if hasattr(obj, 'origin'):
+            return obj.origin
+        return self._archive.ref
 
     @property
     def delayed(self):
@@ -99,6 +123,7 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
     def get(self, external_ref, **kwargs):
         return self._archive.query.get(external_ref, **kwargs)
 
+    # foreground resource operations-- non-masqueraded
     def fragments(self, **kwargs):
         llargs = {k.lower(): v for k, v in kwargs.items()}
         return [self._archive.get_or_make(k) for k in self._archive.r.get_many(FragmentRefModel, 'fragments', **llargs)]
@@ -119,34 +144,40 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
     def missing(self):
         return self._archive.r.get_many(MissingResource, 'missing')
 
+    # Entity operations- masqueraded
     def get_reference(self, key):
         try:
-            parent = self._archive.r.get_one(FragmentRefModel, _ref(key), 'reference')
+            # !TODO! key will always be an external_ref so _o(key) will fail
+            parent = self._archive.r.origin_get_one(FragmentRefModel, self._o(key), _ref(key), 'reference')
         except HTTPError as e:
             if e.args[0] == 400:
                 return None
             raise e
         return self._archive.get_or_make(parent)
 
-    def get_fragment(self, key):
+    def get_fragment(self, fragment):
         """
         detailed version of a fragment
-        :param key:
+        :param fragment:
         :return:
         """
-        return self._archive.r.get_one(FragmentEntity, 'fragments', _ref(key))
+        return self._archive.r.origin_get_one(FragmentEntity, self._o(fragment), 'fragments', _ref(fragment))
 
-    def top(self, key, **kwargs):
-        return self._archive.get_or_make(self._archive.r.get_one(FragmentRefModel, _ref(key), 'top'))
+    def top(self, fragment, **kwargs):
+        return self._archive.get_or_make(self._archive.r.origin_get_one(FragmentRefModel,
+                                                                        self._o(fragment), _ref(fragment), 'top'))
 
     def scenarios(self, fragment, **kwargs):
-        return self._archive.r.get_many(str, _ref(fragment), 'scenarios', **kwargs)
+        return self._archive.r.origin_get_many(str, self._o(fragment), _ref(fragment),
+                                               'scenarios', **kwargs)
 
     def traverse(self, fragment, scenario=None, **kwargs):
-        return self._archive.r.get_many(FragmentFlow, _ref(fragment), 'traverse', scenario=scenario, **kwargs)
+        return self._archive.r.origin_get_many(FragmentFlow, self._o(fragment), _ref(fragment),
+                                               'traverse', scenario=scenario, **kwargs)
 
     def tree(self, fragment, scenario=None, **kwargs):
-        return self._archive.r.get_many(FragmentBranch, _ref(fragment), 'tree', scenario=scenario, **kwargs)
+        return self._archive.r.origin_get_many(FragmentBranch, self._o(fragment), _ref(fragment),
+                                               'tree', scenario=scenario, **kwargs)
 
     def fragment_lcia(self, fragment, quantity_ref, scenario=None, mode=None, **kwargs):
         if mode == 'detailed':
@@ -157,21 +188,26 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
             return self.stage_lcia(fragment, quantity_ref, scenario=scenario, **kwargs)
         elif mode == 'anchor':
             return self.anchor_lcia(fragment, quantity_ref, scenario=scenario, **kwargs)
-        return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'fragment_lcia',
-                                        _ref(quantity_ref), scenario=scenario, **kwargs)
+        return self._archive.r.origin_get_many(LciaResultModel, self._o(fragment), 'fragments', _ref(fragment),
+                                               'fragment_lcia',
+                                               _ref(quantity_ref), scenario=scenario, **kwargs)
 
     def detailed_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
-        return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'detailed_lcia',
-                                        _ref(quantity_ref), scenario=scenario, **kwargs)
+        return self._archive.r.origin_get_many(LciaResultModel, self._o(fragment), 'fragments', _ref(fragment),
+                                               'detailed_lcia',
+                                               _ref(quantity_ref), scenario=scenario, **kwargs)
 
     def flat_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
-        return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'lcia',
-                                        _ref(quantity_ref), scenario=scenario, **kwargs)
+        return self._archive.r.origin_get_many(LciaResultModel, self._o(fragment), 'fragments', _ref(fragment),
+                                               'lcia',
+                                               _ref(quantity_ref), scenario=scenario, **kwargs)
 
     def stage_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
-        return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'stage_lcia',
-                                        _ref(quantity_ref), scenario=scenario, **kwargs)
+        return self._archive.r.origin_get_many(LciaResultModel, self._o(fragment), 'fragments', _ref(fragment),
+                                               'stage_lcia',
+                                               _ref(quantity_ref), scenario=scenario, **kwargs)
 
     def anchor_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
-        return self._archive.r.get_many(LciaResultModel, 'fragments', _ref(fragment), 'anchor_lcia',
-                                        _ref(quantity_ref), scenario=scenario, **kwargs)
+        return self._archive.r.origin_get_many(LciaResultModel, self._o(fragment), 'fragments', _ref(fragment),
+                                               'anchor_lcia',
+                                               _ref(quantity_ref), scenario=scenario, **kwargs)
