@@ -22,6 +22,48 @@ class NoSuchForeground(Exception):
     pass
 
 
+class OriginDependencies(object):
+    """
+    This class stores records of references made from one origin (host) to another (dependency), detected
+    whenever an LcForeground
+    """
+    def __init__(self):
+        self._deps = set()  #
+
+    def add_dependency(self, host, dependency):
+        self._deps.add((str(host), str(dependency)))
+
+    def dependencies(self, host):
+        for h, d in sorted(self._deps):
+            if h == host:
+                yield d
+
+    def recursive_dependencies(self, host):
+        """
+        we want all the downstream dependencies but without repeating or entering an endless loop
+        :param host:
+        :return:
+        """
+        hosts_seen = set()
+        deps_seen = set()
+        queue = [host]
+        while len(queue) > 0:  # this sort of construction always gives me a thrill
+            h = queue.pop(0)
+            if h in hosts_seen:
+                continue
+            hosts_seen.add(h)
+            for d in self.dependencies(h):
+                queue.append(d)
+                if d not in deps_seen:
+                    deps_seen.add(d)
+                    yield d
+
+    def referents(self, dependency):
+        for h, d in sorted(self._deps):
+            if d == dependency:
+                yield h
+
+
 class ForegroundCatalog(LcCatalog):
     """
     Adds the ability to create (and manage?) foreground resources
@@ -42,6 +84,7 @@ class ForegroundCatalog(LcCatalog):
     def __init__(self, *args, **kwargs):
         self._fg_queue = set()  # fgs we are *currently* opening
         self._missing_o = set()  # references we have encountered that we cannot resolve
+        self._dependencies = OriginDependencies()
         super(ForegroundCatalog, self).__init__(*args, **kwargs)
 
     def _check_missing_o(self, res):
@@ -200,7 +243,7 @@ class ForegroundCatalog(LcCatalog):
         :return:
         """
         if delete:
-            print("I ain't deleting shit")
+            print("I ain't deletin' shit")
         ref = res.origin
 
         self._fg_queue.add(ref)
@@ -297,12 +340,20 @@ class ForegroundCatalog(LcCatalog):
 
         return super(ForegroundCatalog, self).query(origin, strict=strict, refresh=refresh, **kwargs)
 
-    def catalog_ref(self, origin, external_ref, entity_type=None, **kwargs):
+    def internal_ref(self, fg, origin, external_ref):
+        """
+        for use by an LcForeground provider to obtain a reference to an entity from a separate origin
+        :param origin:
+        :param external_ref:
+        :return:
+        """
+        self._dependencies.add_dependency(fg, origin)
         try:
             return self.query(origin).get(external_ref)
         except UnknownOrigin:
             self._missing_o.add((origin, 'basic'))
             raise MissingResource(origin, 'basic')
+        # don't catch EntityNotFound
 
     '''
     Parameterization

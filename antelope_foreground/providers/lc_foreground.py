@@ -159,7 +159,7 @@ class LcForeground(BasicArchive):
                 entity_type = 'process'
         '''
         try:
-            return self._catalog.catalog_ref(origin, external_ref, entity_type=entity_type, **kwargs)
+            return self._catalog.internal_ref(self.ref, origin, external_ref)
         except (ForegroundNotSafe, MissingResource):
             print('{%s} Creating delayed ref %s/%s [%s]' % (self.ref, origin, external_ref, entity_type))
             dq = DelayedQuery(origin, self._catalog, self.ref)
