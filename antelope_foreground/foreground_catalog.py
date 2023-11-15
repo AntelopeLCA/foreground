@@ -30,6 +30,11 @@ class OriginDependencies(object):
     def __init__(self):
         self._deps = set()  #
 
+    @property
+    def all(self):
+        for d in sorted(self._deps):
+            yield d
+
     def add_dependency(self, host, dependency):
         self._deps.add((str(host), str(dependency)))
 
@@ -86,6 +91,11 @@ class ForegroundCatalog(LcCatalog):
         self._missing_o = set()  # references we have encountered that we cannot resolve
         self._dependencies = OriginDependencies()
         super(ForegroundCatalog, self).__init__(*args, **kwargs)
+
+    @property
+    def dependencies(self):
+        for d in self._dependencies.all:
+            yield d
 
     def _check_missing_o(self, res):
         for iface in res.interfaces:
@@ -340,14 +350,15 @@ class ForegroundCatalog(LcCatalog):
 
         return super(ForegroundCatalog, self).query(origin, strict=strict, refresh=refresh, **kwargs)
 
-    def internal_ref(self, fg, origin, external_ref):
+    def internal_ref(self, fg_ref, origin, external_ref):
         """
         for use by an LcForeground provider to obtain a reference to an entity from a separate origin
+        :param fg_ref: referring foreground ref
         :param origin:
         :param external_ref:
         :return:
         """
-        self._dependencies.add_dependency(fg, origin)
+        self._dependencies.add_dependency(fg_ref, origin)
         try:
             return self.query(origin).get(external_ref)
         except UnknownOrigin:
