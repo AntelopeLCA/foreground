@@ -71,6 +71,13 @@ class FragmentRef(EntityRef):
         ios, _ = self.unit_inventory(scenario=scenario, **kwargs)  # in the future, may want to cache this
         return ios_exchanges(ios, ref=self)
 
+    def activity(self, scenario=None, **kwargs):
+        """
+        Report interior nodes of the fragments and their activity levels-- converse of inventory()
+        :return:
+        """
+        return self._query.activity(self, scenario=scenario, **kwargs)
+
     def reference_value(self, flow):
         return self._ref_vals[flow.external_ref]
 
@@ -120,7 +127,7 @@ class FragmentRef(EntityRef):
                             pnts.pop()
                             print('   %s    x ' % _pfx())  # end cap
                     else:
-                        print('   %s [%s]' % (_pfx(), branch.anchor.unit))  # new generation
+                        print('   %s [%s]' % (_pfx(), branch.term.unit))  # new generation
                         pnts.append(branch.parent)
                 cur_stage = _print_branch(branch, cur_stage)
 

@@ -175,6 +175,10 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         return self._archive.r.origin_get_many(FragmentFlow, self._o(fragment), _ref(fragment),
                                                'traverse', scenario=scenario, **kwargs)
 
+    def activity(self, fragment, scenario=None, **kwargs):
+        return self._archive.r.origin_get_many(FragmentFlow, self._o(fragment), _ref(fragment),
+                                               'activity', scenario=scenario, **kwargs)
+
     def tree(self, fragment, scenario=None, **kwargs):
         return self._archive.r.origin_get_many(FragmentBranch, self._o(fragment), _ref(fragment),
                                                'tree', scenario=scenario, **kwargs)

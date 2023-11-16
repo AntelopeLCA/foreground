@@ -5,7 +5,7 @@ from antelope_core.implementations.quantity import UnknownRefQuantity
 
 from antelope_core.entities.xlsx_editor import XlsxArchiveUpdater
 from antelope_core.contexts import NullContext
-from ..entities.fragments import InvalidParentChild
+from ..entities.fragments import LcFragment, InvalidParentChild
 from ..entities.fragment_editor import create_fragment, clone_fragment, _fork_fragment, interpose
 
 
@@ -567,6 +567,14 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     def traverse(self, fragment, scenario=None, **kwargs):
         frag = self._archive.retrieve_or_fetch_entity(fragment)
         return frag.traverse(scenario, observed=True)
+
+    def activity(self, fragment, scenario=None, **kwargs):
+        top = self.top(fragment)
+        if isinstance(top, LcFragment):
+            return [f for f in top.traverse(scenario=scenario, **kwargs) if isinstance(f, LcFragment) and
+                    f.top() is top]
+        else:
+            return top.activity(scenario=scenario, **kwargs)
 
     def clear_unit_scores(self, lcia_method=None):
         self._archive.clear_unit_scores(lcia_method)

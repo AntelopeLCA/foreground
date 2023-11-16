@@ -140,6 +140,23 @@ class Anchor(ResponseModel):
                 self.anchor_flow.origin = masq[self.anchor_flow.origin]
 
 
+class Anchors(ResponseModel):
+    anchors: Dict[str, Anchor]
+
+    @classmethod
+    def from_fragment(cls, fragment):
+        def _default_or(scenario):
+            if scenario is None:
+                return 'default'
+            return str(scenario)
+
+        return cls(anchors={_default_or(k): v.to_anchor(save_unit_scores=False) for k, v in fragment.terminations()})
+
+    def masquerade(self, masq):
+        for a in self.anchors.values():
+            a.masquerade(masq)
+
+
 class FragmentRef(Entity):
     """
     From EntityRef, inherits: origin, entity_id (<-external_ref), entity_type, properties
@@ -305,7 +322,13 @@ class FragmentBranch(ResponseModel):
 
     @property
     def term(self):
+        if self.anchor is None:
+            return Anchor.null()
         return self.anchor
+
+    @property
+    def fragment(self):
+        return self.node
 
     @property
     def term_str(self):
