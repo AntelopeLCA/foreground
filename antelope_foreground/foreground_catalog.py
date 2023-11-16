@@ -43,15 +43,15 @@ class OriginDependencies(object):
             if h == host:
                 yield d
 
-    def recursive_dependencies(self, host):
+    def recursive_dependencies(self, *hosts):
         """
         we want all the downstream dependencies but without repeating or entering an endless loop
-        :param host:
+        :param hosts:
         :return:
         """
         hosts_seen = set()
         deps_seen = set()
-        queue = [host]
+        queue = list(hosts)
         while len(queue) > 0:  # this sort of construction always gives me a thrill
             h = queue.pop(0)
             if h in hosts_seen:
