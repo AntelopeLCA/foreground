@@ -495,6 +495,14 @@ class GhostFragment(object):
         return False
 
     @property
+    def is_balance(self):
+        """
+        no way to track this through aggregation (in the present architecture)
+        :return:
+        """
+        return False
+
+    @property
     def entity_type(self):
         return 'fragment'
 

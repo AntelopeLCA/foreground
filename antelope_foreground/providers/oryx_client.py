@@ -142,7 +142,7 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         return self._archive.r.post_return_one(None, bool, 'restore_foreground')
 
     def missing(self):
-        return self._archive.r.get_many(MissingResource, 'missing')
+        return self._archive.r.origin_get_many(MissingResource, 'missing')  # no origin required
 
     # Entity operations- masqueraded
     def get_reference(self, key):
