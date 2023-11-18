@@ -86,7 +86,7 @@ class FragmentRef(EntityRef):
         return self._ref_vals[flow.external_ref]
 
     def tree(self, scenario=None, observed=False):
-        return self._query.tree(self.external_ref, scenario=scenario, observed=observed)
+        return self._query.tree(self, scenario=scenario, observed=observed)
 
     def show_tree(self, scenario=None, observed=False):
         """
@@ -145,7 +145,7 @@ class FragmentRef(EntityRef):
             print('   %s    x ' % _pfx())  # end cap
 
     def traverse(self, scenario=None, **kwargs):
-        return self._query.traverse(self.external_ref, scenario=scenario, **kwargs)
+        return self._query.traverse(self, scenario=scenario, **kwargs)
 
     def lci(self, scenario=None):
         """
@@ -165,10 +165,10 @@ class FragmentRef(EntityRef):
         :param kwargs:
         :return:
         """
-        return self._query.fragment_lcia(self.external_ref, lcia_qty, scenario=scenario, mode=mode, **kwargs)
+        return self._query.fragment_lcia(self, lcia_qty, scenario=scenario, mode=mode, **kwargs)
 
     def bg_lcia(self, lcia_qty, scenario=None, **kwargs):
-        return self.fragment_lcia(self.external_ref, lcia_qty, scenario=scenario, **kwargs)
+        return self.fragment_lcia(self, lcia_qty, scenario=scenario, **kwargs)
 
     def unit_inventory(self, scenario=None, observed=None):
         """
@@ -186,4 +186,4 @@ class FragmentRef(EntityRef):
         return group_ios(self, ffs)
 
     def scenarios(self, **kwargs):
-        return self._query.scenarios(self.external_ref, **kwargs)
+        return self._query.scenarios(self, **kwargs)
