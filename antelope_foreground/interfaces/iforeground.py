@@ -48,6 +48,15 @@ class AntelopeForegroundInterface(ForegroundInterface):
         """
         return self.make_ref(self._perform_query(_interface, 'top', ForegroundRequired, fragment, **kwargs))
 
+    def child_flows(self, fragment, **kwargs):
+        """
+
+        :param fragment:
+        :param kwargs:
+        :return:
+        """
+        return self.make_ref(self._perform_query(_interface, 'child_flows', ForegroundRequired, fragment, **kwargs))
+
     def frag(self, string, many=False, **kwargs):
         """
         Return the unique fragment whose ID starts with string.
@@ -234,6 +243,18 @@ class AntelopeForegroundInterface(ForegroundInterface):
         """
         return self._perform_query(_interface, 'create_process_model', ForegroundRequired,
                                    process, ref_flow=ref_flow, **kwargs)
+
+    def extend_process(self, fragment, scenario=None, include_context=False, **kwargs):
+        """
+
+        :param fragment:
+        :param scenario:
+        :param include_context:
+        :param kwargs:
+        :return:
+        """
+        return self._perform_query(_interface, 'extend_process', ForegroundRequired,
+                                   fragment, scenario=scenario, include_context=include_context, **kwargs)
 
     def fragment_from_exchanges(self, exchanges, parent=None, include_context=False, multi_flow=False, **kwargs):
         """

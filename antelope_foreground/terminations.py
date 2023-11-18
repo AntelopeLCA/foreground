@@ -252,7 +252,7 @@ class FlowTermination(object):
                     raise MissingFlow(term_flow)
             else:
                 self._term_flow = term_flow
-        if self.valid and self.term_flow.validate() and self.node_weight_multiplier == 0:
+        if self.valid and self.node_weight_multiplier == 0:  # we don't need to re-validate the flow
             print('Warning: 0 node weight multiplier for term of %s' % self._parent.external_ref)
 
     @property
@@ -486,8 +486,8 @@ class FlowTermination(object):
         '''
         if not self.valid:
             return 1.0
-        if not self.term_flow.validate():
-            return 1.0
+        # if not self.term_flow.validate():
+        #     return 1.0
         if self.term_flow.reference_entity == self._parent.flow.reference_entity:
             return 1.0
         parent_q = self._parent.flow.reference_entity

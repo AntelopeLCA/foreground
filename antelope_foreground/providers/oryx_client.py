@@ -5,6 +5,7 @@ This is to be the same as the XdbServer, just with different methods defined
 """
 from typing import List
 
+from antelope import UnknownOrigin
 from antelope_core.providers.xdb_client import XdbClient, _ref
 from antelope_core.providers.xdb_client.xdb_entities import XdbEntity
 from antelope_core.implementations import BasicImplementation
@@ -43,19 +44,27 @@ class OryxEntity(XdbEntity):
             d = args.pop('direction', None)
             if f is None:
                 if hasattr(self._model, 'flow'):
-                    flow = query.cascade(self._model.flow.origin).get(self._model.flow.entity_id)
+                    the_origin = self._model.flow.origin
+                    the_id = self._model.flow.entity_id
                     direction = self._model.direction
                 else:
                     raise MalformedOryxEntity(self.link)
             else:
-                flow = query.cascade(f['origin']).get(f['entity_id'])
+                the_origin = f['origin']
+                the_id = f['entity_id']
                 direction = d
+
+            try:
+                flow = query.cascade(the_origin).get(the_id)
+            except UnknownOrigin:
+                flow = query.get(the_id, origin=the_origin)
 
             ref = FragmentRef(self.external_ref, query,
                               flow=flow, direction=direction, **args)
 
             self._ref = ref
             return ref
+
         return super(OryxEntity, self).make_ref(query)
 
 
@@ -94,7 +103,8 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         but the foreground can refer to entities with various origins.
 
         To handle this, we *masquerade* the query (to the primary origin) with the entity's authentic origin (just as
-        we do with local.qdb). this happens in catalog query through the use of _grounded_query()
+        we do with local.qdb). this happens automatically in entity.make_ref() when the query origin doesn't match the
+        entity origin
 
         then in our requester we unset_origin() and issue origin, ref explicitly.
 
@@ -162,6 +172,10 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         :return:
         """
         return self._archive.r.origin_get_one(FragmentEntity, self._o(fragment), 'fragments', _ref(fragment))
+
+    def child_flows(self, fragment, **kwargs):
+        return self._archive.r.origin_get_many(FragmentRefModel, self._o(fragment), 'fragments', _ref(fragment),
+                                               'child_flows')
 
     def top(self, fragment, **kwargs):
         return self._archive.get_or_make(self._archive.r.origin_get_one(FragmentRefModel,

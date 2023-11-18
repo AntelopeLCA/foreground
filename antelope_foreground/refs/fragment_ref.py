@@ -61,6 +61,10 @@ class FragmentRef(EntityRef):
     def top(self):
         return self._query.top(self)
 
+    @property
+    def child_flows(self):
+        return self._query.child_flows(self)
+
     def set_name(self, name, **kwargs):
         return self._query.name_fragment(self, name, **kwargs)
 
@@ -107,9 +111,13 @@ class FragmentRef(EntityRef):
             if _brnch.group != _cur_stage:
                 _cur_stage = _brnch.group
                 print('   %s %5s Stage: %s' % (_pfx(), ' ', _cur_stage))
-            print('   %s%s%s %.5s %s %7.3g %s%s %s' % (_pfx(), _brnch.node.dirn, _brnch.term_str,
+            if _brnch.magnitude is None:
+                mag = '--:--'
+            else:
+                mag = '%7.3g' % _brnch.magnitude
+            print('   %s%s%s %.5s %s %s %s%s %s' % (_pfx(), _brnch.node.dirn, _brnch.term_str,
                                                        _brnch.node.entity_uuid,
-                                                       delim[0], _brnch.magnitude, _brnch.unit, delim[1], _brnch.name))
+                                                       delim[0], mag, _brnch.unit, delim[1], _brnch.name))
             return _cur_stage
 
         for branch in tree:
