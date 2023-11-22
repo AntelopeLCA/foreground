@@ -366,7 +366,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         return self._archive.name_fragment(fragment, name, auto=auto, force=force)
     '''
 
-    def observe(self, fragment, exchange_value=None, units=None, scenario=None,
+    def observe(self, fragment, exchange_value=None, units=None, scenario=None, anchor=None,
                 accept_all=None,
                 termination=None, term_flow=None, descend=None,
                 name=None, auto=None, force=None):
@@ -376,15 +376,18 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param exchange_value: default second positional param; exchange value being observed
         :param units: optional, modifies exchange value
         :param scenario: applies to exchange value and termination equially
+        :param anchor: how to terminate the fragment
         :param accept_all: not allowed; caught and rejected
-        :param termination:
-        :param term_flow:
-        :param descend:
+        :param termination: deprecated. assigned to anchor.
+        :param term_flow: passed to anchor
+        :param descend: passed to anchor
         :param name: may not be used if a scenario is also supplied
-        :param auto:
-        :param force:
+        :param auto: auto-rename on name collision
+        :param force: steal name on name collision
         :return:
         """
+        if termination and not anchor:
+            anchor = termination
         if accept_all is not None:
             print('%s: cannot "accept all"' % fragment)
         if name is not None:
@@ -411,8 +414,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 print('Note: Ignoring exchange value %g for unobservable fragment %s [%s]' % (exchange_value,
                                                                                               fragment.external_ref,
                                                                                               scenario))
-        if termination is not None:
-            term = self.find_term(termination)
+        if anchor is not None:
+            term = self.find_term(anchor)
             fragment.terminate(term, scenario=scenario, term_flow=term_flow, descend=descend)
 
         return fragment.link

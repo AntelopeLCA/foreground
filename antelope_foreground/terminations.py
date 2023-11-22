@@ -60,6 +60,13 @@ class TerminationFromJson(Exception):
     pass
 
 
+class MalformedParent(Exception):
+    """
+    parent's flow or direction is None
+    """
+    pass
+
+
 class FlowTermination(object):
 
     _term = None
@@ -169,7 +176,8 @@ class FlowTermination(object):
         :param descend:
         :param inbound_ev: ignored; deprecated
         """
-
+        if fragment.flow is None or fragment.direction is None:
+            raise MalformedParent(fragment.link)
         self._parent = fragment
         if entity is not None:
             if entity.entity_type == 'flow':
@@ -488,6 +496,10 @@ class FlowTermination(object):
             return 1.0
         # if not self.term_flow.validate():
         #     return 1.0
+        if self.term_flow is None:
+            raise MissingFlow(self)
+        if self._parent.flow is None:
+            raise MalformedParent(self._parent)
         if self.term_flow.reference_entity == self._parent.flow.reference_entity:
             return 1.0
         parent_q = self._parent.flow.reference_entity

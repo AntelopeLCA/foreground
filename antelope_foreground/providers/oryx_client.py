@@ -59,6 +59,9 @@ class OryxEntity(XdbEntity):
             except UnknownOrigin:
                 flow = query.get(the_id, origin=the_origin)
 
+            if self.origin != query.origin:
+                args['masquerade'] = self.origin
+
             ref = FragmentRef(self.external_ref, query,
                               flow=flow, direction=direction, **args)
 

@@ -28,6 +28,7 @@ _interface = 'foreground'
 class AntelopeForegroundInterface(ForegroundInterface):
     """
     The bare minimum foreground interface allows a foreground to return terminations and to save anything it creates.
+    erm "anchors"
     """
     '''
     Left to subclasses
@@ -39,6 +40,17 @@ class AntelopeForegroundInterface(ForegroundInterface):
                                      **kwargs):
             yield self.make_ref(i)
 
+    def get_local(self, entity_id, origin=None, **kwargs):
+        """
+        Get an object either from the local archive or elsewhere in the catalog.  not sure how this overlaps with
+        find_term() or whatnot.
+        :param entity_id:
+        :param origin:
+        :param kwargs:
+        :return:
+        """
+        return self._perform_query(_interface, 'get_local', ForegroundRequired, entity_id, origin=origin, **kwargs)
+
     def top(self, fragment, **kwargs):
         """
         Return the reference fragment that is top parent of named fragment
@@ -47,15 +59,6 @@ class AntelopeForegroundInterface(ForegroundInterface):
         :return:
         """
         return self.make_ref(self._perform_query(_interface, 'top', ForegroundRequired, fragment, **kwargs))
-
-    def child_flows(self, fragment, **kwargs):
-        """
-
-        :param fragment:
-        :param kwargs:
-        :return:
-        """
-        return self.make_ref(self._perform_query(_interface, 'child_flows', ForegroundRequired, fragment, **kwargs))
 
     def frag(self, string, many=False, **kwargs):
         """

@@ -112,7 +112,25 @@ class LcForeground(BasicArchive):
         """
         if hasattr(item, 'link'):
             item = item.link
-        return super(BasicArchive, self).__getitem__(item)
+        entity = super(BasicArchive, self).__getitem__(item)
+        if entity:
+            if entity.link in self._unresolved:
+                return self._replace_unresolved(entity)
+        return entity
+
+    def _replace_unresolved(self, entity):
+        # try to find a new one:
+        new = self.catalog_ref(entity.origin, entity.external_ref, entity_type=entity.entity_type)
+        if not new.resolved:
+            return entity  # nothing to do
+        ks = [k for k, v in self._entities.items() if v is entity]
+        self._unresolved.remove(entity.link)
+        for k in ks:
+            self._entities[k] = new
+
+        if entity.link != new.link:
+            self._ext_ref_mapping[entity.external_ref] = new.link
+        return new
 
     @property
     def _archive_file(self):
@@ -139,6 +157,7 @@ class LcForeground(BasicArchive):
         self._frags_with_flow = defaultdict(set)
 
         self._delayed_refs = []
+        self._unresolved = set()
 
         self.load_all()
 
@@ -177,7 +196,7 @@ class LcForeground(BasicArchive):
 
     @property
     def unresolved(self):
-        return self._counter['unresolved']
+        return list(self._unresolved)
 
     def catalog_query(self, origin, **kwargs):
         return self._catalog.query(origin, **kwargs)
@@ -249,7 +268,7 @@ class LcForeground(BasicArchive):
         try:
             self._add(entity, entity.link)
             if not entity.is_entity and not entity.resolved:
-                self._counter['unresolved'] += 1
+                self._unresolved.add(entity.link)
         except EntityExists:
             if entity is self[entity.link]:
                 pass
