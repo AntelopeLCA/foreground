@@ -177,8 +177,10 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         return self._archive.r.origin_get_one(FragmentEntity, self._o(fragment), 'fragments', _ref(fragment))
 
     def child_flows(self, fragment, **kwargs):
-        return self._archive.r.origin_get_many(FragmentRefModel, self._o(fragment), 'fragments', _ref(fragment),
-                                               'child_flows')
+        return [self._archive.get_or_make(k) for k in self._archive.r.origin_get_many(FragmentRefModel,
+                                                                                      self._o(fragment),
+                                                                                      'fragments', _ref(fragment),
+                                                                                      'child_flows')]
 
     def top(self, fragment, **kwargs):
         return self._archive.get_or_make(self._archive.r.origin_get_one(FragmentRefModel,

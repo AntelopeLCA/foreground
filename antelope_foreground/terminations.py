@@ -12,6 +12,7 @@ from antelope import (BackgroundRequired, check_direction, comp_dir, QuantityReq
 from antelope_core.contexts import NullContext
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
+from antelope_core.implementations.quantity import do_lcia
 from .lcia_dict import LciaResults
 from .models import Anchor, EntityRef, UNRESOLVED_ANCHOR_TYPE
 
@@ -619,10 +620,10 @@ class FlowTermination(object):
             try:
                 locale = self._parent['SpatialScope']
             except KeyError:
-                locale = 'GLO'
+                locale = self.term_flow.locale
             x = ExchangeValue(self._parent, self.term_flow, self._parent.direction, termination=self.term_node,
                               value=self.node_weight_multiplier)  # TODO: need to figure out how we are handling locales
-            res = quantity_ref.do_lcia([x], locale=locale, refresh=refresh, **kwargs)
+            res = do_lcia(quantity_ref, [x], locale=locale, refresh=refresh, **kwargs)
 
         else:
             # OK, so we are not frag and we are not context and we are not null-- we are process!
