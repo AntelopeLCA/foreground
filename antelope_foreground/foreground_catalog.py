@@ -4,7 +4,7 @@ from antelope_core.catalog import LcCatalog
 from .foreground_query import ForegroundQuery, ForegroundNotSafe, MissingResource
 
 from itertools import chain
-from shutil import rmtree
+import shutil
 import os
 
 
@@ -274,6 +274,31 @@ class ForegroundCatalog(LcCatalog):
                 yield org
                 f.add(org)
 
+    def write_versioned_fg(self, foreground, target_dir=None, force=False):
+        if target_dir is None:
+            target_dir = self.root
+        else:
+            target_dir = os.path.abspath(target_dir)
+
+        ar = self.get_archive(foreground)
+        new_ref = '.'.join([foreground, str(ar.metadata.version_major), str(ar.metadata.version_minor)])
+        new_path = os.path.join(target_dir, new_ref)
+
+        if force:
+            if os.path.isdir(new_path):
+                shutil.rmtree(new_path)
+        else:
+            fname = new_path + '.zip'
+            if os.path.exists(fname):
+                raise FileExistsError(fname)
+            if os.path.isdir(new_path):
+                raise IsADirectoryError(new_path)
+
+        shutil.copytree(ar.source, new_path)
+        zipfile = shutil.make_archive(new_path, format='zip', base_dir=new_path)
+        return zipfile
+
+    '''
     def assign_new_origin(self, old_org, new_org):
         """
         This only works for certain types of archives. Foregrounds, in particular. but it is hard to say what else.
@@ -326,13 +351,14 @@ class ForegroundCatalog(LcCatalog):
         self.delete_resource(res)
         abs_src = self.abs_path(res.source)
         if really:
-            rmtree(abs_src)
+            shutil.rmtree(abs_src)
         else:
             del_path = abs_src + '-DELETED'
             if os.path.exists(del_path):
-                rmtree(del_path)
+                shutil.rmtree(del_path)
 
             os.rename(abs_src, del_path)
+    '''
 
     def _seed_fg_query(self, origin, **kwargs):
         self._queries[origin] = ForegroundQuery(origin, catalog=self, **kwargs)

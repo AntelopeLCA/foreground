@@ -5,11 +5,15 @@ import json
 import os
 import re
 
+from typing import Optional
+
 from collections import defaultdict
+from pydantic import ValidationError
 
 from ..foreground_query import DelayedQuery, ForegroundNotSafe, QueryIsDelayed, MissingResource
 from ..refs.fragment_ref import FragmentRef
 from ..implementations import AntelopeForegroundImplementation, AntelopeBasicImplementation
+from ..models import ForegroundMetadata, ForegroundRelease
 
 from antelope import PropertyExists, CatalogRef, EntityNotFound
 from antelope_core.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES
@@ -71,6 +75,7 @@ class LcForeground(BasicArchive):
         (2) by name.  Fragments and any other entities native to the foreground archive can also be retrieved by their
         external ref.  Fragments are the only entities that can be *assigned* a name after creation.  [for this reason,
         Fragments MUST have UUIDs to be used for hashing]
+        [Note: flows can also be named but their name is not their external_ref]
 
          * _ref_to_key transmits the user's heterogeneous input into a valid key to self._entities, or None
            - if the key is already a known link, it's easy
@@ -137,6 +142,10 @@ class LcForeground(BasicArchive):
         return os.path.join(self.source, 'entities.json')
 
     @property
+    def _metadata_file(self):
+        return os.path.join(self.source, 'metadata.json')
+
+    @property
     def _fragment_dir(self):
         return os.path.join(self.source, 'fragments')
 
@@ -155,11 +164,16 @@ class LcForeground(BasicArchive):
         self._catalog = catalog
         self._ext_ref_mapping = dict()
         self._frags_with_flow = defaultdict(set)
+        self._metadata = None
 
         self._delayed_refs = []
         self._unresolved = set()
 
         self.load_all()
+
+    @property
+    def metadata(self):
+        return self._metadata
 
     def catalog_ref(self, origin, external_ref, entity_type=None, **kwargs):
         """
@@ -207,6 +221,20 @@ class LcForeground(BasicArchive):
     def _load_all(self):
         if os.path.exists(self._archive_file):
             self._load_entities_json(self._archive_file)
+        if os.path.exists(self._metadata_file):
+            try:
+                with open(self._metadata_file) as fp:
+                    self._metadata = ForegroundMetadata(**json.load(fp))
+            except ValidationError:
+                self._metadata = ForegroundMetadata(version_major=-1, version_minor=-1,
+                                                    dataSource=self.source,
+                                                    description='failed to load',
+                                                    author=self._metadata_file)
+        else:
+            self._metadata = ForegroundMetadata(version_major=0, version_minor=0,
+                                                dataSource=self.source,
+                                                description='LcForeground',
+                                                author='Antelope')
 
     def make_interface(self, iface):
 
@@ -453,14 +481,51 @@ class LcForeground(BasicArchive):
                 print('deleting %s' % leftover)
                 os.remove(os.path.join(self._fragment_dir, leftover))
 
+    def save_metadata(self):
+        with open(self._metadata_file, 'w') as fp:
+            json.dump(self._metadata.model_dump_json(), fp, indent=2)
+
     def save(self, save_unit_scores=False):
         if not os.path.isdir(self.source):
             os.makedirs(self.source)
 
         self.write_to_file(self._archive_file, gzip=False, characterizations=True, values=True, domesticate=False)
+
+        self.save_metadata()
+
         if not os.path.isdir(self._fragment_dir):
             os.makedirs(self._fragment_dir)
         self.save_fragments(save_unit_scores=save_unit_scores)
+        return True
+
+    def update_metadata(self, bump_version=True, release: Optional[ForegroundRelease] = None):
+        """
+        create a zip file in the fg directort
+
+        Here we assume the ref has NOT been decorated with the semantic version. add logic to prevent this if
+        bad shit starts happening
+        :param bump_version: [True] whether to bump the revision
+        :param release: ForegroundRelease applied to the metadata
+        :return: the path to the zipfile
+        """
+
+        # update metadata
+        if release is None:
+            release = ForegroundRelease()
+
+        if bump_version:
+            if release.major:
+                self.metadata.version_major += 1
+                self.metadata.version_minor = 0
+            else:
+                self.metadata.version_minor += 1
+
+        if release.notes:
+            self.metadata.release_notes = release.notes
+        if release.author:
+            self.metadata.author = release.author
+        if release.description:
+            self.metadata.description = release.description
 
     def clear_unit_scores(self, lcia_method=None):
         for f in self.entities_by_type('fragment'):

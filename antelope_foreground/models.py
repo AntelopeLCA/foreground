@@ -525,6 +525,22 @@ class LcModel(ResponseModel):
         }
 
 
+class ForegroundMetadata(ResponseModel):
+    version_major: int
+    version_minor: int
+    dataSource: str
+    release_notes: Optional[str] = None
+    description: Optional[str] = 'none'
+    author: str = 'nobody'
+
+
+class ForegroundRelease(ResponseModel):
+    major: bool = False
+    notes: Optional[str] = None
+    description: Optional[str] = None
+    author: Optional[str] = None
+
+
 class LcForeground(ResponseModel):
 
     catalogNames: Dict[str, List[str]]  #
