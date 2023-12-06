@@ -483,7 +483,7 @@ class LcForeground(BasicArchive):
 
     def save_metadata(self):
         with open(self._metadata_file, 'w') as fp:
-            json.dump(self._metadata.model_dump_json(), fp, indent=2)
+            json.dump(self._metadata.model_dump(), fp, indent=2)
 
     def save(self, save_unit_scores=False):
         if not os.path.isdir(self.source):
@@ -500,8 +500,8 @@ class LcForeground(BasicArchive):
 
     def update_metadata(self, bump_version=True, release: Optional[ForegroundRelease] = None):
         """
-        create a zip file in the fg directort
-
+        update foreground metadata with release info (default is to bump the version number). also writes the
+        metadata file.
         Here we assume the ref has NOT been decorated with the semantic version. add logic to prevent this if
         bad shit starts happening
         :param bump_version: [True] whether to bump the revision
@@ -526,6 +526,8 @@ class LcForeground(BasicArchive):
             self.metadata.author = release.author
         if release.description:
             self.metadata.description = release.description
+
+        self.save_metadata()
 
     def clear_unit_scores(self, lcia_method=None):
         for f in self.entities_by_type('fragment'):

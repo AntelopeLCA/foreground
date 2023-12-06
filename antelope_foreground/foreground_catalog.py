@@ -296,6 +296,7 @@ class ForegroundCatalog(LcCatalog):
 
         shutil.copytree(ar.source, new_path)
         zipfile = shutil.make_archive(new_path, format='zip', base_dir=new_path)
+        shutil.rmtree(new_path)
         return zipfile
 
     '''
