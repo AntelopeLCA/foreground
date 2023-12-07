@@ -6,6 +6,12 @@ from .foreground_query import ForegroundQuery, ForegroundNotSafe, MissingResourc
 from itertools import chain
 import shutil
 import os
+import re
+import tempfile
+
+
+foreground_origin_regexp = re.compile('^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$')
+savefile_regexp = re.compile('^([A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*)\.(\d+)\.(\d+)\.zip$')
 
 
 class BackReference(Exception):
@@ -180,7 +186,7 @@ class ForegroundCatalog(LcCatalog):
                 self._fg_queue.remove(origin)
                 '''
                 try:
-                    self._check_foreground(res, interface=itype)
+                    self._check_foreground(res)
                     yield res.make_interface(itype)
                 except InterfaceError:
                     continue
@@ -196,16 +202,16 @@ class ForegroundCatalog(LcCatalog):
                 self._missing_o.add((origin, itype))
                 raise MissingResource(origin, itype)
 
-    def create_foreground(self, ref, path=None, quiet=True, delete=False):
+    def create_foreground(self, ref, path=None, quiet=True):
         """
         Creates foreground resource and returns an interface to that resource.
         By default creates in a subdirectory of the catalog root with the ref as the folder
         :param ref:
         :param path:
         :param quiet:
-        :param delete:
         :return:
         """
+        assert bool(foreground_origin_regexp.match(ref)), "Foreground reference not valid: %s" % ref
         if path is None:
             path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
             # localpath = ref
@@ -246,15 +252,100 @@ class ForegroundCatalog(LcCatalog):
 
         return self._check_foreground(res)
 
-    def _check_foreground(self, res, delete=False, interface='foreground'):
+    def _get_target_abspath(self, target_dir=None):
+        if target_dir is None:
+            target_dir = self.root
+        else:
+            target_dir = os.path.abspath(target_dir)
+            if not os.path.isdir(target_dir):
+                raise NotADirectoryError(target_dir)
+        return target_dir
+
+    def _saved_versions(self, foreground, target_dir=None):
+        """
+        Generates a list of versioned foreground savefiles for the named foreground, as produced by write_versioned_fg,
+        in REVERSE ORDER (most recent first), sorted by the numeric values of the major and minor version numbers.
+
+        This routine hard-codes the filename convention of (foreground origin).(major version).(minor version).zip
+        and conventional usage assumes all files can be found in the catalog's root directory
+        :param foreground:
+        :param target_dir: specify where to look for saved versions (default cat.root)
+        :return:
+        """
+        def _make_sortable(filename):
+            """
+            here we have to take something that says "my.origin.[majorversion].[minorversion]" and make it so that
+            [majorversion].10 appears after [majorversion].1 IN GENERAL
+
+            so we pad using %d.%04d and we prohibit more than 9,999 minor versions
+
+            :param filename:
+            :return:
+            """
+            g = savefile_regexp.match(filename).groups()
+            return float('%d.%04d' % (int(g[-2]), int(g[-1])))
+
+        candidates = [file for file in sorted(os.listdir(self._get_target_abspath(target_dir))) if
+                      bool(savefile_regexp.match(file)) and savefile_regexp.match(file).groups()[0] == foreground]
+
+        for save in sorted(candidates, key=lambda x: _make_sortable(x), reverse=True):
+            yield save
+
+    @staticmethod
+    def _restore_foreground_zip_to(source_file, target):
+        print('Unpacking lastsave %s to %s' % (source_file, target))
+        os.makedirs(target)
+        shutil.unpack_archive(source_file, extract_dir=target)
+
+    def restore_foreground_by_version(self, foreground, major_version, minor_version=0, target_dir=None, force=False):
+        target_dir = self._get_target_abspath(target_dir)
+        ref = '%s.%d.%d' % (foreground, major_version, minor_version)
+        file = os.path.join(target_dir, '%s.zip' % ref)
+        try:
+            res = self.get_resource(ref)
+            target = res.source
+        except UnknownOrigin:
+            target = os.path.join(target_dir, ref)
+        if os.path.exists(file):
+            if os.path.exists(target):
+                if force:
+                    if os.path.isdir(target_dir):
+                        shutil.rmtree(target)
+                    else:
+                        os.remove(target)
+                else:
+                    raise FileExistsError(target)
+            self._restore_foreground_zip_to(file, target)
+            return self.create_foreground(ref, path=target)
+        else:
+            raise FileNotFoundError(file)
+
+    def _check_foreground(self, res):
         """
         finish foreground activation + return QUERY interface
+        If the foreground source directory doesn't exist, BUT at least one versioned save file DOES exist, the highest-
+        versioned save file is expanded and renamed to the foreground source directory.
         :param res:
         :return:
         """
-        if delete:
-            print("I ain't deletin' shit")
         ref = res.origin
+
+        abs_source = self.abs_path(res.source)
+
+        if not os.path.exists(abs_source):
+            try:
+                lastsave = next(self._saved_versions(ref))
+                savedir, ext = os.path.splitext(lastsave)
+                assert ext == '.zip'
+                assert savedir.startswith(ref)
+
+                source_file = os.path.join(self._rootdir, lastsave)
+
+                self._restore_foreground_zip_to(source_file, abs_source)
+
+            except StopIteration:
+                # no save files
+                pass
 
         self._fg_queue.add(ref)
         res.check(self)
@@ -264,6 +355,10 @@ class ForegroundCatalog(LcCatalog):
             self._seed_fg_query(ref)
 
         return self._queries[ref]
+
+    def flush_backreference(self, origin):
+        if origin in self._fg_queue:
+            self._fg_queue.remove(origin)
 
     @property
     def foregrounds(self):
@@ -275,10 +370,7 @@ class ForegroundCatalog(LcCatalog):
                 f.add(org)
 
     def write_versioned_fg(self, foreground, target_dir=None, force=False):
-        if target_dir is None:
-            target_dir = self.root
-        else:
-            target_dir = os.path.abspath(target_dir)
+        target_dir = self._get_target_abspath(target_dir)
 
         ar = self.get_archive(foreground)
         new_ref = '.'.join([foreground, str(ar.metadata.version_major), str(ar.metadata.version_minor)])
@@ -295,7 +387,7 @@ class ForegroundCatalog(LcCatalog):
                 raise IsADirectoryError(new_path)
 
         shutil.copytree(ar.source, new_path)
-        zipfile = shutil.make_archive(new_path, format='zip', base_dir=new_path)
+        zipfile = shutil.make_archive(new_path, format='zip', root_dir=new_path)
         shutil.rmtree(new_path)
         return zipfile
 
