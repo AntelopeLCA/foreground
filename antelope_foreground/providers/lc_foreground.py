@@ -482,6 +482,9 @@ class LcForeground(BasicArchive):
                 os.remove(os.path.join(self._fragment_dir, leftover))
 
     def save_metadata(self):
+        if not os.path.isdir(self.source):
+            os.makedirs(self.source)
+
         with open(self._metadata_file, 'w') as fp:
             json.dump(self._metadata.model_dump(), fp, indent=2)
 
