@@ -460,8 +460,8 @@ class MicroCf(ResponseModel):
 
 class Compartment(ResponseModel):
     name: str
-    parent: Optional[str]
-    sense: Optional[str]
+    parent: Optional[str] = None
+    sense: Optional[str] = None
     synonyms: List[str]
 
 
