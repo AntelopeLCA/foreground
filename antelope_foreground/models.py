@@ -229,7 +229,7 @@ class FragmentEntity(Entity):
 
     exchange_values: Dict[str, float]
 
-    anchors: Dict[str, Optional[Anchor]]
+    anchors: Dict[str, Anchor]
 
     @classmethod
     def from_entity(cls, fragment, save_unit_scores=False, **kwargs):
@@ -366,7 +366,7 @@ class FragmentBranch(ResponseModel):
             parent = fragment.reference_entity.external_ref
         term = fragment.termination(scenario)
         anchor = term.to_anchor(save_unit_scores=save_unit_scores)
-        if anchor is None and len(list(fragment.child_flows)) == 0:
+        if anchor.is_null and len(list(fragment.child_flows)) == 0:
             cutoff = True
         else:
             cutoff = False
@@ -443,7 +443,7 @@ class FragmentFlow(FragmentBranch):
                    group=ff.fragment.get(group, ''),
                    magnitude=ff.magnitude, scenario=scen, unit=ff.fragment.flow.unit, node_weight=ff.node_weight,
                    is_balance_flow=ff.fragment.is_balance,
-                   is_cutoff=anchor is None,
+                   is_cutoff=anchor.is_null,
                    is_conserved=ff.is_conserved,
                    anchor=anchor, anchor_scenario=a_scen)
 

@@ -15,7 +15,7 @@ from ..interfaces import AntelopeForegroundInterface
 from ..refs.fragment_ref import FragmentRef, ParentFragment
 
 from ..models import (LcForeground, FragmentFlow, FragmentRef as FragmentRefModel, MissingResource,
-                      FragmentBranch, FragmentEntity)
+                      FragmentBranch, FragmentEntity, Anchor)
 
 from requests.exceptions import HTTPError
 
@@ -48,7 +48,10 @@ class OryxEntity(XdbEntity):
             args = {k: v for k, v in self._model.properties.items()}
             f = args.pop('flow', None)
             d = args.pop('direction', None)
-            parent = self._model.parent or ParentFragment
+            if hasattr(self._model, 'parent'):
+                parent = self._model.parent or ParentFragment
+            else:
+                parent = None
             if f is None:
                 if hasattr(self._model, 'flow'):
                     the_origin = self._model.flow.origin
@@ -62,15 +65,18 @@ class OryxEntity(XdbEntity):
                 direction = d
 
             try:
-                flow = query.cascade(the_origin).get(the_id)
+                flow = query.cascade(the_origin).get(the_id)  # get locally
             except UnknownOrigin:
-                flow = query.get(the_id, origin=the_origin)
+                flow = query.get(the_id, origin=the_origin)  # get remotely
 
             if self.origin != query.origin:
                 args['masquerade'] = self.origin
 
             ref = FragmentRef(self.external_ref, query,
                               flow=flow, direction=direction, parent=parent, **args)
+
+            if hasattr(self._model, 'anchors'):
+                ref.anchors(**self._model.anchors)
 
             self._ref = ref
             return ref
@@ -205,6 +211,10 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
     def top(self, fragment, **kwargs):
         return self._archive.get_or_make(self._archive.r.origin_get_one(FragmentRefModel,
                                                                         self._o(fragment), _ref(fragment), 'top'))
+
+    def anchors(self, fragment, **kwargs):
+        a = self._archive.r.origin_get_one(dict, self._o(fragment), 'fragments', _ref(fragment), 'anchors')
+        return {k: Anchor(**v) for k, v in a.items()}
 
     def scenarios(self, fragment, **kwargs):
         return self._archive.r.origin_get_many(str, self._o(fragment), _ref(fragment),

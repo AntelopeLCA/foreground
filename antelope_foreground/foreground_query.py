@@ -21,32 +21,37 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
     Add foreground interface to query object.
     We also need to add lubricating code to translate between pydantic models and operable objects
     """
+    def make_term_from_anchor(self, parent, anchor, scenario):
+        if anchor.is_null:
+            term = FlowTermination.null(parent)
+        else:
+            if anchor.anchor_flow:
+                term_flow = self.make_ref(self.get(anchor.anchor_flow.entity_id,
+                                                   origin=anchor.anchor_flow.origin))
+            else:
+                term_flow = None
+            if anchor.context:
+                term = FlowTermination(parent, self.get_context(anchor.context), term_flow=term_flow,
+                                       descend=anchor.descend)
+            elif anchor.node:
+                term_node = self.make_ref(self.get(anchor.node.entity_id,
+                                                   origin=anchor.node.origin))
+                term = FlowTermination(parent, term_node, term_flow=term_flow,
+                                       descend=anchor.descend)
+            else:
+                term = FlowTermination.null(parent)
+        if anchor.score_cache:
+            ar = self._catalog.get_archive(self.origin)
+            term._deserialize_score_cache(ar, anchor.score_cache, scenario)
+
+        return term
+
     def _make_fragment_flow(self, ff_model):
         if isinstance(ff_model, FragmentFlowModel):
             frag = self.make_ref(self.get(ff_model.fragment.entity_id, origin=ff_model.fragment.origin))
 
             # we have to do this manually because legacy code is terrible
-            if ff_model.term.is_null:
-                term = FlowTermination.null(frag)
-            else:
-                if ff_model.anchor.anchor_flow:
-                    term_flow = self.make_ref(self.get(ff_model.anchor.anchor_flow.entity_id,
-                                                       origin=ff_model.anchor.anchor_flow.origin))
-                else:
-                    term_flow = None
-                if ff_model.anchor.context:
-                    term = FlowTermination(frag, self.get_context(ff_model.anchor.context), term_flow=term_flow,
-                                           descend=ff_model.anchor.descend)
-                elif ff_model.anchor.node:
-                    term_node = self.make_ref(self.get(ff_model.anchor.node.entity_id,
-                                                       origin=ff_model.anchor.node.origin))
-                    term = FlowTermination(frag, term_node, term_flow=term_flow,
-                                           descend=ff_model.anchor.descend)
-                else:
-                    term = FlowTermination.null(frag)
-            if ff_model.term.score_cache:
-                ar = self._catalog.get_archive(self.origin)
-                term._deserialize_score_cache(ar, ff_model.anchor.score_cache, ff_model.anchor_scenario)
+            term = self.make_term_from_anchor(frag, ff_model.anchor, ff_model.anchor_scenario)
 
             return FragmentFlow(frag, ff_model.magnitude, ff_model.node_weight, term,
                                 ff_model.is_conserved, match_ev=ff_model.scenario, match_term=ff_model.anchor_scenario)

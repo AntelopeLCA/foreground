@@ -1,5 +1,6 @@
 from antelope.refs.base import EntityRef
 from ..fragment_flows import group_ios, ios_exchanges
+from ..models import Anchor
 """
 Not sure what to do about Fragment Refs, whether they belong in the main interface. I'd like to think no, but
 for now we will just deprecate them and remove functionality,
@@ -32,6 +33,8 @@ class FragmentRef(EntityRef):
         self._direction = direction
         self._flow = flow
         self._ref_vals = dict()
+
+        self._anchors = dict()
 
     @property
     def direction(self):
@@ -85,6 +88,34 @@ class FragmentRef(EntityRef):
         if self.reference_entity is None:
             return self
         return self.reference_entity.top()
+
+    def _load_anchors(self):
+        a = self._query.anchors(self)
+        for k, anchor in a.items():
+            if k == 'default':
+                k = None
+            self._anchors[k] = self._query.make_term_from_anchor(self, anchor, k)
+
+    def anchors(self, **kwargs):
+        """
+
+        :param kwargs:
+        :return:
+        """
+        for k, anchor in kwargs.items():
+            if k == 'default':
+                k = None
+            self._anchors[k] = self._query.make_term_from_anchor(self, anchor, k)
+        if len(self._anchors) == 0:
+            self._load_anchors()
+        return self._anchors
+
+    def anchor(self, scenario=None):
+        if scenario in self._anchors:
+            return self._anchors[scenario]
+        else:
+            self._load_anchors()
+            return self._anchors[scenario]
 
     @property
     def child_flows(self):
@@ -209,9 +240,6 @@ class FragmentRef(EntityRef):
             print('Ignoring false observed flag')
         ffs = self.traverse(scenario=scenario)  # in the future, may want to cache this
         return group_ios(self, ffs)
-
-    def anchors(self, **kwargs):
-        return self._query.anchors(self, **kwargs)
 
     def scenarios(self, **kwargs):
         return self._query.scenarios(self, **kwargs)

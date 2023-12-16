@@ -255,7 +255,9 @@ class FlowTermination(object):
                 except KeyError:
                     raise MissingFlow(term_flow)
             elif self.is_frag:
-                if term_flow in (x.flow for x in self.term_node.inventory()):
+                if term_flow == self.term_node.flow:  # don't need the inventory every time
+                    self._term_flow = term_flow
+                elif term_flow in (x.flow for x in self.term_node.inventory()):
                     self._term_flow = term_flow
                 else:
                     raise MissingFlow(term_flow)
@@ -793,16 +795,22 @@ class FlowTermination(object):
 
     def to_anchor(self, save_unit_scores=False):
         if self.is_null:
-            return None
+            return Anchor.null()
         d = {'descend': self.descend}
         if self._parent.is_background and save_unit_scores and len(self._score_cache) > 0:
             d['score_cache'] = self._serialize_score_cache()
         if self.is_context:
             d['context'] = self.term_node.as_list()
-            return Anchor(**d)
-        else:
             if self.term_flow != self._parent.flow:
                 d['anchor_flow'] = EntityRef.from_entity(self.term_flow)
+            return Anchor(**d)
+        else:
+            if self.is_frag:
+                if self._term_flow is not None:
+                    d['anchor_flow'] = EntityRef.from_entity(self.term_flow)
+            else:
+                if self.term_flow != self._parent.flow:
+                    d['anchor_flow'] = EntityRef.from_entity(self.term_flow)
             d['node'] = EntityRef.from_entity(self.term_node)
             return Anchor(**d)
 
