@@ -166,6 +166,7 @@ class FragmentRef(Entity):
     flow: EntityRef
     direction: str
     entity_uuid: str
+    parent: Optional[str] = None
 
     @property
     def dirn(self):
@@ -189,9 +190,13 @@ class FragmentRef(Entity):
             dirn = fragment.direction
         '''
         dirn = fragment.direction
+        if fragment.parent is None:
+            parent = None
+        else:
+            parent = fragment.parent.external_ref
 
         obj = cls(origin=fragment.origin, entity_id=fragment.external_ref, entity_uuid=fragment.uuid,
-                  flow=EntityRef.from_entity(fragment.flow), direction=dirn, properties=dict())
+                  flow=EntityRef.from_entity(fragment.flow), direction=dirn, parent=parent, properties=dict())
         obj.properties['name'] = fragment['name']
         obj.properties['flow'] = obj.flow
         obj.properties['direction'] = obj.direction

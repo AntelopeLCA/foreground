@@ -925,6 +925,8 @@ class LcFragment(LcEntity):
         if self._balance_child is None:
             return None
         else:
+            if self._balance_child.flow.reference_entity is None:
+                raise TypeError('Flow %s has no reference quantity' % self._balance_child.flow.link)
             try:
                 return self._balance_child.flow.reference_entity.cf(self.flow)
             except (QuantityRequired, MissingResource):

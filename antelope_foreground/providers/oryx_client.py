@@ -12,7 +12,7 @@ from antelope_core.implementations import BasicImplementation
 from antelope.models import OriginCount, LciaResult as LciaResultModel, EntityRef
 
 from ..interfaces import AntelopeForegroundInterface
-from ..refs.fragment_ref import FragmentRef
+from ..refs.fragment_ref import FragmentRef, ParentFragment
 
 from ..models import (LcForeground, FragmentFlow, FragmentRef as FragmentRefModel, MissingResource,
                       FragmentBranch, FragmentEntity)
@@ -28,6 +28,12 @@ class MalformedOryxEntity(Exception):
 
 
 class OryxEntity(XdbEntity):
+    @property
+    def uuid(self):
+        if hasattr(self._model, 'entity_uuid'):
+            return self._model.entity_uuid
+        return None
+
     def make_ref(self, query):
         if self._ref is not None:
             return self._ref
@@ -42,6 +48,7 @@ class OryxEntity(XdbEntity):
             args = {k: v for k, v in self._model.properties.items()}
             f = args.pop('flow', None)
             d = args.pop('direction', None)
+            parent = self._model.parent or ParentFragment
             if f is None:
                 if hasattr(self._model, 'flow'):
                     the_origin = self._model.flow.origin
@@ -63,7 +70,7 @@ class OryxEntity(XdbEntity):
                 args['masquerade'] = self.origin
 
             ref = FragmentRef(self.external_ref, query,
-                              flow=flow, direction=direction, **args)
+                              flow=flow, direction=direction, parent=parent, **args)
 
             self._ref = ref
             return ref
@@ -93,6 +100,18 @@ class OryxClient(XdbClient):
         if iface == 'foreground':
             return OryxFgImplementation(self)
         return super(OryxClient, self).make_interface(iface)
+
+    def get_or_make(self, model):
+        ent = super(OryxClient, self).get_or_make(model)
+        if ent.uuid is not None:
+            self._entities[ent.uuid] = ent
+        return ent
+
+    def _fetch(self, key, origin=None, **kwargs):
+        ent = super(OryxClient, self)._fetch(key, origin=origin, **kwargs)
+        if ent.uuid is not None:
+            self._entities[ent.uuid] = ent
+        return ent
 
 
 class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
@@ -134,6 +153,7 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         return self._archive.unresolved
 
     def get(self, external_ref, **kwargs):
+        print('I have a theory this tranche of code never gets run %s' % external_ref)
         return self._archive.query.get(external_ref, **kwargs)
 
     # foreground resource operations-- non-masqueraded
@@ -146,7 +166,7 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         return self._archive.r.post_return_one(pydantic_fg.dict(), OriginCount, 'post_foreground')
 
     def post_entity_refs(self, post_ents: List[EntityRef]):
-        return self._archive.r.post_return_one([p.dict() for p in post_ents], OriginCount, 'entity_refs')
+        return self._archive.r.post_return_one([p.model_dump() for p in post_ents], OriginCount, 'entity_refs')
 
     def save(self):
         return self._archive.r.post_return_one(None, bool, 'save_foreground')
@@ -164,7 +184,7 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
             parent = self._archive.r.origin_get_one(FragmentRefModel, self._o(key), _ref(key), 'reference')
         except HTTPError as e:
             if e.args[0] == 400:
-                return None
+                raise ParentFragment
             raise e
         return self._archive.get_or_make(parent)
 

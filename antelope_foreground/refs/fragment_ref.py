@@ -1,10 +1,15 @@
 from antelope.refs.base import EntityRef
-from antelope import ExchangeRef, comp_dir
 from ..fragment_flows import group_ios, ios_exchanges
 """
 Not sure what to do about Fragment Refs, whether they belong in the main interface. I'd like to think no, but
 for now we will just deprecate them and remove functionality,
 """
+
+
+class ParentFragment(Exception):
+    """
+    a placeholder reference_entity for parent fragments
+    """
 
 
 class FragmentRef(EntityRef):
@@ -41,6 +46,24 @@ class FragmentRef(EntityRef):
         """
         return T
     '''
+    @property
+    def reference_entity(self):
+        if self._reference_entity is None:
+            parent = self.get(self.reference_field)
+            if parent is ParentFragment:
+                self._reference_entity = parent
+                return None
+            elif isinstance(parent, str):
+                self._reference_entity = self._query.get(parent)
+            else:
+                try:
+                    self._reference_entity = self._query.parent(self)
+                except ParentFragment:
+                    self._reference_entity = ParentFragment
+                    return None
+        elif self._reference_entity is ParentFragment:
+            return None
+        return super(FragmentRef, self).reference_entity
 
     @property
     def flow(self):
@@ -59,7 +82,9 @@ class FragmentRef(EntityRef):
         return None
 
     def top(self):
-        return self._query.top(self)
+        if self.reference_entity is None:
+            return self
+        return self.reference_entity.top()
 
     @property
     def child_flows(self):
