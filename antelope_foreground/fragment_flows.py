@@ -483,6 +483,10 @@ class GhostFragment(object):
         # raise ValueError('should probably assign a random uuid but need a live case')
 
     @property
+    def parent(self):
+        return self._parent
+
+    @property
     def reference_entity(self):
         return self._parent
 
