@@ -119,7 +119,7 @@ class LcForeground(BasicArchive):
             item = item.link
         entity = super(BasicArchive, self).__getitem__(item)
         if entity:
-            if entity.link in self._unresolved:
+            if entity.link in self._unresolved and self._catalog is not None:
                 return self._replace_unresolved(entity)
         return entity
 

@@ -1,6 +1,7 @@
 
 from ...implementations import AntelopeForegroundImplementation
 from antelope_core.lcia_results import LciaResult
+from ...refs.fragment_ref import ParentFragment
 
 
 class AntelopeV1ForegroundImplementation(AntelopeForegroundImplementation):
@@ -32,7 +33,12 @@ class AntelopeV1ForegroundImplementation(AntelopeForegroundImplementation):
             fragment = fragment.external_ref
         return self._archive.retrieve_or_fetch_entity(fragment)
 
+    def get_reference(self, key):
+        raise ParentFragment
+
     def traverse(self, fragment, scenario=None, **kwargs):
+        if hasattr(fragment, 'external_ref'):
+            fragment = fragment.external_ref
         if scenario is not None:
             endpoint = 'scenarios/%s/%s/fragmentflows' % (scenario, fragment)
         else:
@@ -50,6 +56,9 @@ class AntelopeV1ForegroundImplementation(AntelopeForegroundImplementation):
     def fragment_lcia(self, fragment, quantity_ref, scenario=None, refresh=False, **kwargs):
         if scenario is None:
             scenario = '1'
+
+        if hasattr(fragment, 'external_ref'):
+            fragment = fragment.external_ref
 
         qi = self._archive.make_interface('quantity')
         lcia_q = qi.get_lcia_quantity(quantity_ref)
