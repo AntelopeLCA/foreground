@@ -57,7 +57,7 @@ class FragmentRef(EntityRef):
                 self._reference_entity = parent
                 return None
             elif isinstance(parent, str):
-                self._reference_entity = self._query.get(parent)
+                self._reference_entity = self._query.get(parent, origin=self.origin)
             else:
                 try:
                     self._reference_entity = self._query.parent(self)

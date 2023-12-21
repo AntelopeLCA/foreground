@@ -9,7 +9,7 @@ from antelope import UnknownOrigin
 from antelope_core.providers.xdb_client import XdbClient, _ref
 from antelope_core.providers.xdb_client.xdb_entities import XdbEntity
 from antelope_core.implementations import BasicImplementation
-from antelope.models import OriginCount, LciaResult as LciaResultModel, EntityRef
+from antelope.models import OriginCount, LciaResult as LciaResultModel, EntityRef, FlowEntity
 
 from ..interfaces import AntelopeForegroundInterface
 from ..refs.fragment_ref import FragmentRef, ParentFragment
@@ -48,21 +48,22 @@ class OryxEntity(XdbEntity):
             args = {k: v for k, v in self._model.properties.items()}
             f = args.pop('flow', None)
             d = args.pop('direction', None)
-            if hasattr(self._model, 'parent'):
-                parent = self._model.parent or ParentFragment
+            parent = args.pop('parent', ParentFragment)
+            if hasattr(self._model, 'flow'):
+                the_origin = self._model.flow.origin
+                the_id = self._model.flow.entity_id
+                direction = self._model.direction
             else:
-                parent = None
-            if f is None:
-                if hasattr(self._model, 'flow'):
-                    the_origin = self._model.flow.origin
-                    the_id = self._model.flow.entity_id
-                    direction = self._model.direction
-                else:
+                if f is None:
+                    print(self._model.model_dump_json(indent=2))
                     raise MalformedOryxEntity(self.link)
-            else:
+                print('Whoozit! This should never happen!')
                 the_origin = f['origin']
                 the_id = f['entity_id']
                 direction = d
+
+            if hasattr(self._model, 'parent'):
+                parent = self._model.parent or ParentFragment
 
             try:
                 flow = query.cascade(the_origin).get(the_id)  # get locally
@@ -107,14 +108,20 @@ class OryxClient(XdbClient):
             return OryxFgImplementation(self)
         return super(OryxClient, self).make_interface(iface)
 
-    def get_or_make(self, model):
-        ent = super(OryxClient, self).get_or_make(model)
-        if ent.uuid is not None:
-            self._entities[ent.uuid] = ent
-        return ent
+    def _model_to_entity(self, model):
+        if model.entity_type == 'fragment':
+            ''' check for flow spec '''
+            if hasattr(model, 'flow'):
+                self.get_or_make(model.flow)
+            else:
+                if hasattr(model, 'properties') and 'flow' in model.properties:
+                    self.get_or_make(FlowEntity(**model.properties['flow']))
+                else:
+                    model = self._requester.origin_get_one(FragmentEntity, model.origin, 'fragments',
+                                                           model.entity_id)
+                    self.get_or_make(model.flow)
 
-    def _fetch(self, key, origin=None, **kwargs):
-        ent = super(OryxClient, self)._fetch(key, origin=origin, **kwargs)
+        ent = super(OryxClient, self)._model_to_entity(model)
         if ent.uuid is not None:
             self._entities[ent.uuid] = ent
         return ent
@@ -220,9 +227,24 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         return self._archive.r.origin_get_many(str, self._o(fragment), _ref(fragment),
                                                'scenarios', **kwargs)
 
+    def _get_or_make_fragment_flows(self, ffs):
+        """
+        whoo-ee we love danger
+        :param ffs:
+        :return:
+        """
+        for ff in ffs:
+            subfrags = [FragmentFlow(**f) for f in ff.subfragments]
+            self._get_or_make_fragment_flows(subfrags)
+            self._archive.get_or_make(ff.node)
+
     def traverse(self, fragment, scenario=None, **kwargs):
-        return self._archive.r.origin_get_many(FragmentFlow, self._o(fragment), _ref(fragment),
-                                               'traverse', scenario=scenario, **kwargs)
+        ffs = self._archive.r.origin_get_many(FragmentFlow, self._o(fragment), _ref(fragment),
+                                              'traverse', scenario=scenario, **kwargs)
+
+        self._get_or_make_fragment_flows(ffs)
+
+        return ffs
 
     def activity(self, fragment, scenario=None, **kwargs):
         return self._archive.r.origin_get_many(FragmentFlow, self._o(fragment), _ref(fragment),

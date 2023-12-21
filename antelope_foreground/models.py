@@ -163,7 +163,7 @@ class FragmentRef(Entity):
     we ensure put a "name" field because we want users to be able to see what they're getting
     """
     entity_type: str = 'fragment'
-    flow: EntityRef
+    flow: FlowEntity
     direction: str
     entity_uuid: str
     parent: Optional[str] = None
@@ -196,10 +196,8 @@ class FragmentRef(Entity):
             parent = fragment.parent.external_ref
 
         obj = cls(origin=fragment.origin, entity_id=fragment.external_ref, entity_uuid=fragment.uuid,
-                  flow=EntityRef.from_entity(fragment.flow), direction=dirn, parent=parent, properties=dict())
+                  flow=FlowEntity.from_flow(fragment.flow), direction=dirn, parent=parent, properties=dict())
         obj.properties['name'] = fragment['name']
-        obj.properties['flow'] = obj.flow
-        obj.properties['direction'] = obj.direction
 
         for key, val in kwargs.items():
             try:
@@ -399,6 +397,7 @@ class FragmentFlow(FragmentBranch):
     node_weight: float
     anchor_scenario: Optional[str]
     is_conserved: bool
+    subfragments: List = []
 
     def __str__(self):
         """
@@ -439,13 +438,25 @@ class FragmentFlow(FragmentBranch):
             group = 'StageName'
         node = FragmentRef.from_fragment(ff.fragment)
         anchor = ff.term.to_anchor(save_unit_scores=save_unit_scores)
-        return cls(parent=parent, node=node, name=ff.name,
+        ff_m = cls(parent=parent, node=node, name=ff.name,
                    group=ff.fragment.get(group, ''),
                    magnitude=ff.magnitude, scenario=scen, unit=ff.fragment.flow.unit, node_weight=ff.node_weight,
                    is_balance_flow=ff.fragment.is_balance,
                    is_cutoff=anchor.is_null,
                    is_conserved=ff.is_conserved,
                    anchor=anchor, anchor_scenario=a_scen)
+        if anchor.descend:
+            ff_m.subfragments = [FragmentFlow.from_fragment_flow(f, group=group, save_unit_scores=save_unit_scores)
+                                 for f in ff.subfragments]
+        return ff_m
+
+    def masquerade(self, masq):
+        self.node.masquerade(masq)
+        if self.anchor:
+            self.anchor.masquerade(masq)
+        for sf in self.subfragments:
+            sf.masquerade(masq)
+
 
 
 """

@@ -14,7 +14,7 @@ from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
 from antelope_core.implementations.quantity import do_lcia
 from .lcia_dict import LciaResults
-from .models import Anchor, EntityRef, UNRESOLVED_ANCHOR_TYPE
+from .models import Anchor, EntityRef, UNRESOLVED_ANCHOR_TYPE, FragmentFlow as FragmentFlowModel
 
 
 # from lcatools.catalog_ref import NoCatalog
@@ -793,7 +793,7 @@ class FlowTermination(object):
             j['scoreCache'] = self._serialize_score_cache()
         return j
 
-    def to_anchor(self, save_unit_scores=False):
+    def to_anchor(self, save_unit_scores=False, group=None):
         if self.is_null:
             return Anchor.null()
         d = {'descend': self.descend}
@@ -806,7 +806,7 @@ class FlowTermination(object):
             return Anchor(**d)
         else:
             if self.is_frag:
-                if self._term_flow is not None:
+                if self.term_flow != self.term_node.flow:
                     d['anchor_flow'] = EntityRef.from_entity(self.term_flow)
             else:
                 if self.term_flow != self._parent.flow:

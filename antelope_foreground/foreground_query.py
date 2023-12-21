@@ -17,6 +17,11 @@ class ForegroundNotSafe(Exception):
 
 
 class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
+    def cascade(self, origin):
+        if origin in self._catalog.foregrounds:
+            return self._catalog.foreground(origin)
+        return super(ForegroundQuery, self).cascade(origin)
+
     """
     Add foreground interface to query object.
     We also need to add lubricating code to translate between pydantic models and operable objects
@@ -26,16 +31,15 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
             term = FlowTermination.null(parent)
         else:
             if anchor.anchor_flow:
-                term_flow = self.make_ref(self.get(anchor.anchor_flow.entity_id,
-                                                   origin=anchor.anchor_flow.origin))
+                term_flow = self.get(anchor.anchor_flow.entity_id,
+                                     origin=anchor.anchor_flow.origin)
             else:
                 term_flow = None
             if anchor.context:
                 term = FlowTermination(parent, self.get_context(anchor.context), term_flow=term_flow,
                                        descend=anchor.descend)
             elif anchor.node:
-                term_node = self.make_ref(self.get(anchor.node.entity_id,
-                                                   origin=anchor.node.origin))
+                term_node = self.get(anchor.node.entity_id, origin=anchor.node.origin)
                 term = FlowTermination(parent, term_node, term_flow=term_flow,
                                        descend=anchor.descend)
             else:
@@ -47,14 +51,22 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
         return term
 
     def _make_fragment_flow(self, ff_model):
+        print('Making fragment model for %s/%s' % (ff_model.fragment.origin, ff_model.fragment.entity_id))
         if isinstance(ff_model, FragmentFlowModel):
-            frag = self.make_ref(self.get(ff_model.fragment.entity_id, origin=ff_model.fragment.origin))
+            frag = self.get(ff_model.fragment.entity_id, origin=ff_model.fragment.origin)
 
             # we have to do this manually because legacy code is terrible
             term = self.make_term_from_anchor(frag, ff_model.anchor, ff_model.anchor_scenario)
 
-            return FragmentFlow(frag, ff_model.magnitude, ff_model.node_weight, term,
-                                ff_model.is_conserved, match_ev=ff_model.scenario, match_term=ff_model.anchor_scenario)
+            the_ff = FragmentFlow(frag, ff_model.magnitude, ff_model.node_weight, term,
+                                  ff_model.is_conserved, match_ev=ff_model.scenario, match_term=ff_model.anchor_scenario)
+
+            if len(ff_model.subfragments) > 0:
+                subfrags = [self._make_fragment_flow(FragmentFlowModel(**ff)) for ff in ff_model.subfragments]
+                the_ff.aggregate_subfragments(subfrags, (ff_model.anchor_scenario,))
+
+            return the_ff
+
         return ff_model
 
     def traverse(self, fragment, scenario=None, **kwargs):
