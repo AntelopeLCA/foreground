@@ -393,6 +393,7 @@ class FragmentFlow(FragmentBranch):
 
     """
     magnitude: float
+    flow_conversion: float
     scenario: Optional[str]
     node_weight: float
     anchor_scenario: Optional[str]
@@ -441,6 +442,7 @@ class FragmentFlow(FragmentBranch):
         ff_m = cls(parent=parent, node=node, name=ff.name,
                    group=ff.fragment.get(group, ''),
                    magnitude=ff.magnitude, scenario=scen, unit=ff.fragment.flow.unit, node_weight=ff.node_weight,
+                   flow_conversion=ff.flow_conversion,
                    is_balance_flow=ff.fragment.is_balance,
                    is_cutoff=anchor.is_null,
                    is_conserved=ff.is_conserved,
@@ -456,7 +458,6 @@ class FragmentFlow(FragmentBranch):
             self.anchor.masquerade(masq)
         for sf in self.subfragments:
             sf.masquerade(masq)
-
 
 
 """

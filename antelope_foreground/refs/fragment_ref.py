@@ -1,4 +1,6 @@
 from antelope.refs.base import EntityRef
+from antelope.refs import RxRef
+from antelope import comp_dir
 from ..fragment_flows import group_ios, ios_exchanges
 from ..models import Anchor
 """
@@ -88,6 +90,17 @@ class FragmentRef(EntityRef):
         if self.reference_entity is None:
             return self
         return self.reference_entity.top()
+
+    def reference(self, flow=None):
+        """
+        For process interoperability
+        :return:
+        """
+        rx = RxRef(self, self.flow, comp_dir(self.direction), self.get('Comment', None), value=1.0)
+        if flow is not None:
+            if not rx.flow.match(flow):
+                raise ValueError('%.5s: Supplied flow %s does not match fragment' % (self.uuid, flow))
+        return rx
 
     def _load_anchors(self):
         a = self._query.anchors(self)

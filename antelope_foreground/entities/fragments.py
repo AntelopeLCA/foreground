@@ -1623,9 +1623,11 @@ class LcFragment(LcEntity):
         else:
             node_weight = magnitude
 
-        node_weight *= term.node_weight_multiplier
+        f_conv = term.node_weight_multiplier
 
-        self.dbg_print('magnitude: %g node_weight: %g' % (magnitude, node_weight))
+        node_weight *= f_conv
+
+        self.dbg_print('magnitude: %g f_conv: %g node_weight: %g' % (magnitude, f_conv, node_weight))
 
         conserved_val = None
         if conserved_qty is not None:
@@ -1651,7 +1653,8 @@ class LcFragment(LcEntity):
         # print('%6f %6f %s' % (magnitude, node_weight, self))
         # this is the only place a FragmentFlow is created
         # TODO: figure out how to cache + propagate matched scenarios ... in progress
-        ff = FragmentFlow(self, magnitude, node_weight, term, conserved, match_ev=_scen_ev, match_term=_scen_term)
+        ff = FragmentFlow(self, magnitude, node_weight, term, conserved, match_ev=_scen_ev, match_term=_scen_term,
+                          flow_conversion=f_conv)
 
         '''
         now looking forward: is our termination a cutoff, background, foreground or subfragment?

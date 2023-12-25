@@ -4,6 +4,7 @@ from .terminations import FlowTermination, UnCachedScore, UnresolvedAnchor
 from antelope_core.lcia_results import LciaResult, DetailedLciaResult, SummaryLciaResult
 
 from collections import defaultdict
+import uuid
 
 
 class CumulatingFlows(Exception):
@@ -84,21 +85,25 @@ class FragmentFlow(object):
         term = FlowTermination.null(fragment)
         return cls(fragment, magnitude, magnitude, term, is_conserved)
 
-    def __init__(self, fragment, magnitude, node_weight, term, is_conserved, match_ev=None, match_term=None):
+    def __init__(self, fragment, magnitude, node_weight, term, is_conserved, match_ev=None, match_term=None,
+                 flow_conversion=1.0):
         """
 
         :param fragment:
         :param magnitude:
-        :param node_weight:
+        :param node_weight: flow (or balance) magnitude * flow conversion / anchor inflow magnitude
         :param term:
         :param is_conserved:
         :param match_ev:
         :param match_term:
+        :param flow_conversion: [1.0] stored in the FragmentFlow for information purposes only. Negative value
+         indicates a direction change at the anchor (driven anchor)
         """
         # TODO: figure out how to cache + propagate scenario applications through aggregation ops
         self.fragment = fragment
         self.magnitude = magnitude
         self.node_weight = node_weight
+        self.flow_conversion = flow_conversion
         self.term = term
         self.is_conserved = is_conserved
         self._subfrags_params = ()
@@ -164,6 +169,9 @@ class FragmentFlow(object):
             if mag * self.node_weight != (self.magnitude * nw):  # formally if m*N/M*n != 1.0:
                 raise ValueError('These fragment flows cannot be combined because their implicit evs do not match')
             conserved = self.is_conserved and other.is_conserved
+
+            mod_mag = mag * other.flow_conversion / self.flow_conversion
+            """
         elif isinstance(other, DetailedLciaResult):
             print('DEPRECATED: adding FragmentFlow to DetailedLciaResult')
             if other.exchange.process is not self.fragment:
@@ -178,11 +186,12 @@ class FragmentFlow(object):
             nw = other.node_weight
             mag = nw
             conserved = False
+            """
         else:
             raise TypeError("Don't know how to add type %s to FragmentFlow\n %s\n to %s" % (type(other), other, self))
         # don't check unit scores-- ?????
-        new = FragmentFlow(self.fragment, self.magnitude + mag, self.node_weight + nw,
-                           self.term, conserved)
+        new = FragmentFlow(self.fragment, self.magnitude + mod_mag, self.node_weight + nw,
+                           self.term, conserved, flow_conversion=self.flow_conversion)
         return new
 
     def __eq__(self, other):
@@ -461,26 +470,21 @@ class GhostFragment(object):
     """
     A GhostFragment is a non-actual fragment used for reporting and aggregating fragment inputs and outputs
       during traversal.
+      We're doing some digging into this because the prior iteration created totally non-functional FragmentFlow models
     """
     def __init__(self, parent, flow, direction):
         self._parent = parent
         self.flow = flow
         self.direction = direction
+        self.uuid = str(uuid.uuid4())
 
     @property
     def origin(self):
-        return self._parent.origin
+        return self.flow.origin
 
     @property
     def external_ref(self):
-        return self._parent.external_ref
-
-    @property
-    def uuid(self):
-        if self.flow.uuid is not None:
-            return self.flow.uuid
-        return self.flow.external_ref
-        # raise ValueError('should probably assign a random uuid but need a live case')
+        return self.uuid
 
     @property
     def parent(self):
@@ -550,7 +554,14 @@ class GhostFragment(object):
             return default
 
     def __getitem__(self, item):
-        if self._parent is None:
+        if item == 'parent':
+            if self._parent:
+                return self._parent.external_ref
+            else:
+                return None
+        try:
             return self.flow[item]
-        else:
-            return self._parent[item]
+        except KeyError:
+            if self._parent:
+                return self._parent[item]
+            raise

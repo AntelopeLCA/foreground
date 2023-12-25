@@ -14,7 +14,7 @@ from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
 from antelope_core.implementations.quantity import do_lcia
 from .lcia_dict import LciaResults
-from .models import Anchor, EntityRef, UNRESOLVED_ANCHOR_TYPE, FragmentFlow as FragmentFlowModel
+from .models import Anchor, EntityRef, UNRESOLVED_ANCHOR_TYPE
 
 
 # from lcatools.catalog_ref import NoCatalog
@@ -42,7 +42,8 @@ class UnresolvedAnchor(Exception):
 
 class NonConfigurableInboundEV(Exception):
     """
-    only foreground terminations may have their inbound exchange values explicitly specified
+    only foreground terminations may have their inbound exchange values explicitly specified (and this via reference
+    flow observation, NOT through specifying it on the anchor)
     """
     pass
 
@@ -481,6 +482,7 @@ class FlowTermination(object):
 
         how to deal with scenario cfs? tbd
         problem is, the term doesn't know its own scenario
+
         :return: float = amount in term_flow ref qty that corresponds to a unit of fragment flow's ref qty
         """
         '''
@@ -496,6 +498,7 @@ class FlowTermination(object):
         but each call to quantity_relation should check for both forward and reverse matches
         '''
         if not self.valid:
+            print('WE ARE NOT EVEN TRYING')
             return 1.0
         # if not self.term_flow.validate():
         #     return 1.0
@@ -508,37 +511,51 @@ class FlowTermination(object):
         parent_q = self._parent.flow.reference_entity
         term_q = self.term_flow.reference_entity
 
+        # first - natural - ask our parent flow if fit can convert to term quantity
         try:
-            rev = parent_q.quantity_relation(self._parent.flow, term_q, None, dist=3)
+            rev = self._parent.flow.cf(term_q, context=self.term_node.external_ref)
         except (QuantityRequired, NotImplementedError, ConversionReferenceMismatch):
             rev = None
 
         if rev:
-            return 1.0 / rev.value
+            return rev
 
+        # then ask the term_flow if it can convert to parent quantity
         try:
-            rev_c = parent_q.quantity_relation(self.term_flow, term_q, None, dist=3)
-        except (QuantityRequired, NotImplementedError, ConversionReferenceMismatch):
-            rev_c = None
-
-        if rev_c:
-            return 1.0 / rev_c.value
-
-        try:
-            fwd = term_q.quantity_relation(self._parent.flow, parent_q, None, dist=3)
+            fwd = self.term_flow.cf(parent_q)
         except (QuantityRequired, NotImplementedError, ConversionReferenceMismatch):
             fwd = None
 
         if fwd:
-            return fwd.value
+            return 1.0 / fwd
 
+        # then ask if our parent qty can convert term_flow
         try:
-            fwd_c = term_q.quantity_relation(self.term_flow, parent_q, None, dist=3)
+            rev_c = parent_q.quantity_relation(self.term_flow, term_q, context=(self.term_node.origin,
+                                                                                self.term_node.external_ref))
+        except (QuantityRequired, NotImplementedError):
+            rev_c = None
+        except ConversionReferenceMismatch:
+            try:
+                rev_c = parent_q.quantity_relation(self.term_flow, term_q, context=None)
+            except ConversionReferenceMismatch:
+                rev_c = None
+
+        if rev_c:
+            return 1.0 / rev_c.value
+
+        # last, ask if remote quantity recognizes *our* flow
+        print(' %s: flow_conversion: untested' % self._parent.link)
+        try:
+            fwd_c = term_q.quantity_relation(self._parent.flow, parent_q, context=(self.term_node.origin,
+                                                                                   self.term_node.external_ref))
         except (QuantityRequired, NotImplementedError, ConversionReferenceMismatch):
             fwd_c = None
 
         if fwd_c:
+            print('reverse q-hit')
             return fwd_c.value
+        print(' %s: flow_conversion FAILED' % self._parent.link)
         raise FlowConversionError('Zero CF found relating %s to %s' % (self.term_flow, self._parent.flow))
 
     @property
@@ -606,6 +623,21 @@ class FlowTermination(object):
                 for x in self.term_node.unobserved_lci(self._parent.child_flows, ref_flow=self.term_flow):
                     yield x  # this should forward out any cutoff exchanges
 
+    def _fallback_lcia(self, quantity_ref, locale, **kwargs):
+        """
+        Uses term node inventory if no background is available
+        :param quantity_ref:
+        :param locale:
+        :param kwargs:
+        :return:
+        """
+        print('WARNING- BackgroundRequired - using fallback lcia %s' % self._parent.link)
+        child_flows = set((k.flow.external_ref, k.direction) for k in self._parent.child_flows)
+        inv = [x for x in self.term_node.inventory(ref_flow=self.term_flow)
+               if (x.flow.external_ref, x.direction) not in child_flows]
+        res = quantity_ref.do_lcia(inv, locale=locale, **kwargs)
+        return res
+
     def compute_unit_score(self, quantity_ref, refresh=False, **kwargs):
         """
         four different ways to do this.
@@ -642,10 +674,9 @@ class FlowTermination(object):
                     res = quantity_ref.do_lcia(self._unobserved_exchanges(refresh=refresh), locale=locale,
                                                refresh=refresh, **kwargs)
                 except (BackgroundRequired, NotImplementedError):
-                    child_flows = set((k.flow.external_ref, k.direction) for k in self._parent.child_flows)
-                    inv = [x for x in self.term_node.inventory(ref_flow=self.term_flow)
-                           if (x.flow.external_ref, x.direction) not in child_flows]
-                    res = quantity_ref.do_lcia(inv, locale=locale, **kwargs)
+                    res = self._fallback_lcia(quantity_ref, locale, **kwargs)
+            except BackgroundRequired:
+                res = self._fallback_lcia(quantity_ref, locale, **kwargs)
 
         if isinstance(res, list):
             [k.scale_result(self.inbound_exchange_value) for k in res]

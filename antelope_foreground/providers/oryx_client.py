@@ -44,20 +44,26 @@ class OryxEntity(XdbEntity):
             If the model is a FragmentEntity, then it contains a 'flow' attribute which is actually a FlowEntity,
             but if the model is a FragmentRef, then its flow and direction are stored along with other 
             entity properties, and they will not be converted into pydantic types but kept as dicts
+            
+            we also need to handle parents, with reference fragments (having None parents) being replaced in the API
+            layer with 404 errors and thereby getting caught and replaced with ParentFragment exceptions... 
+            
+            and also UUIDs which arrive from Entity models as properties and from FragmentRef models as entity_uuid
+            attributes
             """
             args = {k: v for k, v in self._model.properties.items()}
             f = args.pop('flow', None)
             d = args.pop('direction', None)
-            parent = args.pop('parent', ParentFragment)
+            parent = args.pop('parent', ParentFragment) or ParentFragment
             if hasattr(self._model, 'flow'):
                 the_origin = self._model.flow.origin
                 the_id = self._model.flow.entity_id
                 direction = self._model.direction
+                args['uuid'] = self._model.entity_uuid
             else:
                 if f is None:
                     print(self._model.model_dump_json(indent=2))
                     raise MalformedOryxEntity(self.link)
-                print('Whoozit! This should never happen!')
                 the_origin = f['origin']
                 the_id = f['entity_id']
                 direction = d

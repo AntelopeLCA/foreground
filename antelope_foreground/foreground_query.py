@@ -8,7 +8,6 @@ from .fragment_flows import FragmentFlow
 from .terminations import FlowTermination
 
 
-
 class ForegroundNotSafe(Exception):
     """
     This foreground has not been loaded yet. keep our references unresolved
@@ -26,7 +25,7 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
     Add foreground interface to query object.
     We also need to add lubricating code to translate between pydantic models and operable objects
     """
-    def make_term_from_anchor(self, parent, anchor, scenario):
+    def make_term_from_anchor(self, parent, anchor, scenario, flow_conversion):
         if anchor.is_null:
             term = FlowTermination.null(parent)
         else:
@@ -35,11 +34,29 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
                                      origin=anchor.anchor_flow.origin)
             else:
                 term_flow = None
+
+            """
+            def characterize(self, flowable, ref_quantity, query_quantity, value, context=None, location='GLO', **kws):
+            """
             if anchor.context:
-                term = FlowTermination(parent, self.get_context(anchor.context), term_flow=term_flow,
+                cx = self.get_context(anchor.context)
+                if term_flow is not None and flow_conversion != 1.0:
+                    print('Term CF %s : %s [%g]' % (parent.link, cx, flow_conversion))
+                    # log reported flow conversion.  Some shit to sort out w/r/t/ context
+                    self.characterize(parent.flow.name, parent.flow.reference_entity, term_flow.reference_entity,
+                                      flow_conversion, context=cx)
+
+                term = FlowTermination(parent, cx, term_flow=term_flow,
                                        descend=anchor.descend)
             elif anchor.node:
                 term_node = self.get(anchor.node.entity_id, origin=anchor.node.origin)
+                if flow_conversion != 1.0:
+                    rx = term_node.reference(term_flow)
+                    print('Term CF %s : %s [%g]' % (parent.link, term_node.link, flow_conversion))
+                    # log reported flow conversion.  Some shit to sort out w/r/t/ context
+                    self.characterize(parent.flow.name, parent.flow.reference_entity, rx.flow.reference_entity,
+                                      flow_conversion, context=(term_node.origin, term_node.external_ref))
+
                 term = FlowTermination(parent, term_node, term_flow=term_flow,
                                        descend=anchor.descend)
             else:
@@ -51,15 +68,15 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
         return term
 
     def _make_fragment_flow(self, ff_model):
-        print('Making fragment model for %s/%s' % (ff_model.fragment.origin, ff_model.fragment.entity_id))
         if isinstance(ff_model, FragmentFlowModel):
             frag = self.get(ff_model.fragment.entity_id, origin=ff_model.fragment.origin)
 
             # we have to do this manually because legacy code is terrible
-            term = self.make_term_from_anchor(frag, ff_model.anchor, ff_model.anchor_scenario)
+            term = self.make_term_from_anchor(frag, ff_model.anchor, ff_model.anchor_scenario, ff_model.flow_conversion)
 
-            the_ff = FragmentFlow(frag, ff_model.magnitude, ff_model.node_weight, term,
-                                  ff_model.is_conserved, match_ev=ff_model.scenario, match_term=ff_model.anchor_scenario)
+            the_ff = FragmentFlow(frag, ff_model.magnitude, ff_model.node_weight, term, ff_model.is_conserved,
+                                  match_ev=ff_model.scenario, match_term=ff_model.anchor_scenario,
+                                  flow_conversion=ff_model.flow_conversion)
 
             if len(ff_model.subfragments) > 0:
                 subfrags = [self._make_fragment_flow(FragmentFlowModel(**ff)) for ff in ff_model.subfragments]
