@@ -1,2 +1,2 @@
-git+https://github.com/AntelopeLCA/antelope#egg=antelope_interface
-git+https://github.com/AntelopeLCA/core#egg=antelope_core
+antelope_interface>=0.2.3
+antelope_core>=0.3.0

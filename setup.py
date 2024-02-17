@@ -1,13 +1,18 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.2.1'
+VERSION = '0.3.0'
 
 requires = [
-    'antelope_core>=0.2.1'
+    'antelope_core>=0.3.0'
 ]
 
 """
 Revision history
+
+0.3.0   2024-01-05 - 0.3-branch development version, supporting end-user access to vault.lc resources 
+
+# ^ 0.3.* 0.3-branch fork   
+# v 0.2.* main / master for legacy projects
 
 0.2.1 - 21 Jul 2023 - Subfrags comes home-- complete changes throughout the system, impossible to recount.
 
