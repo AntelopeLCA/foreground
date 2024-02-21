@@ -225,7 +225,7 @@ class LcForeground(BasicArchive):
             try:
                 with open(self._metadata_file) as fp:
                     self._metadata = ForegroundMetadata(**json.load(fp))
-            except ValidationError:
+            except (ValidationError, json.JSONDecodeError):
                 self._metadata = ForegroundMetadata(version_major=-1, version_minor=-1,
                                                     dataSource=self.source,
                                                     description='failed to load',
