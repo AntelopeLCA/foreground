@@ -5,6 +5,7 @@ They originated as part of LcFragments but in fact they are more general. A Flow
 as a ProductFlow in lca-matrix, plus features to compute LCIA.  It should be easy to construct either one from the
 other.
 """
+import logging
 
 from antelope import (BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences,
                       NoReference, ConversionReferenceMismatch, EntityNotFound)
@@ -498,7 +499,7 @@ class FlowTermination(object):
         but each call to quantity_relation should check for both forward and reverse matches
         '''
         if not self.valid:
-            print('WE ARE NOT EVEN TRYING')
+            logging.warning('Flow Conversion attempted on invalid term node %5.5s' % self._parent.uuid)
             return 1.0
         # if not self.term_flow.validate():
         #     return 1.0

@@ -202,6 +202,10 @@ class ForegroundCatalog(LcCatalog):
                 self._missing_o.add((origin, itype))
                 raise MissingResource(origin, itype)
 
+    @property
+    def test(self):
+        return bool(self._test)
+
     def create_foreground(self, ref, path=None, quiet=True):
         """
         Creates foreground resource and returns an interface to that resource.
@@ -212,19 +216,22 @@ class ForegroundCatalog(LcCatalog):
         :return:
         """
         assert bool(foreground_origin_regexp.match(ref)), "Foreground reference not valid: %s" % ref
-        if path is None:
-            path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
-            # localpath = ref
+        if self._test:
+            local_path = ref
         else:
-            if os.path.isabs(path):
-                pass
-                # localpath = None
+            if path is None:
+                path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
+                # localpath = ref
             else:
-                # localpath = path
-                path = os.path.join(self._rootdir, path)
+                if os.path.isabs(path):
+                    pass
+                    # localpath = None
+                else:
+                    # localpath = path
+                    path = os.path.join(self._rootdir, path)
 
-        abs_path = os.path.abspath(path)
-        local_path = self._localize_source(abs_path)
+            abs_path = os.path.abspath(path)
+            local_path = self._localize_source(abs_path)
 
         res = self.new_resource(ref, local_path, 'LcForeground',
                                 interfaces=['basic', 'index', 'foreground', 'quantity'],

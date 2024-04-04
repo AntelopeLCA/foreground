@@ -4,6 +4,7 @@ A foreground archive is an LcArchive that also knows how to access, serialize, a
 import json
 import os
 import re
+import logging
 
 from typing import Optional
 
@@ -450,6 +451,8 @@ class LcForeground(BasicArchive):
         """
         fragments = []
         if not os.path.exists(self._fragment_dir):
+            if self._catalog.test:
+                return
             os.makedirs(self._fragment_dir)
         for file in os.listdir(self._fragment_dir):
             if os.path.isdir(os.path.join(self._fragment_dir, file)):
@@ -483,12 +486,17 @@ class LcForeground(BasicArchive):
 
     def save_metadata(self):
         if not os.path.isdir(self.source):
+            if self._catalog.test:
+                return
             os.makedirs(self.source)
 
         with open(self._metadata_file, 'w') as fp:
             json.dump(self._metadata.model_dump(), fp, indent=2)
 
     def save(self, save_unit_scores=False):
+        if self._catalog.test:
+            logging.info('Cannot save foregrounds during tester operation')
+            return False
         if not os.path.isdir(self.source):
             os.makedirs(self.source)
 

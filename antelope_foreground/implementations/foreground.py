@@ -554,8 +554,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         return True
 
     def save(self, save_unit_scores=False):
-        self._archive.save(save_unit_scores=save_unit_scores)
-        return True
+        return self._archive.save(save_unit_scores=save_unit_scores)
 
     def tree(self, fragment, **kwargs):
         """
