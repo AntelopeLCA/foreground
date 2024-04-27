@@ -184,7 +184,8 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         pydantic_fg = LcForeground.from_foreground_archive(fg.archive, save_unit_scores=save_unit_scores)
         return self._archive.r.post_return_one(pydantic_fg.dict(), OriginCount, 'post_foreground')
 
-    def post_entity_refs(self, post_ents: List[EntityRef]):
+    def post_entity_refs(self, entities, **kwargs):
+        post_ents = [p if isinstance(p, EntityRef) else EntityRef.from_entity(p) for p in entities]
         return self._archive.r.post_return_one([p.model_dump() for p in post_ents], OriginCount, 'entity_refs')
 
     def save(self):

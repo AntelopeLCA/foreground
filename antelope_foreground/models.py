@@ -563,7 +563,7 @@ class LcForeground(ResponseModel):
     catalogNames: Dict[str, List[str]]  #
     dataSource: str  #
     dataSourceType: str  #
-    flows: List[Dict]  #
+    flows: List[Dict]  # these should be removed
     initArgs: Dict  #
     quantities: List[Dict]  #
     termManager: Optional[TermManager]  #

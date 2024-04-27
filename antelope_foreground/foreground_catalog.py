@@ -114,8 +114,8 @@ class ForegroundCatalog(LcCatalog):
         self._check_missing_o(res)
         return res
 
-    def add_resource(self, resource, store=True):
-        super(ForegroundCatalog, self).add_resource(resource, store=store)
+    def add_resource(self, resource, **kwargs):
+        super(ForegroundCatalog, self).add_resource(resource, **kwargs)
         self._check_missing_o(resource)
 
     def is_in_queue(self, home):
