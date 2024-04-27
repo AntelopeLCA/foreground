@@ -4,9 +4,10 @@
 """
 
 import uuid
+import logging
 # from collections import defaultdict
 
-from antelope import comp_dir, check_direction, PropertyExists, CatalogRef, RxRef, QuantityRequired
+from antelope import comp_dir, check_direction, PropertyExists, CatalogRef, RxRef, QuantityRequired, RefQuantityRequired
 
 from ..fragment_flows import group_ios, FragmentFlow, ios_exchanges, frag_flow_lcia
 from antelope_core.entities import LcEntity, LcFlow
@@ -208,7 +209,11 @@ class LcFragment(LcEntity):
                     self._d['StageName'] = stagename
         # set EV last
         if balance_flow:
-            self.set_balance_flow()
+            try:
+                self.set_balance_flow()
+            except RefQuantityRequired:
+                # nothing much to do but notify
+                logging.warning('%s: Balance flow missing reference entity' % self.link)
         else:
             if exchange_value is not None:
                 self.set_exchange_value(0, exchange_value, units=units)
@@ -926,7 +931,7 @@ class LcFragment(LcEntity):
             return None
         else:
             if self._balance_child.flow.reference_entity is None:
-                raise TypeError('Flow %s has no reference quantity' % self._balance_child.flow.link)
+                raise RefQuantityRequired('Flow %s has no reference quantity' % self._balance_child.flow.link)
             try:
                 return self._balance_child.flow.reference_entity.cf(self.flow)
             except (QuantityRequired, MissingResource):
