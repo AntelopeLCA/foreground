@@ -8,7 +8,7 @@ other.
 import logging
 
 from antelope import (BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences,
-                      NoReference, ConversionReferenceMismatch, EntityNotFound)
+                      NoReference, ConversionReferenceMismatch, EntityNotFound, NoCatalog)
 
 from antelope_core.contexts import NullContext
 from antelope_core.exchanges import ExchangeValue
@@ -137,7 +137,7 @@ class FlowTermination(object):
             raise TerminationFromJson('term_flow missing and ambiguous: %s (%s)' % (fragment.link, scenario))
         except FlowConversionError:
             t = term_flow or term_node
-            raise TerminationFromJson('Flow Conversion Error %s =/= %s' % (fragment.flow.link, t.link))
+            raise TerminationFromJson('Flow Conversion Error %s =/= %s' % (fragment.link, t.link))
         if 'scoreCache' in j.keys():
             term._deserialize_score_cache(fg, j['scoreCache'], scenario)
         return term
@@ -214,6 +214,12 @@ class FlowTermination(object):
 
     @property
     def term_node(self):
+        if self._term:
+            if self._term.entity_type == UNRESOLVED_ANCHOR_TYPE:
+                try:
+                    self._term = self._term.resolve()
+                except NoCatalog:
+                    pass
         return self._term
 
     @property
@@ -429,6 +435,10 @@ class FlowTermination(object):
         return self._term is None
 
     @property
+    def is_unresolved(self):
+        return self._term is not None and self._term.entity_type == UNRESOLVED_ANCHOR_TYPE
+
+    @property
     def descend(self):
         return self._descend
 
@@ -511,6 +521,8 @@ class FlowTermination(object):
             return 1.0
         parent_q = self._parent.flow.reference_entity
         term_q = self.term_flow.reference_entity
+        if term_q is None:
+            return 0.0
 
         # first - natural - ask our parent flow if fit can convert to term quantity
         try:

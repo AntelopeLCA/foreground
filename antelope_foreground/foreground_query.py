@@ -25,7 +25,7 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
     Add foreground interface to query object.
     We also need to add lubricating code to translate between pydantic models and operable objects
     """
-    def make_term_from_anchor(self, parent, anchor, scenario, flow_conversion):
+    def make_term_from_anchor(self, parent, anchor, scenario, flow_conversion=None):
         if anchor.is_null:
             term = FlowTermination.null(parent)
         else:
@@ -40,7 +40,7 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
             """
             if anchor.context:
                 cx = self.get_context(anchor.context)
-                if term_flow is not None and flow_conversion != 1.0:
+                if term_flow is not None and flow_conversion is not None and flow_conversion != 1.0:
                     print('Term CF %s : %s [%g]' % (parent.link, cx, flow_conversion))
                     # log reported flow conversion.  Some shit to sort out w/r/t/ context
                     self.characterize(parent.flow.name, parent.flow.reference_entity, term_flow.reference_entity,
@@ -50,7 +50,7 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
                                        descend=anchor.descend)
             elif anchor.node:
                 term_node = self.get(anchor.node.entity_id, origin=anchor.node.origin)
-                if flow_conversion != 1.0:
+                if flow_conversion is not None and flow_conversion != 1.0:
                     rx = term_node.reference(term_flow)
                     print('Term CF %s : %s [%g]' % (parent.link, term_node.link, flow_conversion))
                     # log reported flow conversion.  Some shit to sort out w/r/t/ context

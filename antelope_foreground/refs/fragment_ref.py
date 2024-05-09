@@ -134,6 +134,10 @@ class FragmentRef(EntityRef):
     def child_flows(self):
         return self._query.child_flows(self)
 
+    @property
+    def is_background(self):
+        return len(self.child_flows) == 0  # self._background
+
     def set_name(self, name, **kwargs):
         return self._query.name_fragment(self, name, **kwargs)
 
@@ -212,6 +216,34 @@ class FragmentRef(EntityRef):
         while len(pnts) > 0:
             pnts.pop()
             print('   %s    x ' % _pfx())  # end cap
+
+    def nodes(self, scenario=None, descend=True):
+        """
+        Report proximal terminal nodes for the fragment (recurse until a nondescend is reached)
+        :param scenario: [None]
+        :param descend: [True] if False, yield subfragments as nodes
+        :return: generator of terminal nodes
+        """
+        term = self.anchor(scenario)
+        yds = set()
+        if term.is_process or term.is_context or term.is_unresolved:
+            if term.term_node not in yds:
+                yield term.term_node
+                yds.add(term.term_node)
+        elif term.is_subfrag:
+            if term.descend and descend:
+                for n in term.term_node.nodes(scenario, descend=descend):
+                    if n not in yds:
+                        yield n
+                        yds.add(n)
+            else:
+                yield term.term_node
+            # foreground, null: do nothing
+        for c in self.child_flows:
+            for n in c.nodes(scenario, descend=descend):
+                if n not in yds:
+                    yield n
+                    yds.add(n)
 
     def traverse(self, scenario=None, **kwargs):
         return self._query.traverse(self, scenario=scenario, **kwargs)

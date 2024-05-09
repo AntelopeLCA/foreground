@@ -1228,7 +1228,7 @@ class LcFragment(LcEntity):
         """
         term = self.termination(scenario)
         yds = set()
-        if term.is_process or term.is_context:
+        if term.is_process or term.is_context or term.is_unresolved:
             if term.term_node not in yds:
                 yield term.term_node
                 yds.add(term.term_node)
