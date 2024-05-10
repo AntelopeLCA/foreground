@@ -1,7 +1,7 @@
 from antelope.refs.base import EntityRef
 from antelope.refs import RxRef
 from antelope import comp_dir
-from ..fragment_flows import group_ios, ios_exchanges
+from ..fragment_flows import group_ios, ios_exchanges, FragmentInventoryDeprecated
 from ..models import Anchor
 """
 Not sure what to do about Fragment Refs, whether they belong in the main interface. I'd like to think no, but
@@ -144,8 +144,8 @@ class FragmentRef(EntityRef):
     '''
     Process compatibility
     '''
-    def inventory(self, scenario=None, **kwargs):
-        ios, _ = self.unit_inventory(scenario=scenario, **kwargs)  # in the future, may want to cache this
+    def cutoffs(self, scenario=None, **kwargs):
+        ios, _ = self.unit_flows(scenario=scenario, **kwargs)  # in the future, may want to cache this
         return ios_exchanges(ios, ref=self)
 
     def activity(self, scenario=None, **kwargs):
@@ -272,6 +272,9 @@ class FragmentRef(EntityRef):
         return self.fragment_lcia(self, lcia_qty, scenario=scenario, **kwargs)
 
     def unit_inventory(self, scenario=None, observed=None):
+        raise FragmentInventoryDeprecated('"inventory" is an exchange method. Use "unit_flows" instead.')
+
+    def unit_flows(self, scenario=None, observed=None):
         """
 
         :param scenario:

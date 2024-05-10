@@ -278,13 +278,13 @@ class FragmentTests(unittest.TestCase):
         ffs = self.af.traverse(None)
         self._check_fragmentflows(ffs, f4, 'Input', 1, 1)
 
-    def test_af_unit_inventory(self):
+    def test_af_unit_flows(self):
         """
-        A unit inventory reports two separate sets of fragment flows: cutoffs (cross system boundary) and nodes (within
+        unit flows reports two separate sets of fragment flows: cutoffs (cross system boundary) and nodes (within
         system boundary).  For af, there is one cutoff (the reference flow) and two internal, both foreground fragments.
         :return:
         """
-        io, ff = self.af.unit_inventory()
+        io, ff = self.af.unit_flows()
         self._check_fragmentflows(io, f4, 'Output', 1)
         self.assertEqual(len(ff), 2)
         # foreground <=> term is self -- to_foreground() replaced with termination to NullContext
@@ -360,10 +360,10 @@ class FragmentTests(unittest.TestCase):
 
         :return:
         """
-        ff1 = self.a1.inventory()
-        ff1o = self.a1.inventory(observed=True)
-        ff2 = self.a2.inventory()
-        ff2o = self.a2.inventory(observed=True)
+        ff1 = self.a1.cutoffs()
+        ff1o = self.a1.cutoffs(observed=True)
+        ff2 = self.a2.cutoffs()
+        ff2o = self.a2.cutoffs(observed=True)
         self.assertEqual(ff2, ff2o)
         self.assertNotEqual(ff1, ff1o)
         ff1t = self.a1.traverse(observed=True)
@@ -402,7 +402,7 @@ class FragmentTests(unittest.TestCase):
         :return:
         """
         f7_autoconsumption = aa_mj_in / self.a2.exchange_value() * a2_private * a2_item
-        inv = self.aa.inventory()
+        inv = self.aa.cutoffs()
         f7_out = next(f for f in inv if f.flow is f7)
         f5_in = next(f for f in inv if f.flow is f5)
         self.assertEqual((f7_out.direction, f7_out.value), ('Output', 1 - f7_autoconsumption))
@@ -465,11 +465,11 @@ class FragmentTests(unittest.TestCase):
 
     def test_descend_equivalence(self):
         """
-        Inventory results should not vary regardless of descend (this may require more robust testing)
+        Cutoffs results should not vary regardless of descend (this may require more robust testing)
         :return:
         """
-        inv_d = self.aa.inventory()
-        inv_nd = self.aa.inventory('nondescend')
+        inv_d = self.aa.cutoffs()
+        inv_nd = self.aa.cutoffs('nondescend')
         self.assertEqual(inv_d, inv_nd)
 
     def test_nondescend_privacy(self):

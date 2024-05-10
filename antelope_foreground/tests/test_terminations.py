@@ -51,7 +51,7 @@ class FlowTerminationTestCase(BasicEntityTest):
 
     def test_unobserved(self):
         term = self._petro_term()
-        ux = [x for x in term._unobserved_exchanges()]
+        ux = [x for x in term.unobserved_exchanges()]
         self.assertEqual(len(ux), 42)
 
     def _frag_with_child(self):
@@ -64,7 +64,7 @@ class FlowTerminationTestCase(BasicEntityTest):
 
     def test_unobserved_with_child(self):
         frag = self._frag_with_child()
-        ux = [x for x in frag.term._unobserved_exchanges()]
+        ux = [x for x in frag.term.unobserved_exchanges()]
         self.assertEqual(len(ux), 41)
 
     def _get_coolness(self):

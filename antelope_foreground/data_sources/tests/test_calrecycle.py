@@ -87,7 +87,7 @@ class CalRecycleTest(unittest.TestCase):
 
     def test_passthrough(self):
         lm = fg['fragments/3']
-        inv, _ = lm.unit_inventory(None, observed=True)
+        inv, _ = lm.unit_flows(None, observed=True)
         self.assertEqual(len(inv), 3)  # 3 inventory flows
         self.assertEqual(len(set(x.fragment.flow for x in inv)), 2)  # 2 distinct flows
         self.assertSetEqual(set(x.fragment.direction for x in inv if x.fragment.flow == lm.flow),
@@ -98,7 +98,7 @@ class CalRecycleTest(unittest.TestCase):
         uom = fg['fragments/55']
         ffs = uom.traverse(None, observed=True)
         self.assertEqual(len(ffs), 322)  # some ffs went away with uslci bg change 43d35c7; a few came back with 110321a
-        inv = uom.inventory(None, observed=True)
+        inv = uom.cutoffs(None, observed=True)
         light_fuel = next(x for x in inv if x.flow['Name'].startswith('Light Fuel'))
         self.assertEqual(floor(light_fuel.value), 116915718)
         incin = next(x for x in inv if x.flow['Name'].startswith('UO to Incin'))

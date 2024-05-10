@@ -7,6 +7,14 @@ from collections import defaultdict
 import uuid
 
 
+class FragmentInventoryDeprecated(Exception):
+    """
+    The "inventory" term for fragmnts is deprecated.  "unit_inventory" is now "unit_flows" and "inventory"
+    is what it has always been: "cutoffs".  And the old "cutoffs" is gone because it literally never worked.
+    """
+    pass
+
+
 class CumulatingFlows(Exception):
     """
     when a fragment includes multiple instances of the reference flow having consistent (i.e. not complementary)

@@ -265,7 +265,7 @@ class FlowTermination(object):
             elif self.is_frag:
                 if term_flow == self.term_node.flow:  # don't need the inventory every time
                     self._term_flow = term_flow
-                elif term_flow in (x.flow for x in self.term_node.inventory()):
+                elif term_flow in (x.flow for x in self.term_node.cutoffs()):
                     self._term_flow = term_flow
                 else:
                     raise MissingFlow(term_flow)
@@ -605,7 +605,7 @@ class FlowTermination(object):
             return '%4g unit' % self.inbound_exchange_value
         return '%4g %s' % (self.inbound_exchange_value, self.term_flow.unit)  # process
 
-    def _unobserved_exchanges(self, refresh=False):
+    def unobserved_exchanges(self, refresh=False):
         """
         Generator which yields exchanges from the term node's inventory that are not found among the child flows, for
           LCIA purposes
@@ -684,7 +684,7 @@ class FlowTermination(object):
                                              refresh=refresh, locale=locale, **kwargs)
             except (QuantityRequired, EntityNotFound, NotImplementedError):
                 try:
-                    res = quantity_ref.do_lcia(self._unobserved_exchanges(refresh=refresh), locale=locale,
+                    res = quantity_ref.do_lcia(self.unobserved_exchanges(refresh=refresh), locale=locale,
                                                refresh=refresh, **kwargs)
                 except (BackgroundRequired, NotImplementedError):
                     res = self._fallback_lcia(quantity_ref, locale, **kwargs)

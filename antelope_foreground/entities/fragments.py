@@ -9,7 +9,7 @@ import logging
 
 from antelope import comp_dir, check_direction, PropertyExists, CatalogRef, RxRef, QuantityRequired, RefQuantityRequired
 
-from ..fragment_flows import group_ios, FragmentFlow, ios_exchanges, frag_flow_lcia
+from ..fragment_flows import group_ios, FragmentFlow, ios_exchanges, frag_flow_lcia, FragmentInventoryDeprecated
 from antelope_core.entities import LcEntity, LcFlow
 from antelope_core.exchanges import ExchangeValue
 # from lcatools.interact import ifinput, parse_math
@@ -1286,6 +1286,9 @@ class LcFragment(LcEntity):
         return act
 
     def inventory(self, scenario=None, scale=1.0, observed=False):
+        raise FragmentInventoryDeprecated('"inventory" is an exchange method. Use "cutoffs" instead.')
+
+    def cutoffs(self, scenario=None, scale=1.0, observed=False):
         """
         Converts unit inventory into a set of exchanges for easy display
         :param scenario:
@@ -1293,7 +1296,7 @@ class LcFragment(LcEntity):
         :param observed:
         :return:
         """
-        ios, _ = self.unit_inventory(scenario=scenario, observed=observed)
+        ios, _ = self.unit_flows(scenario=scenario, observed=observed)
         return ios_exchanges(ios, ref=self)
 
     def exchanges(self, scenario=None):
@@ -1302,10 +1305,15 @@ class LcFragment(LcEntity):
         :param scenario:
         :return:
         """
-        for x in self.inventory(scenario=scenario):
+        for x in self.child_flows:
+            yield x
+        for x in self.termination(scenario).unobserved_exchanges():
             yield x
 
     def unit_inventory(self, scenario=None, observed=False, frags_seen=None):
+        raise FragmentInventoryDeprecated('"inventory" is an exchange method. "unit_flows" replaces unit_inventory.')
+
+    def unit_flows(self, scenario=None, observed=False, frags_seen=None):
         """
         Traverses the fragment containing self, and returns a set of FragmentFlows indicating the net input/output
          with respect to a *unit node weight of the reference fragment*.
@@ -1333,6 +1341,7 @@ class LcFragment(LcEntity):
 
         return ios, internal
 
+    '''
     def cutoffs(self, scenario=None, observed=False, aggregate=True):
         """
         Return a comprehensive list of cut-offs from a traversal result. Include implicit cutoffs from background
@@ -1350,11 +1359,11 @@ class LcFragment(LcEntity):
                 cos.append(ff)
             else:
                 if ff.fragment.is_background:
-                    '''extend ff with background node cut-off flows.
-                    Need to think about this for a minute because self.is_background could be terminated to either
-                    a process or a fragment.  If it's a process, then for fragment LCIA we will be computing bg_lcia,
-                    so assuming a CatalogRef with background access.
-                    '''
+                    #extend ff with background node cut-off flows.
+                    #Need to think about this for a minute because self.is_background could be terminated to either
+                    #a process or a fragment.  If it's a process, then for fragment LCIA we will be computing bg_lcia,
+                    #so assuming a CatalogRef with background access.
+                    
                     ref = ff.term.term_node
                     cos.extend([FragmentFlow.cutoff(ff.fragment, i.flow, i.direction, i.value * ff.node_weight)
                                 for i in ref.lci(ref_flow=ff.term.term_flow.external_ref)
@@ -1369,6 +1378,7 @@ class LcFragment(LcEntity):
         return sorted([ExchangeValue(f.fragment, f.fragment.flow, f.fragment.direction, value=f.magnitude)
                        for f in cos], key=lambda x: (x.direction == 'Input', x.flow.context,
                                                      x.flow['Name'], x.value), reverse=True)
+    '''
 
     def traverse(self, scenario=None, observed=False, frags_seen=None):
         if isinstance(scenario, set):
@@ -1692,7 +1702,7 @@ def _do_subfragment_traversal(ff, scenarios, frags_seen):
       - selects handler based on term type:
        - LcFragment._subfragment_traversal
        |- invokes (static) _do_subfragment_traversal (YOU ARE HERE)
-       ||- calls [internally recursive] term_node.unit_inventory, which is just a wrapper for
+       ||- calls [internally recursive] term_node.unit_flows, which is just a wrapper for
        || - (static) group_ios
        ||  + reference flow and autoconsumption handling
        || /
@@ -1705,7 +1715,7 @@ def _do_subfragment_traversal(ff, scenarios, frags_seen):
 
 
      - (static) group_ios
-     - nested inside LcFragment.unit_inventory, which is really just a wrapper
+     - nested inside LcFragment.unit_flows, which is really just a wrapper
      - called from
      - called from
 
@@ -1717,12 +1727,12 @@ def _do_subfragment_traversal(ff, scenarios, frags_seen):
     node_weight = ff.node_weight
     self = ff.fragment
 
-    unit_inv, subfrags = term.term_node.unit_inventory(scenario=scenarios, frags_seen=frags_seen)
+    unit_inv, subfrags = term.term_node.unit_flows(scenario=scenarios, frags_seen=frags_seen)
 
     # find the inventory flow that matches us
     # use term_flow over term_node.flow because that allows client code to specify inverse traversal knowing
     #  only the sought flow.
-    # unit_inventory guarantees that there is exactly one of these flows (except in the case of cumulating flows!
+    # unit_flows guarantees that there is exactly one of these flows (except in the case of cumulating flows!
     # see group_ios)
     try:
         match = next(k for k in unit_inv if k.fragment.flow == term.term_flow)
