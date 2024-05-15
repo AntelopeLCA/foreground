@@ -275,11 +275,20 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                         raise TypeError("ref unit (%s) doesn't match supplied (%s)" % (t.unit, reference))
                 if t['Name'] != name:
                     raise ValueError("Name (%s) doesn't match supplied(%s)" % (t['Name'], name))
+            else:
+                if t['Name'] != name:
+                    t['Name'] = name
+            for k, v in kwargs.items():
+                if v is not None:
+                    t[k] = v
             return t
 
         except EntityNotFound:
             try:
-                return self.new_flow(name, ref_quantity=reference, external_ref=external_ref, context=group, **kwargs)
+                cx = kwargs.pop('context', group)
+                if group:
+                    kwargs['group'] = group
+                return self.new_flow(name, ref_quantity=reference, external_ref=external_ref, context=cx, **kwargs)
             except UnknownRefQuantity:
                 # assume reference is a unit string specification
                 return self.new_quantity(name, ref_unit=reference, external_ref=external_ref, group=group, **kwargs)
