@@ -1,13 +1,17 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.3.0'
+VERSION = '0.3.1'
 
 requires = [
-    'antelope_core>=0.3.0'
+    'antelope_core>=0.3.1'
 ]
 
 """
 Revision history
+
+0.3.1   2024-05-15 - "inventory" operations on fragments deprecated
+                     tester catalogs now filesystem-free
+                     handle unresolved anchor issues 
 
 0.3.0   2024-01-05 - 0.3-branch development version, supporting end-user access to vault.lc resources 
 
