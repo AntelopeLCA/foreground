@@ -1,6 +1,7 @@
 from antelope import comp_dir, ExchangeRef
 
 from .terminations import FlowTermination, UnCachedScore, UnresolvedAnchor
+from .models import DescendSpec
 from antelope_core.lcia_results import LciaResult, DetailedLciaResult, SummaryLciaResult
 
 from collections import defaultdict
@@ -118,6 +119,7 @@ class FragmentFlow(object):
         self._subfrags_params = ()
         self.match_scenarios = (match_ev, match_term)
         self._superfrag = None
+        self.uuid = str(uuid.uuid4())
 
     @property
     def superfragment(self):
@@ -393,7 +395,7 @@ def group_ios(parent, ffs, include_ref_flow=True, passthru_threshold=0.45):
                 value = 0.0
         if value < 0:
             direction = comp_dir(direction)
-        external.append(FragmentFlow.cutoff(parent, flow, direction, abs(value))) #, is_conserved=cons[flow]))
+        external.append(FragmentFlow.cutoff(parent, flow, direction, abs(value)))  # , is_conserved=cons[flow]))
 
     return external, internal
 
@@ -412,16 +414,20 @@ def ios_exchanges(ios, ref=None, scale=1.0):
     return sorted(frag_exchs, key=lambda x: (x.direction == 'Input', x.value), reverse=True)
 
 
-def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, **kwargs):
+def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, descend_all=None, descend_spec=None, **kwargs):
     """
     Recursive function to compute LCIA of a traversal record contained in a set of Fragment Flows.
     Note: refresh is no longer supported during traversal
     :param fragmentflows:
     :param quantity_ref:
     :param scenario: necessary if any remote traversals are required
-    :param ignore_uncached: [True] whether to allow zero scores for un-cached, un-computable fragments
+    :param descend_all: if True or False, disregard frag-specific descend settings in favor of spec
+    :param descend_spec: a DescendSpec object (overrides above)
     :return:
     """
+    if descend_spec is None:
+        descend_spec = DescendSpec(descend_all=descend_all)
+
     result = LciaResult(quantity_ref, scenario=str(scenario))
     _first_ff = True
     for ff in fragmentflows:
@@ -444,13 +450,13 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, **kwargs):
 
                 # if we reach here, then we have successfully retrieved a cached unit score and we are done
                 if not v.is_null:
-                    result.add_summary(ff.fragment.uuid, ff, node_weight, v)
+                    result.add_summary(ff.uuid, ff, node_weight, v)
 
                 _first_ff = False
                 continue
 
             except UnresolvedAnchor:
-                result.add_missing(ff.fragment.uuid, ff.term.term_node, node_weight)
+                result.add_missing(ff.uuid, ff.term.term_node, node_weight)
                 _first_ff = False
                 continue
 
@@ -460,21 +466,22 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, **kwargs):
                 _recursive_remote = True
 
         else:
-            v = frag_flow_lcia(ff.subfragments, quantity_ref, scenario=ff.subfragment_scenarios, **kwargs)
+            v = frag_flow_lcia(ff.subfragments, quantity_ref, scenario=ff.subfragment_scenarios,
+                               descend_spec=descend_spec, **kwargs)
             if v.is_null:
                 continue
 
         # if we arrive here, we have a unit score from a subfragment
 
-        if ff.term.descend:
+        if descend_spec.descend_ff(ff):
             if v.has_summaries:
                 for k in v.keys():
                     c = v[k]
                     result.add_summary(k, c.entity, c.node_weight * node_weight, c.internal_result)
             else:
-                result.add_summary(ff.fragment.uuid, ff, node_weight, v)
+                result.add_summary(ff.uuid, ff, node_weight, v)
         else:
-            result.add_summary(ff.fragment.uuid, ff, node_weight, v)
+            result.add_summary(ff.uuid, ff, node_weight, v)
 
         if _first_ff and _recursive_remote:
             if len(fragmentflows) > 1:

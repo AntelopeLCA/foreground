@@ -11,7 +11,7 @@ We need:
 and that's probably it
 
 """
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Set
 from antelope.models import ResponseModel, EntityRef, Entity, FlowEntity
 from antelope.xdb_tokens import ResourceSpec
 
@@ -211,6 +211,59 @@ class FragmentRef(Entity):
             self.origin = masq[self.origin]
         if self.flow.origin in masq:
             self.flow.origin = masq[self.flow.origin]
+
+
+def _to_key(thing):
+    if isinstance(thing, str):
+        return thing
+    elif hasattr(thing, 'uuid'):
+        return thing.uuid
+    elif hasattr(thing, 'link'):
+        return thing.link
+    raise AttributeError(thing)
+
+
+def _to_set(thing_or_things):
+    if thing_or_things is None:
+        return set()
+    try:
+        return {_to_key(thing_or_things)}
+    except AttributeError:
+        return {_to_key(k) for k in thing_or_things}
+
+
+class DescendSpec(ResponseModel):
+    """
+    A specification for which fragments to apply descend settings during aggregation
+    """
+    descend: Set = set()
+    nondescend: Set = set()
+    descend_all: Optional[bool] = None
+
+    def __init__(self, descend=None, nondescend=None, descend_all=None):
+        super(DescendSpec, self).__init__(descend=_to_set(descend), nondescend=_to_set(nondescend),
+                                          descend_all=descend_all)
+
+    def descend_ff(self, ff):
+        """
+        If the fragment is on the explicit descend or nondescend list, apply that.
+        otherwise, if descend_all is True or False, apply that.
+        otherwise, honor the anchor's descend setting.
+        :param ff: a FragmentFlow
+        :return:
+        """
+        if ff.term.is_null:
+            return None
+        ff_keys = {ff.fragment.uuid, ff.fragment.link, ff.fragment.external_ref}
+        if ff_keys & self.descend:
+            return True
+        if ff_keys & self.nondescend:
+            return False
+        if self.descend_all:
+            return True
+        if self.descend_all is False:
+            return False
+        return ff.term.descend
 
 
 class FragmentEntity(Entity):
