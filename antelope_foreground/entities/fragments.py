@@ -361,8 +361,21 @@ class LcFragment(LcEntity):
 
     @property
     def child_flows(self):
+        """
+        Yields the child flows in the order they were created.
+
+        :return:
+        """
         for k in self._child_flows:  # sorted(self._child_flows, key=lambda x: x.uuid):
             yield k
+
+    @property
+    def child(self):
+        """
+        little convenience function to avoid having to write next(frag.child_flows)
+        :return:
+        """
+        return self._child_flows[0]
 
     def children_with_flow(self, flow, direction=None, termination=None, recurse=False):
         for k in self._child_flows:
