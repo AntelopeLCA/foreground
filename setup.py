@@ -1,13 +1,16 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.3.1'
+VERSION = '0.3.2'
 
 requires = [
+    'antelope_interface>=0.2.6'
     'antelope_core>=0.3.1'
 ]
 
 """
 Revision history
+
+0.3.2   2024-xxxx  - move fg methods to interface
 
 0.3.1   2024-05-15 - "inventory" operations on fragments deprecated
                      tester catalogs now filesystem-free
