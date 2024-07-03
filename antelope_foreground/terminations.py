@@ -527,6 +527,9 @@ class FlowTermination(object):
         # first - natural - ask our parent flow if fit can convert to term quantity
         try:
             rev = self._parent.flow.cf(term_q, context=self.term_node.external_ref)
+            if rev == 0.0:
+                rev = self._parent.flow.cf(term_q)
+
         except (QuantityRequired, NotImplementedError, ConversionReferenceMismatch):
             rev = None
 
@@ -544,6 +547,7 @@ class FlowTermination(object):
 
         # then ask if our parent qty can convert term_flow
         try:
+            # I have no idea what unwritten rules are governing this context declaration - 2024-07-01
             rev_c = parent_q.quantity_relation(self.term_flow, term_q, context=(self.term_node.origin,
                                                                                 self.term_node.external_ref))
         except (QuantityRequired, NotImplementedError):

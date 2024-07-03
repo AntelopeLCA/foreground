@@ -115,7 +115,7 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'find_or_create_term', ForegroundRequired,
                                    exchange, background=background)
     '''
-    def add_or_retrieve(self, external_ref, reference, name, **kwargs):
+    def add_or_retrieve(self, external_ref, reference, name, group=None, **kwargs):
         """
         Gets an entity with the given external_ref if it exists, , and creates it if it doesn't exist from the args.
 
@@ -123,11 +123,12 @@ class AntelopeForegroundInterface(ForegroundInterface):
         :param external_ref:
         :param reference:
         :param name:
+        :param group: None
         :param kwargs:
         :return:
         """
         return self._perform_query(_interface, 'add_or_retrieve', ForegroundRequired,
-                                   external_ref, reference, name, **kwargs)
+                                   external_ref, reference, name, group=group, **kwargs)
 
     def post_entity_refs(self, entity_refs, **kwargs):
         """
