@@ -5,6 +5,7 @@ from antelope_core.lcia_results import LciaResult, DetailedLciaResult, SummaryLc
 
 from collections import defaultdict
 import uuid
+import logging
 
 
 class FragmentInventoryDeprecated(Exception):
@@ -116,6 +117,11 @@ class FragmentFlow(object):
         self.is_conserved = is_conserved
         self._subfrags_params = ()
         self.match_scenarios = (match_ev, match_term)
+        self._superfrag = None
+
+    @property
+    def superfragment(self):
+        return self._superfrag
 
     @property
     def subfragments(self):
@@ -140,6 +146,8 @@ class FragmentFlow(object):
         :param scenarios:
         :return:
         """
+        for f in subfrags:
+            f._superfrag = self
         self._subfrags_params = (subfrags, scenarios)
 
     def scale(self, x):
@@ -469,6 +477,8 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, **kwargs):
             result.add_summary(ff.fragment.uuid, ff, node_weight, v)
 
         if _first_ff and _recursive_remote:
+            if len(fragmentflows) > 1:
+                logging.warning('Bailing out early despite %d un-handled fragment flows' % (len(fragmentflows)-1))
             return result  # bail out
         _first_ff = False
     return result

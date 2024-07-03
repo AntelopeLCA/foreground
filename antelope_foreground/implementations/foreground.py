@@ -375,10 +375,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         return self._archive.name_fragment(fragment, name, auto=auto, force=force)
     '''
 
-    def observe(self, fragment, exchange_value=None, units=None, scenario=None, anchor=None,
-                accept_all=None,
-                termination=None, term_flow=None, descend=None,
-                name=None, auto=None, force=None):
+    def observe(self, fragment, exchange_value=None, units=None, scenario=None, anchor=None, anchor_flow=None,
+                descend=None, name=None, auto=None, force=None,
+                accept_all=None, termination=None, term_flow=None):
         """
         All-purpose method to manipulate fragments.
         :param fragment:
@@ -386,17 +385,20 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param units: optional, modifies exchange value
         :param scenario: applies to exchange value and termination equially
         :param anchor: how to terminate the fragment
-        :param accept_all: not allowed; caught and rejected
-        :param termination: deprecated. assigned to anchor.
-        :param term_flow: passed to anchor
+        :param anchor_flow: passed to anchor
         :param descend: passed to anchor
         :param name: may not be used if a scenario is also supplied
         :param auto: auto-rename on name collision
         :param force: steal name on name collision
+        :param accept_all: not allowed; caught and rejected
+        :param termination: deprecated. assigned to anchor.
+        :param term_flow: deprecated. assigned to anchor_flow
         :return:
         """
         if termination and not anchor:
             anchor = termination
+        if term_flow and not anchor_flow:
+            anchor_flow = term_flow
         if accept_all is not None:
             print('%s: cannot "accept all"' % fragment)
         if name is not None:
@@ -425,7 +427,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                                                                                               scenario))
         if anchor is not None:
             term = self.find_term(anchor)
-            fragment.terminate(term, scenario=scenario, term_flow=term_flow, descend=descend)
+            fragment.terminate(term, scenario=scenario, term_flow=anchor_flow, descend=descend)
 
         return fragment.link
 
@@ -640,6 +642,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         self.fragment_from_exchanges(process.inventory(ref_flow=term.term_flow), parent=fragment, scenario=scenario,
                                      include_context=include_context,
                                      **kwargs)
+        return fragment
 
     '''
     def extend_process_model(self, fragment, include_elementary=False, terminate=True, **kwargs):

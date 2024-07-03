@@ -7,14 +7,16 @@ import uuid
 import logging
 # from collections import defaultdict
 
-from antelope import comp_dir, check_direction, PropertyExists, CatalogRef, RxRef, QuantityRequired, RefQuantityRequired
+from antelope import (comp_dir, check_direction, PropertyExists, CatalogRef, RxRef, QuantityRequired,
+                      RefQuantityRequired, ConversionError)
 
 from ..fragment_flows import group_ios, FragmentFlow, ios_exchanges, frag_flow_lcia, FragmentInventoryDeprecated
 from antelope_core.entities import LcEntity, LcFlow
-from antelope_core.exchanges import ExchangeValue
+# from antelope_core.exchanges import ExchangeValue
 # from lcatools.interact import ifinput, parse_math
 from ..terminations import FlowTermination, MissingFlow
 from ..foreground_query import MissingResource
+
 
 class InvalidParentChild(Exception):
     pass
@@ -844,8 +846,10 @@ class LcFragment(LcEntity):
         if units is not None and len(units) > 0:
             try:
                 value *= self.flow.reference_entity.convert(units)
-            except KeyError:
-                print('Flow conversion error: %5.5s: %s (%s)' % (self.uuid, self.flow.reference_entity, units))
+            except ConversionError:
+                print('##!! Flow conversion error setting exchange value: %5.5s: %s (%s)' % (self.uuid,
+                                                                                             self.flow.reference_entity,
+                                                                                             units))
                 value = 0.0
 
         if scenario == 0 or scenario == '0' or scenario == 'cached' or scenario is None:

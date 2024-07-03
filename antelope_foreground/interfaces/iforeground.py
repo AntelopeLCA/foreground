@@ -104,20 +104,6 @@ class AntelopeForegroundInterface(ForegroundInterface):
                                    fragment, name, **kwargs)
     '''
 
-    def fragments_with_flow(self, flow, direction=None, reference=True, background=None, **kwargs):
-        """
-        Generates fragments made with the specified flow, optionally filtering by direction, reference status, and
-        background status.  For all three filters, the default None is to generate all fragments.
-        :param flow:
-        :param direction: [None | 'Input' | 'Output']
-        :param reference: [None | False | {True} ]
-        :param background: [None | False | True]
-        :param kwargs:
-        :return:
-        """
-        return self._perform_query(_interface, 'fragments_with_flow', ForegroundRequired,
-                                   flow, direction=direction, reference=reference, background=background, **kwargs)
-
     '''
     def find_or_create_term(self, exchange, background=None):
         """
@@ -143,6 +129,16 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'add_or_retrieve', ForegroundRequired,
                                    external_ref, reference, name, **kwargs)
 
+    def post_entity_refs(self, entity_refs, **kwargs):
+        """
+        Add entities to the foreground by reference. mostly useful when working with remote foregrounds.
+        :param entity_refs:
+        :param kwargs:
+        :return:
+        """
+        return self._perform_query(_interface, 'post_entity_refs', ForegroundRequired,
+                                   entity_refs, **kwargs)
+
     def create_fragment_from_node(self, process_ref, ref_flow=None, include_elementary=False):
         """
         a synonym for create_process_model
@@ -163,27 +159,6 @@ class AntelopeForegroundInterface(ForegroundInterface):
         """
         return self._perform_query(_interface, 'clone_fragment', ForegroundRequired,
                                    frag, tag=tag, **kwargs)
-
-    def split_subfragment(self, fragment, replacement=None, **kwargs):
-        """
-                Given a non-reference fragment, split it off into a new reference fragment, and create a surrogate child
-        that terminates to it.
-
-        without replacement:
-        Old:   ...parent-->fragment
-        New:   ...parent-->surrogate#fragment;   (fragment)
-
-        with replacement:
-        Old:   ...parent-->fragment;  (replacement)
-        New:   ...parent-->surrogate#replacement;  (fragment);  (replacement)
-
-        :param fragment:
-        :param replacement:
-        :param kwargs:
-        :return:
-        """
-        return self._perform_query(_interface, 'split_subfragment', ForegroundRequired,
-                                   fragment, replacement=replacement, **kwargs)
 
     def delete_fragment(self, fragment, **kwargs):
         """
@@ -268,17 +243,15 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'extend_process', ForegroundRequired,
                                    fragment, scenario=scenario, include_context=include_context, **kwargs)
 
-    def fragment_from_exchanges(self, exchanges, parent=None, include_context=False, multi_flow=False, **kwargs):
+    def fragment_from_exchanges(self, exchanges, parent=None, include_context=False, **kwargs):
         """
 
         :param exchanges:
         :param parent: if parent is None, the first exchange is taken to be a reference fragment
         :param include_context: [False] if true, create subfragments terminating to context for elementary flows.
          otherwise leaves them unspecified (fragment LCIA includes unobserved exchanges)
-        :param multi_flow:
         :param kwargs:
         :return:
         """
         return self._perform_query(_interface, 'fragment_from_exchanges', ForegroundRequired,
-                                   parent=parent, include_context=include_context,
-                                   multi_flow=multi_flow, **kwargs)
+                                   exchanges, parent=parent, include_context=include_context, **kwargs)
