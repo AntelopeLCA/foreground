@@ -1326,7 +1326,10 @@ class LcFragment(LcEntity):
 
         return ios, internal
 
-    def cutoffs(self, scenario=None, observed=False, aggregate=True):
+    def cutoffs(self, scenario=None, observed=False):
+        return self.inventory(scenario=scenario, observed=observed)
+
+    def _deprecated_cutoffs(self, scenario=None, observed=False, aggregate=True):
         """
         Return a comprehensive list of cut-offs from a traversal result. Include implicit cutoffs from background
          computations.
