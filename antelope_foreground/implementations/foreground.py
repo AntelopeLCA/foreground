@@ -155,8 +155,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     def context(self, item):
         return self._archive.tm[item]
 
+    '''
     def get_context(self, item):
         return self._archive.tm[item]
+    '''
 
     def flowable(self, item):
         return self._archive.tm.get_flowable(item)
@@ -622,11 +624,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         rv = process.reference_value(ref_flow)
         if rv < 0:  # put in to handle Ecoinvent treatment processes
             dirn = comp_dir(rx.direction)
-            # rv = abs(rv)
+            rv = abs(rv)
         else:
             dirn = rx.direction
-        frag = self.new_fragment(rx.flow, dirn, value=1.0, observe=True, **kwargs)
-        frag.terminate(process, term_flow=rx.flow)
+        frag = self.new_fragment(rx.flow, dirn, value=rv, observe=True, **kwargs)
+        node = self.new_fragment(rx.flow, frag.direction, parent=frag, balance=True)
+        node.terminate(process, term_flow=rx.flow)
         # if set_background:
         #     frag.set_background()
         # self.fragment_from_exchanges(process.inventory(rx), parent=frag,
@@ -634,12 +637,13 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         return frag
 
     def extend_process(self, fragment, scenario=None, include_context=False, **kwargs):
-        term = fragment.termination(scenario)
-        if not term.is_process:
-            raise TypeError('Termination is not to process')
-        # fragment.unset_background()
-        process = term.term_node
-        self.fragment_from_exchanges(process.inventory(ref_flow=term.term_flow), parent=fragment, scenario=scenario,
+        if fragment.termination(scenario).is_fg and fragment.balance_flow:
+            parent = fragment.balance_flow
+        else:
+            parent = fragment
+        term = parent.termination(scenario)
+        self.fragment_from_exchanges(term.term_node.inventory(ref_flow=term.term_flow), parent=parent,
+                                     scenario=scenario,
                                      include_context=include_context,
                                      **kwargs)
         return fragment
@@ -698,8 +702,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         And now we are adding auto-terminate to anything that comes back from fragments_with_flow
 
         :param _xg: Generates a list of exchanges or exchange references
-        :param parent: if None, create parent from first exchange
-        :param ref: if parent is created, assign it a name (if parent is non-None, ref is ignored
+        :param parent: if None, create parent from first exchange. If parent is provided, _xg must exclude references
+        :param ref: if parent is created, assign it a name
         :param scenario: [None] specify the scenario under which to terminate child flows
         :param term_dict: [None] a mapping from EITHER existing termination OR flow external ref to target OR (target, term_flow) tuple
         :param set_background: [None] DEPRECATED / background is meaningless
@@ -712,13 +716,22 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         if set_background is not None:
             print('Warning: set_background is no longer meaningful- all terminations are background')
         if parent is None:
-            x = next(_xg)
-            parent = self.new_fragment(self._grounded_entity(x.flow), x.direction, value=x.value, units=x.unit, Name=str(x.process), **x.args)
-            if ref is None:
+            try:
+                x = next(_xg)
+            except TypeError:
+                x = _xg.pop(0)
+            if ref is not None:
+                parent = self[ref]
+
+            if parent is None:
+                parent = self.new_fragment(self._grounded_entity(x.flow), x.direction, value=x.value, units=x.unit,
+                                           Name=str(x.process), **x.args)
                 print('Creating new fragment %s (%s)' % (x.process.name, parent.uuid))
+                if ref is not None:
+                    self.observe(parent, name=ref)
+
             else:
-                print('Creating new fragment %s' % ref)
-                self.observe(parent, name=ref)
+                self.observe(parent, exchange_value=x.value, units=x.unit)
 
         _children = list(parent.child_flows)
 
@@ -788,9 +801,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                         v *= c_up.flow.reference_entity.convert(y.unit)
 
                     if c_up.exchange_value(scenario) != v:
-                        print('Updating %s exchange value %.3f' % (c_up, v))
+                        print('Updating %s exchange value %.3f %s' % (c_up, y.value, y.unit or ''))
 
-                        self.observe(c_up, exchange_value=v, scenario=scenario)
+                        self.observe(c_up, exchange_value=y.value, units=y.unit, scenario=scenario)
 
                     '''# we certainly can
                     if multi_flow:
