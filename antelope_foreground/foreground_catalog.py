@@ -172,11 +172,12 @@ class ForegroundCatalog(LcCatalog):
 
         return self._check_foreground(res)
 
-    def foreground(self, ref, reset=False):
+    def foreground(self, ref, reset=False, create=False):
         """
         activates a foreground resource and returns an interface to that resource.
         :param ref:
         :param reset: re-load the foreground from the saved files
+        :param create: [True] run create_foreground(ref) or [False] raise NoSuchForeground
         :return:
         """
         if ref in self._fg_queue:
@@ -185,7 +186,10 @@ class ForegroundCatalog(LcCatalog):
         try:
             res = next(self._resolver.resolve(ref, interfaces='foreground'))
         except (UnknownOrigin, StopIteration):
-            raise NoSuchForeground(ref)
+            if create:
+                return self.create_foreground(ref)
+            else:
+                raise NoSuchForeground(ref)
 
         if reset:
             self.purge_resource_archive(res)
