@@ -23,6 +23,15 @@ import json
 import os
 
 
+def _num(entry):
+    name, value = entry
+    try:
+        return float(value)
+    except TypeError:
+        print('glitch on value %s' % value)
+        return 0.0
+
+
 class _FragmentLcaTest(BaseModel):
     test: str
     """
@@ -33,6 +42,10 @@ class _FragmentLcaTest(BaseModel):
     precision: int
     scenarios: List[str] = []
     results: Set[Tuple[str, str]] = {}
+
+    @property
+    def name(self):
+        return 'Test %s: %s/%s (%s)' % (self.test, self.origin, self.external_ref, self.scenarios)
 
     @classmethod
     def from_model(cls, model, *scenarios, precision=None, **kwargs):
@@ -61,12 +74,14 @@ class _FragmentLcaTest(BaseModel):
         else:
             print('In Test:')
             if first:
-                print(first)
+                for i in sorted(first, key=_num, reverse=True):
+                    print(i)
             else:
                 print('all accounted')
             print('\nIn Results:')
             if second:
-                print(second)
+                for i in sorted(second, key=_num, reverse=True):
+                    print(i)
             else:
                 print('all accounted')
             return False
@@ -113,9 +128,15 @@ class _LciaTest(_FragmentLcaTest):
 
     lcia_method: QuantityRef | LcQuantity  # we keep a live query on hand
 
+    @property
+    def name(self):
+        return 'Test %s: %s/%s (%s) | %s' % (self.test, self.origin, self.external_ref, self.scenarios,
+                                             self.lcia_method.name)
+
     def check(self, model):
-        if not self.lcia_method.resolved:
-            return False
+        if not self.lcia_method.is_entity:
+            if not self.lcia_method.resolved:
+                return False
         return super(_LciaTest, self).check(model)
 
     @field_serializer('lcia_method')
@@ -140,7 +161,8 @@ class LciaContribTest(_LciaTest):
 
     def run(self, model):
         res = model.fragment_lcia(self.lcia_method, scenario=self.scenarios)
-        return {(obj.entity.name, self.rounding(obj.cumulative_result)) for obj in res.components()}
+        return {(obj.name, self.rounding(obj.cumulative_result)) for obj in res.components()} | \
+            {('total', self.rounding(res.total()))}
 
 
 class LciaAggTest(_LciaTest):
@@ -150,16 +172,18 @@ class LciaAggTest(_LciaTest):
         return obj.entity, self.rounding(obj.cumulative_result)
 
     def run(self, model):
-        res = model.fragment_lcia(self.lcia_method, scenario=self.scenarios).aggregate()
-        return {self._make_entry(c) for c in res.components()}
+        res = model.fragment_lcia(self.lcia_method, scenario=self.scenarios, mode='stage')
+        return {self._make_entry(c) for c in res.components()} | \
+            {('total', self.rounding(res.total()))}
 
 
 class LciaFlatTest(LciaAggTest):
     test: str = 'lcia_flat'
 
     def run(self, model):
-        res = model.fragment_lcia(self.lcia_method, scenario=self.scenarios).flatten()
-        return {self._make_entry(c) for c in res.components()}
+        res = model.fragment_lcia(self.lcia_method, scenario=self.scenarios, mode='flat')
+        return {self._make_entry(c) for c in res.components()} | \
+            {('total', self.rounding(res.total()))}
 
 
 _my_mapping = {
@@ -233,6 +257,7 @@ class LcaTestSuite(BaseModel):
         for group in _my_mapping.keys():
             tests = getattr(self, group)
             for test in tests:
+                print('\n%s' % test.name)
                 if check_origin:
                     org = check_origin
                 else:
