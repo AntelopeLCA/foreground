@@ -231,6 +231,13 @@ class LcFragment(LcEntity):
             raise AttributeError('Origin not set!')
         return hash('%s/%s' % (self.origin, self.uuid))
 
+    def resolve(self):
+        if hasattr(self.flow, 'resolved') and not self.flow.resolved:
+            self.dbg_print('attempting to resolve %s' % self.flow.link)
+            self.flow = self.flow.resolve()
+        if self.flow.reference_entity is None:
+            self.dbg_print('failed to resolve %s' % self.flow.link)
+
     @property
     def external_ref(self):
         if self._external_ref is None:
@@ -948,10 +955,22 @@ class LcFragment(LcEntity):
             return None
         else:
             if self._balance_child.flow.reference_entity is None:
-                raise RefQuantityRequired('Flow %s has no reference quantity' % self._balance_child.flow.link)
+                self._balance_child.resolve()
+                logging.warning('tryna resolve %s' % self._balance_child.flow.link)
+            f = self._balance_child.flow
+            if f.reference_entity is None:
+                self.dbg_print('Balance Flow %5.5s has no reference' % f.uuid, 0)
+                raise RefQuantityRequired('Flow %s [%s][%s] has no reference quantity' % (f.link,
+                                                                                          type(f),
+                                                                                          type(f._the_query)))
             try:
-                return self._balance_child.flow.reference_entity.cf(self.flow)
-            except (QuantityRequired, MissingResource):
+                cf = self._balance_child.flow.reference_entity.cf(self.flow)
+                self.dbg_print('Found balance magnitude %g' % cf)
+                # if cf == 0:  # debug goes here
+                #     logging.error('%s' % zz)
+                return cf
+            except (QuantityRequired, MissingResource) as e:
+                self.dbg_print('Encountered %s during cf' % e)
                 return 0.0
 
     '''
@@ -1275,18 +1294,30 @@ class LcFragment(LcEntity):
             for b in c.tree():
                 yield b
 
-    def fragment_lcia(self, quantity_ref, scenario=None, observed=True, **kwargs):
+    def fragment_lcia(self, quantity_ref, scenario=None, observed=True, mode=None, group_by=None, **kwargs):
         """
         Fragments don't have access to a qdb, so this piggybacks on the quantity_ref.
         note: refresh is no longer supported during traversal
         :param quantity_ref:
         :param scenario:
         :param observed: [True] whether to limit the computation to observed flows
+        :param mode: None, 'detailed' (NOP when local), 'flat', 'stage', 'anchor'
+        :param group_by: fragment property to group by for stage_lcia
         :param kwargs: ultimately passed down to LCIA computation routine
         :return:
         """
         fragmentflows = self.traverse(scenario=scenario, observed=observed)
-        return frag_flow_lcia(fragmentflows, quantity_ref, scenario=scenario, **kwargs)
+        res = frag_flow_lcia(fragmentflows, quantity_ref, scenario=scenario, **kwargs)
+        if mode == 'flat':
+            return res.flatten()
+        elif mode == 'stage':
+            if group_by:
+                return res.aggregate(key=lambda x: x.fragment.get(group_by, 'Others'))
+            return res.aggregate()
+        elif mode == 'anchor':
+            return res.terminal_nodes()
+        else:
+            return res
 
     def activity(self, scenario=None, observed=True):
         """

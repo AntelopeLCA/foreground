@@ -192,6 +192,10 @@ class ForegroundCatalog(LcCatalog):
                     continue
 
         elif (origin, itype) in self._missing_o:
+            if itype == 'quantity':
+                # try locally first
+                for k in super(ForegroundCatalog, self).gen_interfaces(self._qdb.ref, itype=itype):
+                    yield k
             raise MissingResource(origin, itype)
 
         else:
@@ -199,6 +203,10 @@ class ForegroundCatalog(LcCatalog):
                 for k in super(ForegroundCatalog, self).gen_interfaces(origin, itype=itype, strict=strict):
                     yield k
             except (UnknownOrigin, InterfaceError):
+                if itype == 'quantity':
+                    # try locally first
+                    for k in super(ForegroundCatalog, self).gen_interfaces(self._qdb.ref, itype=itype):
+                        yield k
                 self._missing_o.add((origin, itype))
                 raise MissingResource(origin, itype)
 

@@ -1,4 +1,4 @@
-from antelope import InvalidQuery, EntityNotFound
+from antelope import InvalidQuery, EntityNotFound, ItemNotFound
 from antelope_core.catalog_query import CatalogQuery
 from antelope_core.contexts import NullContext
 
@@ -49,7 +49,10 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
                 term = FlowTermination(parent, cx, term_flow=term_flow,
                                        descend=anchor.descend)
             elif anchor.node:
-                term_node = self.get(anchor.node.entity_id, origin=anchor.node.origin)
+                if anchor.node.link == parent.link:  # self-termination
+                    term_node = parent
+                else:
+                    term_node = self.get(anchor.node.entity_id, origin=anchor.node.origin)
                 if flow_conversion is not None and flow_conversion != 1.0:
                     rx = term_node.reference(term_flow)
                     print('Term CF %s : %s [%g]' % (parent.link, term_node.link, flow_conversion))
@@ -148,6 +151,12 @@ class DelayedQuery(ForegroundQuery):
             return super(DelayedQuery, self).validate()
         except MissingResource:
             return True  # likewise
+
+    def get_item(self, external_ref, item):
+        try:
+            return super(DelayedQuery, self).get_item(external_ref, item)
+        except MissingResource:
+            raise ItemNotFound
 
     def _perform_query(self, itype, attrname, exc, *args, **kwargs):
         if self._catalog.is_in_queue(self._home):

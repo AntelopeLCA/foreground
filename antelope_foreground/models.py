@@ -322,7 +322,7 @@ class FragmentEntity(Entity):
     def _serialize_terms(self):
         terms = dict()
         for k, v in self.anchors.items():
-            if v is None:
+            if v.is_null:
                 terms[k] = {}
             else:
                 terms[k] = v.serialize()
@@ -616,7 +616,6 @@ class LcForeground(ResponseModel):
     catalogNames: Dict[str, List[str]]  #
     dataSource: str  #
     dataSourceType: str  #
-    flows: List[Dict]  # these should be removed
     initArgs: Dict  #
     quantities: List[Dict]  #
     termManager: Optional[TermManager]  #
@@ -628,9 +627,10 @@ class LcForeground(ResponseModel):
         """
         A simple function to construct a serialized foreground for transmission to an oryx server
         :param ar: an LcForeground archive
+        :param save_unit_scores: subject to permission
         :return: an LcForeground model
         """
-        j = ar.serialize(characterizations=True, values=True)
+        j = ar.serialize(characterizations=True, values=True, domesticate=True)
         ms = [LcModel.from_reference_fragment(f, save_unit_scores=save_unit_scores) for f in ar.fragments()]
         rs = []
         return cls(resources=rs, models=ms, **j)
