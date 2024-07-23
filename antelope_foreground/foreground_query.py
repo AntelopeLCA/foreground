@@ -158,6 +158,12 @@ class DelayedQuery(ForegroundQuery):
         except MissingResource:
             raise ItemNotFound
 
+    def is_lcia_engine(self, **kwargs):
+        try:
+            return super(DelayedQuery, self).is_lcia_engine(**kwargs)
+        except MissingResource:
+            return False
+
     def _perform_query(self, itype, attrname, exc, *args, **kwargs):
         if self._catalog.is_in_queue(self._home):
             raise QueryIsDelayed(self.origin, self._home)
