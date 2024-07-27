@@ -372,6 +372,7 @@ class FragmentBranch(ResponseModel):
     group: str  # this is the StageName, used for aggregation.. the backend must set / user specify / modeler constrain
     magnitude: Optional[float]
     unit: str
+    scenario: Optional[str]
     anchor: Optional[Anchor]
     is_cutoff: bool
     is_balance_flow: bool
@@ -422,9 +423,20 @@ class FragmentBranch(ResponseModel):
         else:
             cutoff = False
         return cls(parent=parent, node=FragmentRef.from_fragment(fragment), name=term.name,
-                   group=fragment.get(group, ''),
+                   group=fragment.get(group, ''), scenario=scenario,
                    magnitude=mag, unit=fragment.flow.unit, is_balance_flow=fragment.is_balance,
                    anchor=anchor, is_cutoff=cutoff)
+
+    @classmethod
+    def from_fragment_branch(cls, n):
+        if n.parent is None:
+            parent = None
+        else:
+            parent = n.parent.external_ref
+        return cls(parent=parent, node=FragmentRef.from_fragment(n.node), name=n.name,
+                   group=n.group, scenario=n.scenario, magnitude=n.magnitude, unit=n.unit,
+                   anchor=n.anchor.to_anchor(),
+                   is_balance_flow=n.is_balance_flow, is_cutoff=n.is_cutoff)
 
     def masquerade(self, masq):
         self.node.masquerade(masq)

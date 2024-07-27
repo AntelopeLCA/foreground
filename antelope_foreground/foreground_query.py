@@ -3,7 +3,7 @@ from antelope_core.catalog_query import CatalogQuery
 from antelope_core.contexts import NullContext
 
 from .interfaces.iforeground import AntelopeForegroundInterface
-from .models import FragmentFlow as FragmentFlowModel
+from .models import FragmentFlow as FragmentFlowModel, FragmentBranch as FragmentBranchModel
 from .fragment_flows import FragmentFlow
 from .terminations import FlowTermination
 
@@ -13,6 +13,32 @@ class ForegroundNotSafe(Exception):
     This foreground has not been loaded yet. keep our references unresolved
     """
     pass
+
+
+class FragmentBranch(object):
+    def __init__(self, node, anchor, group='', scenario=None, magnitude=None, is_cutoff=None):
+        self.node = node
+        self.anchor = anchor
+        self.group = group
+        self.scenario = scenario
+        self.magnitude = magnitude
+        self.is_cutoff = bool(is_cutoff)
+
+    @property
+    def parent(self):
+        return self.node.reference_entity
+
+    @property
+    def name(self):
+        return self.anchor.name
+
+    @property
+    def unit(self):
+        return self.node.flow.unit
+
+    @property
+    def is_balance_flow(self):
+        return self.node.is_balance
 
 
 class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
@@ -69,6 +95,18 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
             term._deserialize_score_cache(ar, anchor.score_cache, scenario)
 
         return term
+
+    def _make_fragment_branch(self, n):
+        if isinstance(n, FragmentBranchModel):
+            frag = self.get(n.node.entity_id, origin=n.node.origin)
+            term = self.make_term_from_anchor(frag, n.anchor, n.scenario, 1.0)
+            return FragmentBranch(frag, term, group=n.group, scenario=n.scenario, magnitude=n.magnitude,
+                                  is_cutoff=n.is_cutoff)
+        return n
+
+    def nodes(self, origin=None, **kwargs):
+        ns = super(ForegroundQuery, self).nodes(origin=origin, **kwargs)
+        return [self._make_fragment_branch(n) for n in ns]
 
     def _make_fragment_flow(self, ff_model):
         if isinstance(ff_model, FragmentFlowModel):

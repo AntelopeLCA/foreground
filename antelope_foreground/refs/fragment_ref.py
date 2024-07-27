@@ -2,7 +2,8 @@ from antelope.refs.base import EntityRef
 from antelope.refs import RxRef
 from antelope import comp_dir
 from ..fragment_flows import group_ios, ios_exchanges, FragmentInventoryDeprecated
-from ..models import Anchor
+from ..models import FragmentBranch as FragmentBranchModel
+
 """
 Not sure what to do about Fragment Refs, whether they belong in the main interface. I'd like to think no, but
 for now we will just deprecate them and remove functionality,

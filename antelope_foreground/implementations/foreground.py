@@ -1,12 +1,13 @@
-from antelope import CONTEXT_STATUS_, EntityNotFound, comp_dir  # , BackgroundRequired
+from antelope import EntityNotFound, comp_dir  # , BackgroundRequired
 from ..interfaces.iforeground import AntelopeForegroundInterface
 from antelope_core.implementations import BasicImplementation
 from antelope_core.implementations.quantity import UnknownRefQuantity
 
 from antelope_core.entities.xlsx_editor import XlsxArchiveUpdater
 from antelope_core.contexts import NullContext
-from ..entities.fragments import LcFragment, InvalidParentChild
+from ..entities.fragments import LcFragment, InvalidParentChild, FragmentBranch
 from ..entities.fragment_editor import create_fragment, clone_fragment, _fork_fragment, interpose
+from ..models import ForegroundRelease
 
 
 class NotForeground(Exception):
@@ -60,9 +61,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
      - exchange value
      - termination
     """
-    #_count = 0
-    #_frags_with_flow = defaultdict(set)  # we actually want this to be shared among
-    #_recursion_check = None
+    # _count = 0
+    # _frags_with_flow = defaultdict(set)  # we actually want this to be shared among
+    # _recursion_check = None
 
     ''' # NOT YET
     def __getitem__(self, item):
@@ -458,6 +459,16 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for s in fragment.scenarios(recurse=recurse):
             yield s
 
+    def nodes(self, origin=None, group='StageName', **kwargs):
+        for f in self._archive.entities_by_type('fragment'):
+            grp = f.get(group, '')
+            for sc, t in f.terminations():
+                if t.is_null or t.is_context:
+                    continue
+                if (origin is None and t.term_node.origin != self.origin) or t.term_node.origin == origin:
+                    ev = f.exchange_value(sc)
+                    yield FragmentBranch(f, t, grp, scenario=sc, magnitude=ev, is_cutoff=False)
+
     def knobs(self, search=None, param_dict=False, **kwargs):
         args = tuple(filter(None, [search]))
         for k in sorted(self._archive.fragments(*args, show_all=True), key=lambda x: x.external_ref):
@@ -566,7 +577,11 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             self.delete_fragment(c)
         return True
 
-    def save(self, save_unit_scores=False):
+    def save(self, release: ForegroundRelease = None, description=None, author=None, notes=None, major=False,
+             save_unit_scores=None):
+        if release is None:
+            release = ForegroundRelease(major=major, description=description, author=author, notes=notes)
+        self._archive.update_metadata(release)
         return self._archive.save(save_unit_scores=save_unit_scores)
 
     def tree(self, fragment, **kwargs):

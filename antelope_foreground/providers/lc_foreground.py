@@ -509,7 +509,7 @@ class LcForeground(BasicArchive):
         self.save_fragments(save_unit_scores=save_unit_scores)
         return True
 
-    def update_metadata(self, bump_version=True, release: Optional[ForegroundRelease] = None):
+    def update_metadata(self, release: Optional[ForegroundRelease] = None, bump_version=True):
         """
         update foreground metadata with release info (default is to bump the version number). also writes the
         metadata file.

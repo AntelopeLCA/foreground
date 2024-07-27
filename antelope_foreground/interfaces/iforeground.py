@@ -184,6 +184,14 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'scenarios', ForegroundRequired,
                                    fragment, recurse=recurse, **kwargs)
 
+    def nodes(self, origin=None, **kwargs):
+        """
+        Return non-trivial anchors in the current foreground, optionally filtered by origin
+        :param origin:
+        :return:
+        """
+        return self._perform_query(_interface, 'nodes', ForegroundRequired, origin=origin, **kwargs)
+
     def knobs(self, search=None, **kwargs):
         """
         Return a list of named fragments whose values can be observed to define scenarios.  Generates a list

@@ -15,7 +15,7 @@ from antelope_core.entities import LcEntity, LcFlow
 # from antelope_core.exchanges import ExchangeValue
 # from lcatools.interact import ifinput, parse_math
 from ..terminations import FlowTermination, MissingFlow
-from ..foreground_query import MissingResource
+from ..foreground_query import MissingResource, FragmentBranch
 
 
 class InvalidParentChild(Exception):
@@ -1255,7 +1255,7 @@ class LcFragment(LcEntity):
             if match is not None:
                 self._exchange_values[match] = _balance
     '''
-    def nodes(self, scenario=None, descend=True):
+    def nodes(self, scenario=None, descend=True, group='StageName'):
         """
         Report proximal terminal nodes for the fragment (recurse until a nondescend is reached)
         :param scenario: [None]
@@ -1263,25 +1263,20 @@ class LcFragment(LcEntity):
         :return: generator of terminal nodes
         """
         term = self.termination(scenario)
-        yds = set()
+        ev = self.exchange_value(scenario)
+        gp = self.get(group, '')
         if term.is_process or term.is_context or term.is_unresolved:
-            if term.term_node not in yds:
-                yield term.term_node
-                yds.add(term.term_node)
+            yield FragmentBranch(self, term, gp, scenario=scenario, magnitude=ev, is_cutoff=False)
         elif term.is_subfrag:
             if term.descend and descend:
                 for n in term.term_node.nodes(scenario, descend=descend):
-                    if n not in yds:
-                        yield n
-                        yds.add(n)
+                    yield n
             else:
-                yield term.term_node
+                yield FragmentBranch(self, term, gp, scenario=scenario, magnitude=ev, is_cutoff=False)
             # foreground, null: do nothing
         for c in self.child_flows:
             for n in c.nodes(scenario, descend=descend):
-                if n not in yds:
-                    yield n
-                    yds.add(n)
+                yield n
 
     def tree(self):
         """

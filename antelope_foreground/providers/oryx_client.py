@@ -15,7 +15,7 @@ from ..interfaces import AntelopeForegroundInterface
 from ..refs.fragment_ref import FragmentRef, ParentFragment
 
 from ..models import (LcForeground, FragmentFlow, FragmentRef as FragmentRefModel, MissingResource,
-                      FragmentBranch, FragmentEntity, Anchor)
+                      FragmentBranch, FragmentEntity, Anchor, ForegroundRelease)
 
 from requests.exceptions import HTTPError
 
@@ -94,6 +94,10 @@ class OryxEntity(XdbEntity):
 class OryxClient(XdbClient):
 
     _base_type = OryxEntity
+
+    @property
+    def missing(self):
+        return self.r.origin_get_many(MissingResource, 'missing')
 
     def __init__(self, *args, catalog=None, **kwargs):
         """
@@ -188,14 +192,14 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         post_ents = [p if isinstance(p, EntityRef) else EntityRef.from_entity(p) for p in entities]
         return self._archive.r.post_return_one([p.model_dump() for p in post_ents], OriginCount, 'entity_refs')
 
-    def save(self):
-        return self._archive.r.post_return_one(None, bool, 'save_foreground')
+    def save(self, description=None, author=None, notes=None, major=False):
+        if description is None:
+            raise ValueError('Foreground release description must be provided')
+        release = ForegroundRelease(major=major, description=description, author=author, notes=notes)
+        return self._archive.r.post_return_one(release.model_dump(), bool, 'save_foreground')
 
     def restore(self):
         return self._archive.r.post_return_one(None, bool, 'restore_foreground')
-
-    def missing(self):
-        return self._archive.r.origin_get_many(MissingResource, 'missing')  # no origin required
 
     # Entity operations- masqueraded
     def get_reference(self, key):
@@ -233,6 +237,15 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
     def scenarios(self, fragment, **kwargs):
         return self._archive.r.origin_get_many(str, self._o(fragment), _ref(fragment),
                                                'scenarios', **kwargs)
+
+    def nodes(self, origin=None, **kwargs):
+        if origin:
+            fbs = self._archive.r.get_many(FragmentBranch, 'nodes', origin=origin)
+        else:
+            fbs = self._archive.r.get_many(FragmentBranch, 'nodes')
+        for fb in fbs:
+            self._archive.get_or_make(fb.node)
+        return fbs
 
     def _get_or_make_fragment_flows(self, ffs):
         """
