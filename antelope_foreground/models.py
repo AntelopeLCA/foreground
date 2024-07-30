@@ -576,6 +576,38 @@ class LcTermination(ResponseModel):
 '''
 
 
+class Observation(ResponseModel):
+    fragment: EntityRef
+    scenario: Optional[str]
+    exchange_value: Optional[float]
+    units: Optional[str]
+    name: Optional[str]
+    anchor: Optional[Anchor]
+
+    @classmethod
+    def name(cls, frag):
+        return cls(fragment=EntityRef.from_entity(frag), name=frag.external_ref)
+
+    @classmethod
+    def dename(cls, frag):
+        return cls(fragment=EntityRef.from_entity(frag), name=frag.uuid)
+
+    @classmethod
+    def ev(cls, frag, scenario, value, units=None):
+        if units is None:
+            units = frag.flow.unit
+        return cls(fragment=EntityRef.from_entity(frag), scenario=scenario, value=value, units=units)
+
+    @classmethod
+    def anchor(cls, frag, scenario, anchor):
+        return cls(fragment=EntityRef.from_entity(frag), scenario=scenario, anchor=anchor)
+
+    def masquerade(self, masq):
+        self.fragment.masquerade(masq)
+        if self.anchor:
+            self.anchor.masquerade(masq)
+
+
 class LcModel(ResponseModel):
     fragments: List[FragmentEntity]
 

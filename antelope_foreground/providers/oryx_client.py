@@ -3,9 +3,10 @@ Client for the oryx Foreground server
 
 This is to be the same as the XdbServer, just with different methods defined
 """
+import logging
 from typing import List
 
-from antelope import UnknownOrigin
+from antelope import UnknownOrigin, comp_dir
 from antelope_core.providers.xdb_client import XdbClient, _ref
 from antelope_core.providers.xdb_client.xdb_entities import XdbEntity
 from antelope_core.implementations import BasicImplementation
@@ -15,9 +16,10 @@ from ..interfaces import AntelopeForegroundInterface
 from ..refs.fragment_ref import FragmentRef, ParentFragment
 
 from ..models import (LcForeground, FragmentFlow, FragmentRef as FragmentRefModel, MissingResource,
-                      FragmentBranch, FragmentEntity, Anchor, ForegroundRelease)
+                      FragmentBranch, FragmentEntity, Anchor, ForegroundRelease, Observation)
 
 from requests.exceptions import HTTPError
+from uuid import uuid4
 
 
 class MalformedOryxEntity(Exception):
@@ -184,6 +186,51 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         llargs = {k.lower(): v for k, v in kwargs.items()}
         return [self._archive.get_or_make(k) for k in self._archive.r.get_many(FragmentRefModel, 'fragments', **llargs)]
 
+    def new_fragment(self, flow, direction, parent=None, external_ref=None, uuid=None, balance=None,
+                     value=None, exchange_value=None, units=None,
+                     **kwargs):
+        """
+        The strategy here is to just POST a fragment entity.
+        :param flow:
+        :param direction:
+        :param parent:
+        :param external_ref:
+        :param uuid:
+        :param balance:
+        :param value:
+        :param exchange_value: synonym for value
+        :param units:
+        :param kwargs:
+        :return:
+        """
+        if uuid is None:
+            uuid = uuid4()
+        if external_ref is None:
+            entity_id = uuid
+        else:
+            entity_id = external_ref
+        if parent is None:
+            direction = comp_dir(direction)
+            p = None
+            origin = self.origin
+        else:
+            p = _ref(parent)
+            origin = self._o(parent)
+        frag = FragmentEntity(origin=origin, entity_id=entity_id, flow=FlowEntity.from_flow(flow), direction=direction,
+                              entity_uuid=uuid, is_balance_flow=balance, exchange_values={'0': 1.0}, anchors=dict(),
+                              parent=p, properties=kwargs)
+        fragments = self._archive.get_or_make(self._archive.r.post_return_one(FragmentEntity,
+                                                                              [frag.model_dump()], 'fragments'))
+        if len(fragments) > 1:
+            logging.warning('Multiple fragments returned!')
+        fragment = fragments[0]
+        if exchange_value is None:
+            if value is not None:
+                exchange_value = value
+        if exchange_value:
+            self.observe(fragment, exchange_value=exchange_value, units=units)
+        return fragment
+
     def post_foreground(self, fg, save_unit_scores=False):
         pydantic_fg = LcForeground.from_foreground_archive(fg.archive, save_unit_scores=save_unit_scores)
         return self._archive.r.post_return_one(pydantic_fg.dict(), OriginCount, 'post_foreground')
@@ -306,3 +353,28 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         return self._archive.r.origin_get_one(LciaResultModel, self._o(fragment), 'fragments', _ref(fragment),
                                               'anchor_lcia',
                                               _ref(quantity_ref), scenario=scenario, **kwargs)
+
+    def observe(self, fragment, scenario=None, exchange_value=None, units=None, name=None, anchor=None,
+                anchor_node=None, anchor_flow=None, descend=None, **kwargs):
+        if anchor is None:
+            if anchor_node:
+                if anchor_flow:
+                    anchor_flow = EntityRef.from_entity(anchor_flow)
+                if anchor_node.entity_type == 'context':
+                    anchor = Anchor(context=anchor_node.as_list(), anchor_flow=anchor_flow)
+                else:
+                    anchor = Anchor(node=EntityRef.from_entity(anchor_node), anchor_flow=anchor_flow, descend=descend)
+        obs = Observation(fragment=EntityRef.from_entity(fragment),
+                          scenario=scenario,
+                          exchange_value=exchange_value,
+                          units=units,
+                          name=name,
+                          anchor=anchor)
+        obs_apply = self._archive.r.origin_post_return_many(obs, Observation, 'observation', **kwargs)
+        # we somehow need to update the local copies of the fragment with the observations
+        for o in obs_apply:
+            if o.name:
+                self._archive.name_fragment(o.fragment, o.name, **kwargs)
+            if o.anchor:
+                fragment._query.make_term_from_anchor(fragment, o.anchor, o.scenario)
+        return obs_apply

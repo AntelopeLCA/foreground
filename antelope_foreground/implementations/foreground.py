@@ -75,10 +75,6 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         return self.get_local(item)
     '''
 
-    def __init__(self, *args, **kwargs):
-        super(AntelopeForegroundImplementation, self).__init__(*args, **kwargs)
-        self._observations = []
-
     '''
     Add some useful functions from other interfaces to the foreground
     '''
@@ -395,7 +391,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param force: steal name on name collision
         :param accept_all: not allowed; caught and rejected
         :param termination: deprecated. assigned to anchor.
-        :param term_flow: deprecated. assigned to anchor_flow
+        :param term_flow: deprecated. assigned to anchor
+        :param descend: deprecated, assigned to anchor
         :return:
         """
         if termination and not anchor:
@@ -415,13 +412,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             else:
                 print('Ignoring fragment name under a scenario specification')
         if fragment.observable(scenario):
-            if fragment not in self._observations:
-                self._observations.append(fragment)
-            if exchange_value is not None:
-                fragment.observe(scenario=scenario, value=exchange_value, units=units)
-            elif scenario is None and fragment.observed_ev == 0:
-                # If we are observing a fragment with no scenario, we simply apply the cached ev to the observed ev
-                fragment.observe(value=fragment.cached_ev)
+            self._archive.observe_ev(fragment, scenario=scenario, value=exchange_value, units=units)
 
         else:
             if exchange_value is not None:
@@ -430,7 +421,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                                                                                               scenario))
         if anchor is not None:
             term = self.find_term(anchor)
-            fragment.terminate(term, scenario=scenario, term_flow=anchor_flow, descend=descend)
+            self._archive.observe_anchor(fragment, scenario, anchor_node=term, anchor_flow=anchor_flow, descend=descend)
 
         return fragment.link
 
@@ -446,11 +437,6 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         """
         term = fragment.termination(scenario)
         term.add_lcia_score(quantity, score, scenario=scenario)
-
-    @property
-    def observed_flows(self):
-        for k in self._observations:
-            yield k
 
     def scenarios(self, fragment, recurse=True, **kwargs):
         if isinstance(fragment, str):

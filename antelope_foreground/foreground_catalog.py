@@ -373,6 +373,7 @@ class ForegroundCatalog(LcCatalog):
 
         if ref not in self._queries:
             self._seed_fg_query(ref)
+            self.get_archive(ref).make_interface('foreground')  # finish the job
 
         return self._queries[ref]
 

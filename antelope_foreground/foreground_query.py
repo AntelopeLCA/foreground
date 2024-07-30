@@ -1,3 +1,5 @@
+import logging
+
 from antelope import InvalidQuery, EntityNotFound, ItemNotFound
 from antelope_core.catalog_query import CatalogQuery
 from antelope_core.contexts import NullContext
@@ -94,6 +96,10 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
             ar = self._catalog.get_archive(self.origin)
             term._deserialize_score_cache(ar, anchor.score_cache, scenario)
 
+        if parent.is_entity:
+            logging.warning('make_term_from_anchor called by fragment entity %s' % parent.link)
+        else:
+            parent._anchors[scenario] = term  # just deal with it
         return term
 
     def _make_fragment_branch(self, n):

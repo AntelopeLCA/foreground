@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from ..foreground_query import DelayedQuery, ForegroundNotSafe, QueryIsDelayed, MissingResource
 from ..refs.fragment_ref import FragmentRef
 from ..implementations import AntelopeForegroundImplementation, AntelopeBasicImplementation
-from ..models import ForegroundMetadata, ForegroundRelease
+from ..models import ForegroundMetadata, ForegroundRelease, Observation
 
 from antelope import PropertyExists, CatalogRef, EntityNotFound
 from antelope_core.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES
@@ -60,6 +60,8 @@ class LcForeground(BasicArchive):
     _entity_types = FOREGROUND_ENTITY_TYPES
     _ns_uuid_required = None
     _frags_loaded = False
+
+    _observations = None
 
     def _load_entities_json(self, filename):
         with open(filename, 'r') as fp:
@@ -165,12 +167,24 @@ class LcForeground(BasicArchive):
         self._catalog = catalog
         self._ext_ref_mapping = dict()
         self._frags_with_flow = defaultdict(set)
+
+        self._observations = []
+
         self._metadata = None
 
-        self._delayed_refs = []
+        # self._delayed_refs = []
         self._unresolved = set()
 
         self.load_all()
+
+    def observations(self, fresh=True):
+        if fresh:
+            for obs in self._observations:
+                yield obs
+        else:
+            for frag in self.fragments():
+                for obs in frag.observations():
+                    yield obs
 
     @property
     def metadata(self):
@@ -357,6 +371,9 @@ class LcForeground(BasicArchive):
 
         self._rename_mechanics(prior, priorlink)
         assert self._ref_to_key(name) is None
+        obs = Observation.dename(prior)
+        self._observations.append(obs)
+        return obs
 
     def name_fragment(self, frag, name, auto=None, force=None):
         """
@@ -419,8 +436,31 @@ class LcForeground(BasicArchive):
         self._add_ext_ref_mapping(frag)
         self._rename_mechanics(frag, oldname)
         assert self._ref_to_key(name) == frag.link
+        obs = Observation.name(frag)
+        self._observations.append(obs)
 
-        return name
+        return obs
+
+    def observe_ev(self, fragment, scenario=None, value=None, units=None):
+        if value is not None:
+            fragment.observe(scenario=scenario, value=value, units=units)
+            obs = Observation.ev(fragment, scenario, value, units)
+            self._observations.append(obs)
+        elif scenario is None and fragment.observed_ev == 0:
+            # If we are observing a fragment with no scenario and no observed ev, we simply apply the cached ev
+            fragment.observe(value=fragment.cached_ev)
+            obs = Observation.ev(fragment, scenario, fragment.cached_ev)
+            self._observations.append(obs)
+        else:
+            obs = None
+        return obs
+
+    def observe_anchor(self, fragment, scenario, anchor_node, anchor_flow, descend):
+        term = fragment.terminate(anchor_node, scenario=scenario, term_flow=anchor_flow, descend=descend)
+        anchor = term.to_anchor()
+        obs = Observation.anchor(fragment, scenario, anchor)
+        self._observations.append(obs)
+        return obs
 
     '''
     Save and load the archive

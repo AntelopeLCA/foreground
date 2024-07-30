@@ -2,7 +2,6 @@ from antelope.refs.base import EntityRef
 from antelope.refs import RxRef
 from antelope import comp_dir
 from ..fragment_flows import group_ios, ios_exchanges, FragmentInventoryDeprecated
-from ..models import FragmentBranch as FragmentBranchModel
 
 """
 Not sure what to do about Fragment Refs, whether they belong in the main interface. I'd like to think no, but
@@ -108,7 +107,7 @@ class FragmentRef(EntityRef):
         for k, anchor in a.items():
             if k == 'default':
                 k = None
-            self._anchors[k] = self._query.make_term_from_anchor(self, anchor, k)
+            self._query.make_term_from_anchor(self, anchor, k)  # stores the term
 
     def anchors(self, **kwargs):
         """
@@ -119,7 +118,7 @@ class FragmentRef(EntityRef):
         for k, anchor in kwargs.items():
             if k == 'default':
                 k = None
-            self._anchors[k] = self._query.make_term_from_anchor(self, anchor, k)
+            self._query.make_term_from_anchor(self, anchor, k)  # stores the term
         if len(self._anchors) == 0:
             self._load_anchors()
         return self._anchors
