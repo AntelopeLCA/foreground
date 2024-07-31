@@ -436,7 +436,7 @@ class LcForeground(BasicArchive):
         self._add_ext_ref_mapping(frag)
         self._rename_mechanics(frag, oldname)
         assert self._ref_to_key(name) == frag.link
-        obs = Observation.name(frag)
+        obs = Observation.from_name(frag)
         self._observations.append(obs)
 
         return obs
@@ -458,7 +458,7 @@ class LcForeground(BasicArchive):
     def observe_anchor(self, fragment, scenario, anchor_node, anchor_flow, descend):
         term = fragment.terminate(anchor_node, scenario=scenario, term_flow=anchor_flow, descend=descend)
         anchor = term.to_anchor()
-        obs = Observation.anchor(fragment, scenario, anchor)
+        obs = Observation.from_anchor(fragment, scenario, anchor)
         self._observations.append(obs)
         return obs
 

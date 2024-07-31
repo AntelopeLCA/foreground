@@ -37,6 +37,10 @@ class Anchor(ResponseModel):
     descend: bool
     score_cache: Optional[Dict[str, float]] = None
 
+    @classmethod
+    def from_rx(cls, rx, descend=False):
+        return cls(node=EntityRef.from_entity(rx.process), anchor_flow=EntityRef.from_entity(rx.flow), descend=descend)
+
     def __str__(self):
         """
         Replicate FlowTermination
@@ -578,14 +582,14 @@ class LcTermination(ResponseModel):
 
 class Observation(ResponseModel):
     fragment: EntityRef
-    scenario: Optional[str]
-    exchange_value: Optional[float]
-    units: Optional[str]
-    name: Optional[str]
-    anchor: Optional[Anchor]
+    scenario: Optional[str] = None
+    exchange_value: Optional[float] = None
+    units: Optional[str] = None
+    name: Optional[str] = None
+    anchor: Optional[Anchor] = None
 
     @classmethod
-    def name(cls, frag):
+    def from_name(cls, frag):
         return cls(fragment=EntityRef.from_entity(frag), name=frag.external_ref)
 
     @classmethod
@@ -599,7 +603,7 @@ class Observation(ResponseModel):
         return cls(fragment=EntityRef.from_entity(frag), scenario=scenario, value=value, units=units)
 
     @classmethod
-    def anchor(cls, frag, scenario, anchor):
+    def from_anchor(cls, frag, scenario, anchor):
         return cls(fragment=EntityRef.from_entity(frag), scenario=scenario, anchor=anchor)
 
     def masquerade(self, masq):

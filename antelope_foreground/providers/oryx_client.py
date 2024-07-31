@@ -370,7 +370,7 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
                           units=units,
                           name=name,
                           anchor=anchor)
-        obs_apply = self._archive.r.origin_post_return_many(obs, Observation, 'observation', **kwargs)
+        obs_apply = self._archive.r.origin_post_return_many('observation', obs.model_dump(), Observation, **kwargs)
         # we somehow need to update the local copies of the fragment with the observations
         for o in obs_apply:
             if o.name:

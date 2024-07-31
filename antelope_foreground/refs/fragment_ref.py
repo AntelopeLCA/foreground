@@ -169,7 +169,10 @@ class FragmentRef(EntityRef):
         :return:
         """
         tree = self.tree(scenario=scenario, observed=observed)  # these come already sorted
-        pnts = []
+        if self.reference_entity is None:
+            pnts = []
+        else:
+            pnts = [self.reference_entity.external_ref]
         cur_stage = ''
 
         if observed:
