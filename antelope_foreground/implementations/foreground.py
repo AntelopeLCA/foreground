@@ -445,10 +445,13 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         for s in fragment.scenarios(recurse=recurse):
             yield s
 
-    def nodes(self, origin=None, group='StageName', **kwargs):
+    def nodes(self, origin=None, group='StageName', scenario=None, **kwargs):
         for f in self._archive.entities_by_type('fragment'):
             grp = f.get(group, '')
             for sc, t in f.terminations():
+                if scenario is not None:
+                    if sc != scenario:
+                        continue
                 if t.is_null or t.is_context:
                     continue
                 if (origin is None and t.term_node.origin != self.origin) or t.term_node.origin == origin:

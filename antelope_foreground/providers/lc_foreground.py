@@ -562,7 +562,7 @@ class LcForeground(BasicArchive):
 
         # update metadata
         if release is None:
-            release = ForegroundRelease()
+            release = ForegroundRelease(description='no info')
 
         if bump_version:
             if release.major:
@@ -571,12 +571,10 @@ class LcForeground(BasicArchive):
             else:
                 self.metadata.version_minor += 1
 
-        if release.notes:
-            self.metadata.release_notes = release.notes
-        if release.author:
-            self.metadata.author = release.author
-        if release.description:
-            self.metadata.description = release.description
+        # we do in fact want to update these fields even if they are None
+        self.metadata.release_notes = release.notes
+        self.metadata.author = release.author
+        self.metadata.description = release.description
 
         self.save_metadata()
 

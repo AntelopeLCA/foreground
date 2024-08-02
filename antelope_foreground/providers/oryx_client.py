@@ -285,11 +285,8 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         return self._archive.r.origin_get_many(str, self._o(fragment), _ref(fragment),
                                                'scenarios', **kwargs)
 
-    def nodes(self, origin=None, **kwargs):
-        if origin:
-            fbs = self._archive.r.get_many(FragmentBranch, 'nodes', origin=origin)
-        else:
-            fbs = self._archive.r.get_many(FragmentBranch, 'nodes')
+    def nodes(self, **kwargs):
+        fbs = self._archive.r.get_many(FragmentBranch, 'nodes', **kwargs)
         for fb in fbs:
             self._archive.get_or_make(fb.node)
         return fbs

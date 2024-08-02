@@ -184,13 +184,14 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'scenarios', ForegroundRequired,
                                    fragment, recurse=recurse, **kwargs)
 
-    def nodes(self, origin=None, **kwargs):
+    def nodes(self, origin=None, scenario=None, **kwargs):
         """
         Return non-trivial anchors in the current foreground, optionally filtered by origin
-        :param origin:
+        :param origin: [None] if present, only return nodes whose anchor has the given origin
+        :param scenario: [None] if present, only return nodes for the given scenario
         :return:
         """
-        return self._perform_query(_interface, 'nodes', ForegroundRequired, origin=origin, **kwargs)
+        return self._perform_query(_interface, 'nodes', ForegroundRequired, origin=origin, scenario=scenario, **kwargs)
 
     def knobs(self, search=None, **kwargs):
         """
