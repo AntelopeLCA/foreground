@@ -34,7 +34,7 @@ class Anchor(ResponseModel):
     node: Optional[EntityRef] = None
     anchor_flow: Optional[EntityRef] = None
     context: Optional[List[str]] = None
-    descend: bool
+    descend: bool = False
     score_cache: Optional[Dict[str, float]] = None
 
     @classmethod

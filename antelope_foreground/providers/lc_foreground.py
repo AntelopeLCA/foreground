@@ -206,6 +206,8 @@ class LcForeground(BasicArchive):
             else:
                 entity_type = 'process'
         '''
+        if origin in self.catalog_names:
+            return self.get(external_ref)
         try:
             return self._catalog.internal_ref(self.ref, origin, external_ref)
         except (ForegroundNotSafe, MissingResource):
@@ -455,7 +457,7 @@ class LcForeground(BasicArchive):
             obs = None
         return obs
 
-    def observe_anchor(self, fragment, scenario, anchor_node, anchor_flow, descend):
+    def observe_anchor(self, fragment, scenario, anchor_node, anchor_flow, descend=None):
         term = fragment.terminate(anchor_node, scenario=scenario, term_flow=anchor_flow, descend=descend)
         anchor = term.to_anchor()
         obs = Observation.from_anchor(fragment, scenario, anchor)
