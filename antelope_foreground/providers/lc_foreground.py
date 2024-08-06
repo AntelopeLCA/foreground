@@ -330,7 +330,12 @@ class LcForeground(BasicArchive):
         if entity.origin == self.ref and entity.external_ref != entity.uuid:
             self._add_ext_ref_mapping(entity)
 
-        # TODO: figure out how to specify which flows should NOT be merged (current: only flows with no context)
+        # it's up to the other foregrounds (local or not) to add their own quantities to the TM
+        if (entity.entity_type == 'quantity' and entity.origin != self.ref and
+                entity.origin in self._catalog.foregrounds):
+            # do not add to tm
+            return
+
         try:
             self._add_to_tm(entity)  # , merge_strategy='distinct')  # DWR!!! need to
         except QueryIsDelayed:
@@ -581,6 +586,7 @@ class LcForeground(BasicArchive):
         self.save_metadata()
 
     def clear_unit_scores(self, lcia_method=None):
+        logging.info('Clearing unit scores in %s for %s' % (self.ref, lcia_method))
         for f in self.entities_by_type('fragment'):
             for s, t in f.terminations():
                 if lcia_method is None:
