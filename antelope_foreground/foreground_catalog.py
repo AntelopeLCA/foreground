@@ -7,7 +7,7 @@ from itertools import chain
 import shutil
 import os
 import re
-import tempfile
+import logging
 
 
 foreground_origin_regexp = re.compile('^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$')
@@ -389,6 +389,12 @@ class ForegroundCatalog(LcCatalog):
             if inf == 'foreground' and org not in f:
                 yield org
                 f.add(org)
+
+    def clear_unit_scores(self, lcia_method):
+        logging.info('Clearing unit scores for %s' % lcia_method.link)
+        for f in self.foregrounds:
+            if f in self._queries:
+                self.get_archive(f).clear_unit_scores(lcia_method)
 
     def write_versioned_fg(self, foreground, target_dir=None, force=False):
         target_dir = self._get_target_abspath(target_dir)

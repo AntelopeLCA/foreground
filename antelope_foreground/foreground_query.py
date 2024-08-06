@@ -1,8 +1,9 @@
 import logging
 
-from antelope import InvalidQuery, EntityNotFound, ItemNotFound
+from antelope import InvalidQuery, EntityNotFound, ItemNotFound, QuantityRequired
 from antelope_core.catalog_query import CatalogQuery
 from antelope_core.contexts import NullContext
+from antelope.models import Characterization as CharacterizationModel
 
 from .interfaces.iforeground import AntelopeForegroundInterface
 from .models import FragmentFlow as FragmentFlowModel, FragmentBranch as FragmentBranchModel
@@ -48,6 +49,35 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
         if origin in self._catalog.foregrounds:
             return self._catalog.foreground(origin)
         return super(ForegroundQuery, self).cascade(origin)
+
+    def characterize(self, flowable, ref_quantity, query_quantity, value, context=None, location='GLO', **kwargs):
+        """
+        Now that we are back in the foreground, we want to go back to the implementation's own characterize.
+        we overrule CatalogQuery.characterize() and go back to the abstract interface.
+        We also want to make sure that we get rid of stale characterizations and unit scores.
+        SEE? I TOLD you flows_for_flowable was important.
+        {all of this goofy stuff would go away with a proper graph database, grumble}
+        :param flowable:
+        :param ref_quantity:
+        :param query_quantity:
+        :param value:
+        :param context:
+        :param location:
+        :param kwargs:
+        :return:
+        """
+        cf = self._perform_query('quantity', 'characterize', QuantityRequired,
+                                 flowable, ref_quantity, query_quantity, value,
+                                 context=context, location=location, **kwargs)
+        qq = self.get_canonical(query_quantity)
+        if qq.is_lcia_method:
+            self._catalog.clear_unit_scores(qq)
+        for flow in self._tm.flows_for_flowable(flowable):
+            flow.clear_chars(qq)
+        if isinstance(cf, CharacterizationModel):
+            return self._resolve_cf(cf)
+        else:
+            return cf
 
     """
     Add foreground interface to query object.

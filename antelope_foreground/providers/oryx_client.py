@@ -4,7 +4,6 @@ Client for the oryx Foreground server
 This is to be the same as the XdbServer, just with different methods defined
 """
 import logging
-from typing import List
 
 from antelope import UnknownOrigin, comp_dir
 from antelope_core.providers.xdb_client import XdbClient, _ref
