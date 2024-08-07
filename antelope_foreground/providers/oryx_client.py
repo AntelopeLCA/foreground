@@ -100,6 +100,9 @@ class OryxClient(XdbClient):
     def missing(self):
         return self.r.origin_get_many(MissingResource, 'missing')
 
+    def clear_unit_scores(self, lcia_method):
+        pass
+
     def __init__(self, *args, catalog=None, **kwargs):
         """
         Not sure we need the catalog yet, but LcResource gives it to us, so let's hold on to it
