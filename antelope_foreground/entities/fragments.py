@@ -1429,12 +1429,14 @@ class LcFragment(LcEntity):
         elif isinstance(scenario, tuple) or isinstance(scenario, list):
             scenarios = set(scenario)
         elif scenario is None:
+            scenarios = set()
+        else:
+            scenarios = {scenario}
+        if len(scenarios) == 0:
             if observed:
                 scenarios = {1}
             else:
                 scenarios = None
-        else:
-            scenarios = {scenario}
         ffs, _ = self._traverse_node(1.0, scenarios, frags_seen=frags_seen)
         return ffs
 

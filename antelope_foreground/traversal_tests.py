@@ -251,7 +251,7 @@ class LcaTestSuite(BaseModel):
     def __len__(self):
         return sum(len(getattr(self, s)) for s in _my_mapping.keys())
 
-    def run_tests(self, cat, check_origin=None):
+    def run_tests(self, cat, check_origin=None, apply_scenarios=None):
         results = defaultdict(list)
         ps = ct = sk = 0
         for group in _my_mapping.keys():
@@ -268,7 +268,13 @@ class LcaTestSuite(BaseModel):
                     sk += 1
                     print('entity %s/%s not found - skipping' % (org, test.external_ref))
                     continue
-                o = test.check(model)
+                if apply_scenarios:
+                    hold = model.scenarios
+                    model.scenarios = apply_scenarios
+                    o = test.check(model)
+                    model.scenarios = hold
+                else:
+                    o = test.check(model)
                 results[group].append(o)
                 if o:
                     ps += 1
