@@ -126,12 +126,13 @@ class TestFlowConversions(unittest.TestCase):
         h = self.alt.new_flow('Fuel flow H', 'mass')
         f_h = self.alt.new_fragment(h, 'Output', observe=True)
 
+        f_h.terminate(f_e)
         with self.assertRaises(FlowConversionError):
-            f_h.terminate(f_e)
+            f_h.traverse()
 
         h.characterize(self.ncv, 123.0)
 
-        f_h.terminate(f_e)
+        f_h.traverse()
         self.assertEqual(f_h.term.flow_conversion, 123.0)
 
         """ # we don't actually raise DuplicateCharacterizationError- we catch it and IGNORE it. possibly unwise.

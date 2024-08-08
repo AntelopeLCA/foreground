@@ -322,7 +322,8 @@ class FragmentTests(unittest.TestCase):
         with self.assertRaises(MissingFlow):
             k.terminate(self.a1, term_flow=f6)
         with self.assertRaises(FlowConversionError):
-            k.terminate(self.a1)
+            k.terminate(self.a1)  # we now permit the flow to be terminated without an operable flow conversion,
+            k.traverse()  # but it cannot be traversed
 
     def test_unobserved_traversal(self):
         """
