@@ -206,7 +206,7 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         :return:
         """
         if uuid is None:
-            uuid = uuid4()
+            uuid = str(uuid4())
         if external_ref is None:
             entity_id = uuid
         else:
@@ -221,8 +221,8 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
         frag = FragmentEntity(origin=origin, entity_id=entity_id, flow=FlowEntity.from_flow(flow), direction=direction,
                               entity_uuid=uuid, is_balance_flow=balance, exchange_values={'0': 1.0}, anchors=dict(),
                               parent=p, properties=kwargs)
-        fragments = self._archive.get_or_make(self._archive.r.post_return_one(FragmentEntity,
-                                                                              [frag.model_dump()], 'fragments'))
+        fragments = [self._archive.get_or_make(k) for k in
+                     self._archive.r.post_return_many([frag.model_dump()], FragmentRefModel, 'fragments')]
         if len(fragments) > 1:
             logging.warning('Multiple fragments returned!')
         fragment = fragments[0]

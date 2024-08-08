@@ -12,7 +12,7 @@ and that's probably it
 
 """
 from typing import Dict, Optional, List, Set
-from antelope.models import ResponseModel, EntityRef, Entity, FlowEntity
+from antelope.models import ResponseModel, EntityRef, Entity, FlowEntity, LciaResult
 from antelope.xdb_tokens import ResourceSpec
 
 
@@ -278,7 +278,7 @@ class FragmentEntity(Entity):
     flow: FlowEntity  # should be full entity or just a ref? this is a full return, it should be full
     direction: str
     parent: Optional[str]
-    is_balance_flow: bool
+    is_balance_flow: bool = False
 
     entity_uuid: str  # we need uuid for consistency since we are running the same LcForeground on the backend
 
@@ -682,3 +682,12 @@ class LcForeground(ResponseModel):
         ms = [LcModel.from_reference_fragment(f, save_unit_scores=save_unit_scores) for f in ar.fragments()]
         rs = []
         return cls(resources=rs, models=ms, **j)
+
+
+class ForegroundLciaResult(LciaResult):
+    def masquerade(self, masq):
+        if self.quantity.origin in masq:
+            self.quantity.origin = masq[self.quantity.origin]
+        for c in self.components:
+            if c.origin in masq:
+                c.origin = masq[c.origin]
