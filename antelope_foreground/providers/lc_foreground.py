@@ -63,6 +63,9 @@ class LcForeground(BasicArchive):
 
     _observations = None
 
+    def _ref_to_nsuuid(self, key):
+        return None
+
     def _load_entities_json(self, filename):
         with open(filename, 'r') as fp:
             self.load_from_dict(json.load(fp), jsonfile=filename)
@@ -288,12 +291,13 @@ class LcForeground(BasicArchive):
         return ref
 
     def _make_entity(self, e, etype, ext_ref):
-        if e['origin'] != self.ref:
+        if e['origin'] != self.ref and e['origin'] not in self.catalog_names:
             if etype == 'flow':
                 return self._flow_ref_from_json(e, ext_ref)
             elif etype == 'quantity':
                 unit = e.pop('referenceUnit', None)
                 return self.catalog_ref(e.pop('origin'), ext_ref, entity_type='quantity', reference_entity=unit, **e)
+        e.pop('origin', None)  # just go ahead and domesticate anything we make as an entity
         return super(LcForeground, self)._make_entity(e, etype, ext_ref)
 
     def add(self, entity):
@@ -306,8 +310,9 @@ class LcForeground(BasicArchive):
         if entity.origin is None:
             entity.origin = self.ref  # have to do this now in order to have the link properly defined
         elif entity.is_entity and entity.origin != self.ref:
-            # TODO: Alert! entity properties are not preserved in the local ref
-            entity = self.catalog_ref(entity.origin, entity.external_ref, entity_type=entity.entity_type)
+            if entity.origin not in self.catalog_names:
+                # TODO: Alert! entity properties are not preserved in the local ref
+                entity = self.catalog_ref(entity.origin, entity.external_ref, entity_type=entity.entity_type)
             # for p in entity.properties:
             #     enew[p] = entity[p]  ...
         try:
