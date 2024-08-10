@@ -101,8 +101,10 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
                 if term_flow is not None and flow_conversion is not None and flow_conversion != 1.0:
                     print('Term CF %s : %s [%g]' % (parent.link, cx, flow_conversion))
                     # log reported flow conversion.  Some shit to sort out w/r/t/ context
-                    self.characterize(parent.flow.name, parent.flow.reference_entity, term_flow.reference_entity,
-                                      flow_conversion, context=cx)
+                    # we want this characterization to apply locally
+                    super(ForegroundQuery, self).characterize(parent.flow.name, parent.flow.reference_entity,
+                                                              term_flow.reference_entity,
+                                                              flow_conversion, context=cx)
 
                 term = FlowTermination(parent, cx, term_flow=term_flow,
                                        descend=anchor.descend)
@@ -115,8 +117,10 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
                     rx = term_node.reference(term_flow)
                     print('Term CF %s : %s [%g]' % (parent.link, term_node.link, flow_conversion))
                     # log reported flow conversion.  Some shit to sort out w/r/t/ context
-                    self.characterize(parent.flow.name, parent.flow.reference_entity, rx.flow.reference_entity,
-                                      flow_conversion, context=(term_node.origin, term_node.external_ref))
+                    super(ForegroundQuery, self).characterize(parent.flow.name, parent.flow.reference_entity,
+                                                              rx.flow.reference_entity,
+                                                              flow_conversion,
+                                                              context=(term_node.origin, term_node.external_ref))
 
                 term = FlowTermination(parent, term_node, term_flow=term_flow,
                                        descend=anchor.descend)
