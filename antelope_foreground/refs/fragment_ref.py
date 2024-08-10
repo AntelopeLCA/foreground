@@ -277,11 +277,12 @@ class FragmentRef(EntityRef):
     def unit_inventory(self, scenario=None, observed=None):
         raise FragmentInventoryDeprecated('"inventory" is an exchange method. Use "unit_flows" instead.')
 
-    def unit_flows(self, scenario=None, observed=None):
+    def unit_flows(self, scenario=None, observed=None, frags_seen=None):
         """
 
         :param scenario:
         :param observed: ignored; supplied only for signature consistency
+        :param unit_flows: not bothering with this for the moment
         :return:
         """
         '''

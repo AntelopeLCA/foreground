@@ -225,7 +225,10 @@ class ForegroundCatalog(LcCatalog):
         """
         assert bool(foreground_origin_regexp.match(ref)), "Foreground reference not valid: %s" % ref
         if self._test:
-            local_path = ref
+            if path is not None and os.path.exists(path):
+                local_path = path
+            else:
+                local_path = ref
         else:
             if path is None:
                 path = os.path.join(self._rootdir, ref)  # should really sanitize this somehow
@@ -373,7 +376,7 @@ class ForegroundCatalog(LcCatalog):
 
         if ref not in self._queries:
             self._seed_fg_query(ref)
-            self.get_archive(ref).make_interface('foreground')  # finish the job
+            self.get_archive(ref, strict=True).make_interface('foreground')  # finish the job
 
         return self._queries[ref]
 
