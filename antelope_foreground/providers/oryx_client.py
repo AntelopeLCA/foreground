@@ -13,6 +13,7 @@ from antelope.models import OriginCount, LciaResult as LciaResultModel, EntityRe
 
 from ..interfaces import AntelopeForegroundInterface
 from ..refs.fragment_ref import FragmentRef, ParentFragment
+from .lc_foreground import AmbiguousReference, FragmentNotFound
 
 from ..models import (LcForeground, FragmentFlow, FragmentRef as FragmentRefModel, MissingResource,
                       FragmentBranch, FragmentEntity, Anchor, ForegroundRelease, Observation)
@@ -140,6 +141,21 @@ class OryxClient(XdbClient):
             self._entities[ent.uuid] = ent
         return ent
 
+    def frag(self, string, many=True, strict=False):
+        found = None
+        for v in self.entities_by_type('fragment'):
+            if v.uuid.startswith(string):
+                if many or not strict:
+                    return v
+                else:
+                    if found is None:
+                        found = v
+                    else:
+                        raise AmbiguousReference(string)
+        if found is None:
+            raise FragmentNotFound(string)
+        return found
+
 
 class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
     """
@@ -187,6 +203,25 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
     def fragments(self, **kwargs):
         llargs = {k.lower(): v for k, v in kwargs.items()}
         return [self._archive.get_or_make(k) for k in self._archive.r.get_many(FragmentRefModel, 'fragments', **llargs)]
+
+    def frag(self, string, many=False, **kwargs):
+        """
+        this just runs locally
+        :param string:
+        :param many:
+        :param kwargs:
+        :return:
+        """
+        return self._archive.frag(string, many=many, **kwargs)
+
+    def frags(self, string, **kwargs):
+        return [self._archive.get_or_make(k) for k in self._archive.r.get_many(FragmentRefModel,
+                                                                               'frags', string)]
+
+    def knobs(self, search=None, reference=False):
+        return [self._archive.get_or_make(k) for k in self._archive.r.get_many(FragmentRefModel,
+                                                                               'knobs', search=search,
+                                                                               reference=reference)]
 
     def new_fragment(self, flow, direction, parent=None, external_ref=None, uuid=None, balance=None,
                      value=None, exchange_value=None, units=None,
