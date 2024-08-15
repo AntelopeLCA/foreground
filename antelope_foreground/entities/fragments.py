@@ -86,7 +86,11 @@ class LcFragment(LcEntity):
             parent = fg[j['parent']]
             if parent is None:
                 print('warning: parent %s returned None' % j['parent'])
-        flow = fg[j['flow']]
+        flow_block = j['flow']
+        if isinstance(flow_block, dict):  # "modern" but still legacy
+            flow = fg.catalog_ref(flow_block['origin'], flow_block['externalId'])
+        else:
+            flow = fg[j['flow']]
         if flow is None:
             try:
                 org, ext = j['flow'].split('/')
@@ -446,11 +450,10 @@ class LcFragment(LcEntity):
     def serialize(self, save_unit_scores=False, domesticate=True, **kwargs):
         j = super(LcFragment, self).serialize(domesticate=True, **kwargs)  # once you save a fragment, it's yours
 
-        if self.flow.origin == self.origin:
-            f_e_r = self.flow.external_ref
-        else:
-            f_e_r = self.flow.link
-
+        f_e_r = {
+            'origin': self.flow.origin,
+            'externalId': self.flow.external_ref,
+        }
         j.update({
             'entityId': self.uuid,
             'flow': f_e_r,
