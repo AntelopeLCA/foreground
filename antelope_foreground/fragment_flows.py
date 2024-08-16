@@ -212,6 +212,12 @@ class FragmentFlow(object):
                            self.term, conserved, flow_conversion=self.flow_conversion)
         return new
 
+    def get(self, item, default=None):
+        return self.fragment.get(item, default=default)
+
+    def __getitem__(self, item):
+        return self.fragment.__getitem__(item)
+
     def __eq__(self, other):
         """
         FragmentFlows are equal if they have the same fragment and termination.  Formerly magnitude too but why?
@@ -429,9 +435,9 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, descend_all=None,
         descend_spec = DescendSpec(descend_all=descend_all)
 
     result = LciaResult(quantity_ref, scenario=str(scenario))
-    _first_ff = True
+    # _first_ff = True  # I have no idea what problem this was meant to solve
     for ff in fragmentflows:
-        _recursive_remote = False
+        # _recursive_remote = False
         if ff.term.is_null:
             continue
 
@@ -452,18 +458,18 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, descend_all=None,
                 if not v.is_null:
                     result.add_summary(ff.uuid, ff, node_weight, v)
 
-                _first_ff = False
+                # _first_ff = False
                 continue
 
             except UnresolvedAnchor:
                 result.add_missing(ff.uuid, ff.term.term_node, node_weight)
-                _first_ff = False
+                # _first_ff = False
                 continue
 
             except UnCachedScore:
                 # a subfragment with no stored subfragments and no cached score: we gotta ask
                 v = ff.term.term_node.fragment_lcia(quantity_ref, scenario=scenario)
-                _recursive_remote = True
+                # _recursive_remote = True  # skip this noise
 
         else:
             v = frag_flow_lcia(ff.subfragments, quantity_ref, scenario=ff.subfragment_scenarios,
@@ -483,11 +489,11 @@ def frag_flow_lcia(fragmentflows, quantity_ref, scenario=None, descend_all=None,
         else:
             result.add_summary(ff.uuid, ff, node_weight, v)
 
-        if _first_ff and _recursive_remote:
-            if len(fragmentflows) > 1:
-                logging.warning('Bailing out early despite %d un-handled fragment flows' % (len(fragmentflows)-1))
-            return result  # bail out
-        _first_ff = False
+        # if _first_ff and _recursive_remote:
+        #     if len(fragmentflows) > 1:
+        #         logging.warning('Bailing out early despite %d un-handled fragment flows' % (len(fragmentflows)-1))
+        #     return result  # bail out
+        # _first_ff = False
     return result
 
 

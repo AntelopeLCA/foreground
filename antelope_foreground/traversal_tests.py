@@ -169,7 +169,7 @@ class LciaAggTest(_LciaTest):
     test: str = 'lcia_agg'
 
     def _make_entry(self, obj):
-        return obj.entity, self.rounding(obj.cumulative_result)
+        return obj.entity.name, self.rounding(obj.cumulative_result)
 
     def run(self, model):
         res = model.fragment_lcia(self.lcia_method, scenario=self.scenarios, mode='stage')
