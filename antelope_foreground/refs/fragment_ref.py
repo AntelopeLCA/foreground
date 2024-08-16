@@ -1,6 +1,7 @@
 from antelope.refs.base import EntityRef
 from antelope.refs import RxRef
 from antelope import comp_dir
+from antelope.interfaces.iforeground import ForegroundRequired
 from ..fragment_flows import group_ios, ios_exchanges, FragmentInventoryDeprecated
 
 """
@@ -30,17 +31,45 @@ class FragmentRef(EntityRef):
     def dbg_print(self, *args):
         pass
 
-    def __init__(self, *args, flow=None, direction=None, **kwargs):
+    def __init__(self, *args, flow=None, direction=None, balance_flow=None, exchange_values=None, **kwargs):
         super(FragmentRef, self).__init__(*args, **kwargs)
         self._direction = direction
         self._flow = flow
+        self._is_balance = bool(balance_flow)
         self._ref_vals = dict()
+        self._exch_vals = dict()
+        if isinstance(exchange_values, dict):
+            self._exch_vals.update(exchange_values)
 
         self._anchors = dict()
 
     @property
     def direction(self):
         return self._direction
+
+    @property
+    def is_balance(self):
+        return self._is_balance
+
+    def _query_ev(self, **kwargs):
+        return self._query._perform_query('foreground', 'ev', ForegroundRequired, self, **kwargs)
+
+    def exchange_value(self, scenario=None, observed=None):
+        if scenario is None or len(scenario) == 0:
+            if observed:
+                scenario = '1'
+            else:
+                scenario = '0'
+            if scenario in self._exch_vals:
+                return self._exch_vals[scenario]
+            else:
+                self._exch_vals[scenario] = self._query_ev(observed=bool(observed))
+        else:
+            if scenario in self._exch_vals:
+                return self._exch_vals[scenario]
+            else:
+                self._exch_vals[scenario] = self._query_ev(scenario=scenario)
+        return self._exch_vals[scenario]
 
     '''
     @property
@@ -130,6 +159,9 @@ class FragmentRef(EntityRef):
             self._load_anchors()
             return self._anchors[scenario]
 
+    def children_with_flow(self, flow):
+        return [c for c in self.child_flows if c.flow == flow]
+
     @property
     def child_flows(self):
         return self._query.child_flows(self)
@@ -145,7 +177,7 @@ class FragmentRef(EntityRef):
     Process compatibility
     '''
     def cutoffs(self, scenario=None, **kwargs):
-        ios, _ = self.unit_flows(scenario=scenario, **kwargs)  # in the future, may want to cache this
+        ios = self._query.cutoff_flows(self, scenario=scenario, **kwargs)
         return ios_exchanges(ios, ref=self)
 
     def activity(self, scenario=None, **kwargs):
@@ -279,19 +311,18 @@ class FragmentRef(EntityRef):
 
     def unit_flows(self, scenario=None, observed=None, frags_seen=None):
         """
+        Fragment Refs do not expose internal flows during traversal (and traversal route may be protected)
 
         :param scenario:
         :param observed: ignored; supplied only for signature consistency
-        :param unit_flows: not bothering with this for the moment
+        :param frags_seen: not bothering with this for the moment (until there's a recursive crash and then what)
         :return:
         """
         '''
         return NotImplemented
         '''
-        if observed is False:
-            print('Ignoring false observed flag')
-        ffs = self.traverse(scenario=scenario)  # in the future, may want to cache this
-        return group_ios(self, ffs)
+        ios = self._query.cutoff_flows(self, scenario=scenario, observed=observed)
+        return ios, ()
 
     def scenarios(self, **kwargs):
         return self._query.scenarios(self, **kwargs)

@@ -169,6 +169,9 @@ class FragmentRef(Entity):
     entity_type: str = 'fragment'
     flow: FlowEntity
     direction: str
+
+    is_balance_flow: bool = False
+
     entity_uuid: str
     parent: Optional[str] = None
 
@@ -200,6 +203,7 @@ class FragmentRef(Entity):
             parent = fragment.parent.external_ref
 
         obj = cls(origin=fragment.origin, entity_id=fragment.external_ref, entity_uuid=fragment.uuid,
+                  is_balance_flow=fragment.is_balance,
                   flow=FlowEntity.from_flow(fragment.flow), direction=dirn, parent=parent, properties=dict())
         obj.properties['name'] = fragment['name']
 
@@ -691,3 +695,6 @@ class ForegroundLciaResult(LciaResult):
         for c in self.components:
             if c.origin in masq:
                 c.origin = masq[c.origin]
+        for s in self.summaries:
+            if s.origin in masq:
+                s.origin = masq[s.origin]

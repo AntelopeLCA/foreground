@@ -56,6 +56,9 @@ class OryxEntity(XdbEntity):
             args = {k: v for k, v in self._model.properties.items()}
             f = args.pop('flow', None)
             d = args.pop('direction', None)
+            if hasattr(self._model, 'is_balance_flow'):
+                args['balance_flow'] = self._model.is_balance_flow
+
             parent = args.pop('parent', ParentFragment) or ParentFragment
             if hasattr(self._model, 'flow'):
                 the_origin = self._model.flow.origin
@@ -80,6 +83,9 @@ class OryxEntity(XdbEntity):
 
             if self.origin != query.origin:
                 args['masquerade'] = self.origin
+
+            if hasattr(self._model, 'exchange_values'):
+                args['exchange_values'] = self._model.exchange_values
 
             ref = FragmentRef(self.external_ref, query,
                               flow=flow, direction=direction, parent=parent, **args)
@@ -223,6 +229,26 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
                                                                                'knobs', search=search,
                                                                                reference=reference)]
 
+    @staticmethod
+    def _sc(scenario):
+        if scenario is None:
+            return None
+        elif isinstance(scenario, int):
+            return str(scenario)
+        elif isinstance(scenario, str):
+            return scenario
+        elif hasattr(scenario, '__iter__'):
+            return ','.join(map(str, scenario))
+        raise TypeError(scenario)
+
+    def ev(self, frag, scenario=None, observed=None):
+        scenario = self._sc(scenario)
+        if scenario is None:
+            return self._archive.r.origin_get_one(float, self._o(frag), 'fragments', _ref(frag), 'ev',
+                                                  observed=bool(observed))
+        return self._archive.r.origin_get_one(float, self._o(frag), 'fragments', _ref(frag), 'ev',
+                                              scenario=scenario)
+
     def new_fragment(self, flow, direction, parent=None, external_ref=None, uuid=None, balance=None,
                      value=None, exchange_value=None, units=None,
                      **kwargs):
@@ -340,6 +366,7 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
             self._archive.get_or_make(ff.node)
 
     def traverse(self, fragment, scenario=None, **kwargs):
+        scenario = self._sc(scenario)
         ffs = self._archive.r.origin_get_many(FragmentFlow, self._o(fragment), _ref(fragment),
                                               'traverse', scenario=scenario, **kwargs)
 
@@ -347,15 +374,27 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
 
         return ffs
 
+    def cutoff_flows(self, fragment, scenario=None, **kwargs):
+        scenario = self._sc(scenario)
+        ffs = self._archive.r.origin_get_many(FragmentFlow, self._o(fragment), _ref(fragment),
+                                              'cutoff_flows', scenario=scenario, **kwargs)
+
+        self._get_or_make_fragment_flows(ffs)
+
+        return ffs
+
     def activity(self, fragment, scenario=None, **kwargs):
+        scenario = self._sc(scenario)
         return self._archive.r.origin_get_many(FragmentFlow, self._o(fragment), _ref(fragment),
                                                'activity', scenario=scenario, **kwargs)
 
     def tree(self, fragment, scenario=None, **kwargs):
+        scenario = self._sc(scenario)
         return self._archive.r.origin_get_many(FragmentBranch, self._o(fragment), _ref(fragment),
                                                'tree', scenario=scenario, **kwargs)
 
     def fragment_lcia(self, fragment, quantity_ref, scenario=None, mode=None, **kwargs):
+        scenario = self._sc(scenario)
         if mode == 'detailed':
             return self.detailed_lcia(fragment, quantity_ref, scenario=scenario, **kwargs)
         elif mode == 'flat':
@@ -369,21 +408,25 @@ class OryxFgImplementation(BasicImplementation, AntelopeForegroundInterface):
                                               _ref(quantity_ref), scenario=scenario, **kwargs)
 
     def detailed_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+        scenario = self._sc(scenario)
         return self._archive.r.origin_get_one(LciaResultModel, self._o(fragment), 'fragments', _ref(fragment),
                                               'detailed_lcia',
                                               _ref(quantity_ref), scenario=scenario, **kwargs)
 
     def flat_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+        scenario = self._sc(scenario)
         return self._archive.r.origin_get_one(LciaResultModel, self._o(fragment), 'fragments', _ref(fragment),
                                               'lcia',
                                               _ref(quantity_ref), scenario=scenario, **kwargs)
 
     def stage_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+        scenario = self._sc(scenario)
         return self._archive.r.origin_get_one(LciaResultModel, self._o(fragment), 'fragments', _ref(fragment),
                                               'stage_lcia',
                                               _ref(quantity_ref), scenario=scenario, **kwargs)
 
     def anchor_lcia(self, fragment, quantity_ref, scenario=None, **kwargs):
+        scenario = self._sc(scenario)
         return self._archive.r.origin_get_one(LciaResultModel, self._o(fragment), 'fragments', _ref(fragment),
                                               'anchor_lcia',
                                               _ref(quantity_ref), scenario=scenario, **kwargs)

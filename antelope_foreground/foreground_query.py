@@ -171,6 +171,10 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
         ffs = super(ForegroundQuery, self).traverse(fragment, scenario=scenario, **kwargs)
         return [self._make_fragment_flow(ff) for ff in ffs]
 
+    def cutoff_flows(self, fragment, scenario=None, **kwargs):
+        ffs = super(ForegroundQuery, self).cutoff_flows(fragment, scenario=scenario, **kwargs)
+        return [self._make_fragment_flow(ff) for ff in ffs]
+
     def activity(self, fragment, scenario=None, **kwargs):
         ffs = super(ForegroundQuery, self).activity(fragment, scenario=scenario, **kwargs)
         return [self._make_fragment_flow(ff) for ff in ffs]
