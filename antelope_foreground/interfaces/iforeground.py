@@ -40,17 +40,6 @@ class AntelopeForegroundInterface(ForegroundInterface):
                                      **kwargs):
             yield self.make_ref(i)
 
-    def get_local(self, entity_id, origin=None, **kwargs):
-        """
-        Get an object either from the local archive or elsewhere in the catalog.  not sure how this overlaps with
-        find_term() or whatnot.
-        :param entity_id:
-        :param origin:
-        :param kwargs:
-        :return:
-        """
-        return self._perform_query(_interface, 'get_local', ForegroundRequired, entity_id, origin=origin, **kwargs)
-
     def top(self, fragment, **kwargs):
         """
         Return the reference fragment that is top parent of named fragment

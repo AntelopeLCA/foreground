@@ -1,10 +1,15 @@
+import logging
+
 from antelope import EntityNotFound, comp_dir  # , BackgroundRequired
-from ..interfaces.iforeground import AntelopeForegroundInterface
+from ..interfaces.iforeground import AntelopeForegroundInterface  # , ForegroundRequired
 from antelope_core.implementations import BasicImplementation
 from antelope_core.implementations.quantity import UnknownRefQuantity
 
 from antelope_core.entities.xlsx_editor import XlsxArchiveUpdater
 from antelope_core.contexts import NullContext
+from antelope_core.entities.quantities import new_quantity
+from antelope_core.entities.flows import new_flow
+
 from ..entities.fragments import LcFragment, InvalidParentChild, FragmentBranch
 from ..entities.fragment_editor import create_fragment, clone_fragment, _fork_fragment, interpose
 from ..models import ForegroundRelease
@@ -102,30 +107,6 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         """
         with XlsxArchiveUpdater(self._archive, xlsx, quiet=quiet, merge='overwrite') as x:
             x.apply()
-
-    def get_local(self, external_ref, origin=None, **kwargs):
-        """
-        The special characteristic of a foreground is its access to the catalog-- so-- use it
-        lookup locally; fallback to catalog query- should make origin a kwarg
-        :param external_ref:
-        :param origin: optional; if not provided, attempts to split the ref, then uses first
-        :param kwargs:
-        :return:
-        """
-        e = self._fetch(external_ref, **kwargs)  # this just tries _archive.__getitem__ then retrieve_or_fetch
-        if e is not None:
-            return e
-        if origin is None:
-            try:
-                origin, external_ref = external_ref.split('/', maxsplit=1)
-            except ValueError:
-                origin = self.origin.split('.')[0]
-        last_try = self._archive.catalog_ref(origin, external_ref)
-        if last_try.is_entity:
-            return last_try
-        elif hasattr(last_try, 'resolved') and last_try.resolved:
-            return last_try
-        raise EntityNotFound(origin, external_ref)
 
     def count(self, entity_type):
         return self._archive.count_by_type(entity_type)
@@ -234,7 +215,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param kwargs:
         :return:
         """
-        return self._archive.query.new_quantity(name, ref_unit=ref_unit, **kwargs)
+        q = new_quantity(name, ref_unit, origin=self.origin, **kwargs)
+        self._archive.add(q)
+        return q
 
     def add_entity_and_children(self, *args, **kwargs):
         """
@@ -292,6 +275,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 # assume reference is a unit string specification
                 return self.new_quantity(name, ref_unit=reference, external_ref=external_ref, group=group, **kwargs)
 
+
     def new_flow(self, name, ref_quantity=None, **kwargs):
         """
 
@@ -300,7 +284,16 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param kwargs:
         :return:
         """
-        return self._archive.query.new_flow(name, ref_quantity=ref_quantity, **kwargs)
+
+        if ref_quantity is None:
+            ref_quantity = 'Number of items'
+        try:
+            ref_q = self.get_canonical(ref_quantity)
+        except EntityNotFound:
+            raise UnknownRefQuantity(ref_quantity)
+        f = new_flow(name, ref_q, **kwargs)
+        self._archive.add_entity_and_children(f)
+        return self.get(f.link)
 
     def find_term(self, term_ref, origin=None, **kwargs):
         """
@@ -310,6 +303,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param kwargs:
         :return:
         """
+        logging.warning('DEPRECATED: find_term()')
         if term_ref is None:
             return
         if hasattr(term_ref, 'entity_type'):
@@ -356,10 +350,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
           **kwargs passed to LcFragment
         :return:
         """
-        try:
-            flow = self.find_term(flow, check_etype='flow')
-        except TypeError:
-            raise UnknownFlow('Unknown flow spec %s (%s)' % (flow, type(flow)))
+        if isinstance(flow, str):
+            flow = self.get(flow)
         if flow.entity_type != 'flow':
             raise TypeError('%s: Not a %s' % (flow, 'flow'))
         frag = create_fragment(flow, direction, origin=self.origin, **kwargs)
@@ -374,7 +366,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         return self._archive.name_fragment(fragment, name, auto=auto, force=force)
     '''
 
-    def observe(self, fragment, exchange_value=None, units=None, scenario=None, anchor=None, anchor_flow=None,
+    def observe(self, fragment, exchange_value=None, units=None, scenario=None, anchor=None,
+                anchor_node=None, anchor_flow=None,
                 descend=None, name=None, auto=None, force=None,
                 accept_all=None, termination=None, term_flow=None):
         """
@@ -383,9 +376,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param exchange_value: default second positional param; exchange value being observed
         :param units: optional, modifies exchange value
         :param scenario: applies to exchange value and termination equially
-        :param anchor: how to terminate the fragment
-        :param anchor_flow: passed to anchor
-        :param descend: passed to anchor
+        :param anchor: must be a FlowTermination
+        :param anchor_node: anchor target (node or context)
+        :param anchor_flow: convert to flow on termination
+        :param descend: set on anchor
         :param name: may not be used if a scenario is also supplied
         :param auto: auto-rename on name collision
         :param force: steal name on name collision
@@ -395,9 +389,20 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param descend: deprecated, assigned to anchor
         :return:
         """
-        if termination and not anchor:
-            anchor = termination
-        if term_flow and not anchor_flow:
+        anchor_target = None
+        if anchor:
+            if descend is None:
+                descend = anchor.descend
+            if anchor.term_node:
+                anchor_target = anchor.term_node
+                if anchor_flow is None:
+                    anchor_flow = anchor.term_flow
+
+        if anchor_node:  # override
+            anchor_target = anchor_node
+        elif termination:
+            anchor_target = termination
+        if term_flow:
             anchor_flow = term_flow
         if accept_all is not None:
             print('%s: cannot "accept all"' % fragment)
@@ -419,9 +424,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 print('Note: Ignoring exchange value %g for unobservable fragment %s [%s]' % (exchange_value,
                                                                                               fragment.external_ref,
                                                                                               scenario))
-        if anchor is not None:
-            term = self.find_term(anchor)
-            self._archive.observe_anchor(fragment, scenario, anchor_node=term, anchor_flow=anchor_flow, descend=descend)
+
+        if anchor_target is not None:
+            self._archive.observe_anchor(fragment, scenario, anchor_target, anchor_flow, descend=descend)
 
         return fragment.link
 
@@ -763,9 +768,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             else:
                 try:
                     if hasattr(y.process, 'origin'):
-                        term = self.find_term(y.termination, origin=y.process.origin)
+                        term = self._archive.catalog_ref(y.process.origin, y.termination)
                     else:
-                        term = self.find_term(y.termination)
+                        term = self.get(y.termination)
                 except EntityNotFound:
                     term = None
             if isinstance(term, tuple):
@@ -884,6 +889,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         return parent
 
+    '''
     def make_fragment_trees(self, exchanges):
         """
         Take in a list of exchanges [that are properly connected] and build fragment trees from them. Return all roots.
@@ -925,3 +931,4 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         for r in roots:
             yield r
+    '''

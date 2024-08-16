@@ -281,13 +281,11 @@ class LcForeground(BasicArchive):
         ref = self.catalog_ref(origin, external_ref, entity_type='flow', reference_entity=r_q, **e)
         if not ref.resolved and self._frags_loaded:  # not found
             try:
-                ref_qty_uu = e.pop('referenceQuantity')
-            except KeyError:
-                c = e.pop('characterizations', [])
-                ref_qty_uu = next(cf['quantity'] for cf in c if 'isReference' in cf and cf['isReference'] is True)
-            ref_qty = self[ref_qty_uu]
-            name = e.pop('Name', None) or 'unnamed flow %s' % origin
-            ref = self.make_interface('foreground').add_or_retrieve(external_ref, ref_qty, name, **e)
+                ref_q = self._catalog.get_canonical(r_q)
+                name = e.pop('Name', None) or 'unnamed flow %s' % origin
+                ref = self.make_interface('foreground').add_or_retrieve(external_ref, ref_q, name, **e)
+            except EntityNotFound:
+                pass
         return ref
 
     def _make_entity(self, e, etype, ext_ref):
@@ -309,10 +307,15 @@ class LcForeground(BasicArchive):
         """
         if entity.origin is None:
             entity.origin = self.ref  # have to do this now in order to have the link properly defined
-        elif entity.is_entity and entity.origin != self.ref:
-            if entity.origin not in self.catalog_names:
-                # TODO: Alert! entity properties are not preserved in the local ref
-                entity = self.catalog_ref(entity.origin, entity.external_ref, entity_type=entity.entity_type)
+        elif entity.is_entity:
+            if entity.origin != self.ref:
+                if entity.origin not in self.catalog_names:
+                    # TODO: Alert! entity properties are not preserved in the local ref
+                    entity = self.catalog_ref(entity.origin, entity.external_ref, entity_type=entity.entity_type)
+            elif entity.entity_type == 'quantity':
+                q_ref = entity.make_ref(self.query)
+                self._catalog.register_entity_ref(q_ref)
+
             # for p in entity.properties:
             #     enew[p] = entity[p]  ...
         try:
@@ -336,10 +339,10 @@ class LcForeground(BasicArchive):
             self._add_ext_ref_mapping(entity)
 
         # it's up to the other foregrounds (local or not) to add their own quantities to the TM
-        if (entity.entity_type == 'quantity' and entity.origin != self.ref and
-                entity.origin in self._catalog.foregrounds):
-            # do not add to tm
-            return
+        if entity.entity_type == 'quantity':
+            if entity.origin != self.ref and entity.origin in self._catalog.foregrounds:
+                # do not add to tm
+                return
 
         try:
             self._add_to_tm(entity)  # , merge_strategy='distinct')  # DWR!!! need to
@@ -467,8 +470,8 @@ class LcForeground(BasicArchive):
             obs = None
         return obs
 
-    def observe_anchor(self, fragment, scenario, anchor_node, anchor_flow, descend=None):
-        term = fragment.terminate(anchor_node, scenario=scenario, term_flow=anchor_flow, descend=descend)
+    def observe_anchor(self, fragment, scenario, anchor_target, anchor_flow, descend=None):
+        term = fragment.terminate(anchor_target, scenario=scenario, term_flow=anchor_flow, descend=descend)
         anchor = term.to_anchor()
         obs = Observation.from_anchor(fragment, scenario, anchor)
         self._observations.append(obs)
