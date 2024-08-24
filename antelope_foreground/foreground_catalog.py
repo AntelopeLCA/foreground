@@ -223,6 +223,12 @@ class ForegroundCatalog(LcCatalog):
         :param quiet:
         :return:
         """
+        if ref in self._nicknames:
+            ref, _ = self._nicknames[ref]
+
+        if ref in self.foregrounds:
+            raise KeyError('Foreground %s already exists' % ref)
+
         assert bool(foreground_origin_regexp.match(ref)), "Foreground reference not valid: %s" % ref
         if self._test:
             if path is not None and os.path.exists(path):
@@ -259,6 +265,9 @@ class ForegroundCatalog(LcCatalog):
         :param create: [True] run create_foreground(ref) or [False] raise NoSuchForeground
         :return:
         """
+        if ref in self._nicknames:
+            ref, _ = self._nicknames[ref]
+
         if ref in self._fg_queue:
             raise BackReference(ref)
 
