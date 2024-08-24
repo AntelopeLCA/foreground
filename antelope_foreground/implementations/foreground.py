@@ -12,7 +12,7 @@ from antelope_core.entities.flows import new_flow
 
 from ..entities.fragments import LcFragment, InvalidParentChild, FragmentBranch
 from ..entities.fragment_editor import create_fragment, clone_fragment, _fork_fragment, interpose
-from ..models import ForegroundRelease
+from ..models import ForegroundRelease, Anchor
 
 
 class NotForeground(Exception):
@@ -275,7 +275,6 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 # assume reference is a unit string specification
                 return self.new_quantity(name, ref_unit=reference, external_ref=external_ref, group=group, **kwargs)
 
-
     def new_flow(self, name, ref_quantity=None, **kwargs):
         """
 
@@ -341,6 +340,21 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             return found_ref
         raise TypeError('Invalid entity type for termination: %s' % found_ref.entity_type)
 
+    def post_entity_refs(self, entity_refs, **kwargs):
+        """
+        Not even sure this function is properly designed. do I *have* to construct a model just to post an existing
+        entity to an existing foreground?
+        :param entity_refs:
+        :param kwargs:
+        :return:
+        """
+        for ref in entity_refs:
+            r = self._archive.catalog_ref(ref.origin, ref.external_ref, entity_type=ref.entity_type)
+            if hasattr(ref, 'properties'):
+                for k in ref.properties():
+                    r[k] = ref[k]
+            self._archive.add(r)
+
     def new_fragment(self, flow, direction, external_ref=None, **kwargs):
         """
         :param flow:
@@ -376,7 +390,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param exchange_value: default second positional param; exchange value being observed
         :param units: optional, modifies exchange value
         :param scenario: applies to exchange value and termination equially
-        :param anchor: must be a FlowTermination
+        :param anchor: must be an Anchor or FlowTermination
         :param anchor_node: anchor target (node or context)
         :param anchor_flow: convert to flow on termination
         :param descend: set on anchor
@@ -393,10 +407,18 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         if anchor:
             if descend is None:
                 descend = anchor.descend
-            if anchor.term_node:
-                anchor_target = anchor.term_node
-                if anchor_flow is None:
-                    anchor_flow = anchor.term_flow
+            if isinstance(anchor, Anchor):
+                if anchor.type == 'node':
+                    anchor_target = anchor.node
+                    if anchor_flow is None:
+                        anchor_flow = anchor.anchor_flow.entity_id
+                else:
+                    anchor_target = self.get_context(anchor.context)
+            else:
+                if anchor.term_node:
+                    anchor_target = anchor.term_node
+                    if anchor_flow is None:
+                        anchor_flow = anchor.term_flow
 
         if anchor_node:  # override
             anchor_target = anchor_node
@@ -466,6 +488,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     def knobs(self, search=None, param_dict=False, **kwargs):
         args = tuple(filter(None, [search]))
         for k in sorted(self._archive.fragments(*args, show_all=True), key=lambda x: x.external_ref):
+            if k.is_balance:
+                continue
             if k.is_reference:
                 continue
             if k.external_ref == k.uuid:  # only generate named fragments
@@ -766,13 +790,18 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             elif y.flow.external_ref in term_dict:
                 term = term_dict[y.flow.external_ref]
             else:
-                try:
-                    if hasattr(y.process, 'origin'):
-                        term = self._archive.catalog_ref(y.process.origin, y.termination)
-                    else:
-                        term = self.get(y.termination)
-                except EntityNotFound:
-                    term = None
+                if y.type == 'context':
+                    term = y.termination
+                elif y.type == 'self':
+                    term = None  # cutoff self-termination
+                else:
+                    try:
+                        if hasattr(y.process, 'origin'):
+                            term = self._archive.catalog_ref(y.process.origin, y.termination)
+                        else:
+                            term = self.get(y.termination)
+                    except EntityNotFound:
+                        term = None
             if isinstance(term, tuple):
                 term, term_flow = term
             else:

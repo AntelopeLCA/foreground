@@ -604,7 +604,7 @@ class Observation(ResponseModel):
     def ev(cls, frag, scenario, value, units=None):
         if units is None:
             units = frag.flow.unit
-        return cls(fragment=EntityRef.from_entity(frag), scenario=scenario, value=value, units=units)
+        return cls(fragment=EntityRef.from_entity(frag), scenario=scenario, exchange_value=value, units=units)
 
     @classmethod
     def from_anchor(cls, frag, scenario, anchor):

@@ -467,13 +467,17 @@ class LcForeground(BasicArchive):
             obs = Observation.ev(fragment, scenario, fragment.cached_ev)
             self._observations.append(obs)
         else:
-            obs = None
+            fragment.set_exchange_value(scenario, None)
+            obs = Observation.ev(fragment, scenario, None)
         return obs
 
     def observe_anchor(self, fragment, scenario, anchor_target, anchor_flow, descend=None):
+        if anchor_target.entity_type != 'context':
+            # adds dependency and turns models into entities (idempotent)
+            anchor_target = self._catalog.internal_ref(self.ref, anchor_target.origin, anchor_target.external_ref)
         term = fragment.terminate(anchor_target, scenario=scenario, term_flow=anchor_flow, descend=descend)
         anchor = term.to_anchor()
-        obs = Observation.from_anchor(fragment, scenario, anchor)
+        obs = Observation.from_anchor(fragment, scenario, anchor)  # and back into model
         self._observations.append(obs)
         return obs
 
@@ -549,10 +553,10 @@ class LcForeground(BasicArchive):
             json.dump(self._metadata.model_dump(), fp, indent=2)
 
     def save(self, save_unit_scores=False):
-        if self._catalog and self._catalog.test:
-            logging.info('Cannot save foregrounds during tester operation')
-            return False
         if not os.path.isdir(self.source):
+            if self._catalog and self._catalog.test:
+                logging.error('Cannot save new foregrounds during tester operation')
+                return False
             os.makedirs(self.source)
 
         self.write_to_file(self._archive_file, gzip=False, characterizations=True, values=True, domesticate=False)
