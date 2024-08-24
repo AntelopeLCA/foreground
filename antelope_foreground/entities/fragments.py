@@ -187,7 +187,8 @@ class LcFragment(LcEntity):
         if parent is not None:
             self.set_parent(parent)
 
-        assert flow.entity_type == 'flow', '%s %s' % (flow.entity_type, flow.link)
+        # # this is a problem when using a flow that is defined by a DelayedQuery that hasn't been resolved yet
+        # assert flow.entity_type == 'flow', '%s %s' % (flow.entity_type, flow.link)
         # # this is a problem when referencing a flow with unknown origin / no query
         # assert flow.reference_entity.entity_type == 'quantity'
         self.flow = flow
@@ -963,9 +964,7 @@ class LcFragment(LcEntity):
             f = self._balance_child.flow
             if f.reference_entity is None:
                 self.dbg_print('Balance Flow %5.5s has no reference' % f.uuid, 0)
-                raise RefQuantityRequired('Flow %s [%s][%s] has no reference quantity' % (f.link,
-                                                                                          type(f),
-                                                                                          type(f._the_query)))
+                raise RefQuantityRequired('Flow %s [%s] has no reference quantity' % (f.link, type(f)))
             try:
                 cf = self._balance_child.flow.reference_entity.cf(self.flow)
                 self.dbg_print('Found balance magnitude %g' % cf)
