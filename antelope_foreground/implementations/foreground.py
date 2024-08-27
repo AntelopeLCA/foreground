@@ -642,15 +642,17 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             return res.terminal_nodes()
         return res
 
-    def create_process_model(self, process, ref_flow=None, set_background=None, **kwargs):
+    def create_process_model(self, process, ref_flow=None, set_background=None, StageName=None, **kwargs):
         """
-        Create a fragment from the designated process model.  Note: the fragment's reference flow will have a unit
-        value, even if the process's reference flow does not have a unit value, because both lci() and inventory()
-        normalize the process inventory during computation.
+        Create a fragment from the designated process model.  Creates a reference fragment whose exchange value
+        is the reference value of the target, linked to a balance flow that is actually anchored to the target.
+        Negative directions (i.e. ecoinvent's negative-valued treatment processes) are inverted and presented as
+        having their natural direction.
         :param process:
         :param ref_flow:
         :param set_background:
-        :param kwargs:
+        :param StageName: applied to both the reference and child
+        :param kwargs: applied to the reference
         :return:
         """
         rx = process.reference(ref_flow)
@@ -662,6 +664,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             dirn = rx.direction
         frag = self.new_fragment(rx.flow, dirn, value=rv, observe=True, **kwargs)
         node = self.new_fragment(rx.flow, frag.direction, parent=frag, balance=True)
+        if StageName:
+            frag['StageName'] = StageName
+            node['StageName'] = StageName
         node.terminate(process, term_flow=rx.flow)
         # if set_background:
         #     frag.set_background()
