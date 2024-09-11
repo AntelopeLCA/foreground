@@ -10,6 +10,7 @@ import logging
 from antelope import (BackgroundRequired, check_direction, comp_dir, QuantityRequired, MultipleReferences,
                       NoReference, ConversionReferenceMismatch, EntityNotFound, NoCatalog)
 
+from antelope.models import DirectedFlow
 from antelope_core.contexts import NullContext
 from antelope_core.exchanges import ExchangeValue
 from antelope_core.lcia_results import LciaResult
@@ -610,6 +611,11 @@ class FlowTermination(object):
             return '%4g unit' % self.inbound_exchange_value
         return '%4g %s' % (self.inbound_exchange_value, self.term_flow.unit)  # process
 
+    @property
+    def observed_flows(self):
+        for cf in self._parent.child_flows:
+            yield DirectedFlow.from_observed(cf)
+
     def unobserved_exchanges(self, refresh=False):
         """
         Generator which yields exchanges from the term node's inventory that are not found among the child flows, for
@@ -638,7 +644,7 @@ class FlowTermination(object):
                 for x in self.term_node.lci(ref_flow=self.term_flow, refresh=refresh):
                     yield x
             else:
-                for x in self.term_node.unobserved_lci(self._parent.child_flows, ref_flow=self.term_flow):
+                for x in self.term_node.unobserved_lci(self.observed_flows, ref_flow=self.term_flow):
                     yield x  # this should forward out any cutoff exchanges
 
     def _fallback_lcia(self, quantity_ref, locale, **kwargs):
@@ -685,7 +691,7 @@ class FlowTermination(object):
                 locale = 'GLO'
 
             try:
-                res = self.term_node.bg_lcia(quantity_ref, observed=self._parent.child_flows, ref_flow=self.term_flow,
+                res = self.term_node.bg_lcia(quantity_ref, observed=self.observed_flows, ref_flow=self.term_flow,
                                              refresh=refresh, locale=locale, **kwargs)
             except (QuantityRequired, EntityNotFound, NotImplementedError):
                 try:

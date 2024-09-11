@@ -1,6 +1,7 @@
+from itertools import chain
 import logging
 
-from antelope import EntityNotFound, comp_dir  # , BackgroundRequired
+from antelope import EntityNotFound, comp_dir, BackgroundRequired
 from ..interfaces.iforeground import AntelopeForegroundInterface  # , ForegroundRequired
 from antelope_core.implementations import BasicImplementation
 from antelope_core.implementations.quantity import UnknownRefQuantity
@@ -431,8 +432,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         if name is not None:
             if scenario is None:  #
                 if fragment.external_ref != name:
-                    print('Naming fragment %s -> %s' % (fragment.external_ref, name))
                     self._archive.name_fragment(fragment, name, auto=auto, force=force)
+                    print('Naming fragment %s -> %s' % (fragment.external_ref, name))
                 else:
                     # nothing to do
                     pass
@@ -680,7 +681,19 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         else:
             parent = fragment
         term = parent.termination(scenario)
-        self.fragment_from_exchanges(term.term_node.inventory(ref_flow=term.term_flow), parent=parent,
+        try:
+            term.term_node.check_bg()
+            if include_context:
+                inv = chain(term.term_node.dependencies(ref_flow=term.term_flow),
+                            term.term_node.cutoffs(ref_flow=term.term_flow),
+                            term.term_node.emissions(ref_flow=term.term_flow))
+            else:
+                inv = chain(term.term_node.dependencies(ref_flow=term.term_flow),
+                            term.term_node.cutoffs(ref_flow=term.term_flow))
+        except BackgroundRequired:
+            inv = term.term_node.inventory(term.term_flow)
+
+        self.fragment_from_exchanges(inv, parent=parent,
                                      scenario=scenario,
                                      include_context=include_context,
                                      **kwargs)

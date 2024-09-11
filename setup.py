@@ -1,14 +1,17 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.3.2'
+VERSION = '0.3.3'
 
 requires = [
-    'antelope_interface>=0.2.6.3'
-    'antelope_core>=0.3.1'
+    'antelope_interface>=0.2.7'
+    'antelope_core>=0.3.3'
 ]
 
 """
 Revision history
+0.3.3   2024-09-10 - normalize how directed flows are used in lci()
+                     use dependencies() instead of inventory() to extend process models
+                     numerous bugfixes to observations and foreground handling
 
 0.3.2   2024-08-15 - move fg methods to interface. lots of remote traversal work
 

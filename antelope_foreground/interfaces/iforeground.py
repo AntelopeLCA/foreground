@@ -116,8 +116,8 @@ class AntelopeForegroundInterface(ForegroundInterface):
         :param kwargs:
         :return:
         """
-        return self._perform_query(_interface, 'add_or_retrieve', ForegroundRequired,
-                                   external_ref, reference, name, group=group, **kwargs)
+        return self.make_ref(self._perform_query(_interface, 'add_or_retrieve', ForegroundRequired,
+                                                 external_ref, reference, name, group=group, **kwargs))
 
     def post_entity_refs(self, entity_refs, **kwargs):
         """

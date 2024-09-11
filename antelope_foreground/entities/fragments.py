@@ -613,6 +613,14 @@ class LcFragment(LcEntity):
         '''
         return self._exchange_values[1]
 
+    @property
+    def value(self):
+        """
+        for compatibility with Exchanges
+        :return:
+        """
+        return self.observed_ev
+
     def observable(self, scenario=None):
         return self._check_observability(scenario=scenario)
 
