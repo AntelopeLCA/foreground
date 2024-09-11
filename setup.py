@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 VERSION = '0.3.3'
 
 requires = [
-    'antelope_interface>=0.2.7'
+    'antelope_interface>=0.2.7',
     'antelope_core>=0.3.3'
 ]
 
