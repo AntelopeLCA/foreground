@@ -496,6 +496,9 @@ class ForegroundCatalog(LcCatalog):
         self._queries[origin] = ForegroundQuery(origin, catalog=self, **kwargs)
 
     def query(self, origin, strict=False, refresh=False, **kwargs):
+        if origin in self._nicknames:
+            origin, _ = self._nicknames[origin]
+
         if origin in self.foregrounds:
             if origin not in self._queries:
                 # we haven't loaded this fg yet, so
