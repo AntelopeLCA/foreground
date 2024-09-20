@@ -230,17 +230,19 @@ class AntelopeForegroundInterface(ForegroundInterface):
         return self._perform_query(_interface, 'create_process_model', ForegroundRequired,
                                    process, ref_flow=ref_flow, **kwargs)
 
-    def extend_process(self, fragment, scenario=None, include_context=False, **kwargs):
+    def extend_process(self, fragment, scenario=None, include_context=False, inventory=False, **kwargs):
         """
 
         :param fragment:
         :param scenario:
         :param include_context:
+        :param inventory:
         :param kwargs:
         :return:
         """
         return self._perform_query(_interface, 'extend_process', ForegroundRequired,
-                                   fragment, scenario=scenario, include_context=include_context, **kwargs)
+                                   fragment, scenario=scenario, include_context=include_context, inventory=inventory,
+                                   **kwargs)
 
     def fragment_from_exchanges(self, exchanges, parent=None, include_context=False, **kwargs):
         """

@@ -675,23 +675,39 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         #                              include_context=include_context, multi_flow=multi_flow)
         return frag
 
-    def extend_process(self, fragment, scenario=None, include_context=False, **kwargs):
+    def extend_process(self, fragment, scenario=None, include_context=False, inventory=False, **kwargs):
+        """
+        Extend a process model, creating a child flow for each entry in a node's dependencies and cutoff flows.
+        if include_context is True, emissions are included as well.
+
+        :param fragment:
+        :param scenario:
+        :param include_context:
+        :param inventory: [False] if True, use inventory() instead of background routes to build the process.  This
+         allows the model to access exchange properties (like comments) but LCI will be computed incorrectly in cases
+         where the flow has negative-valued exchanges (i.e. ecoinvent-style 'treatment' exchanges)
+        :param kwargs:
+        :return:
+        """
         if fragment.termination(scenario).is_fg and fragment.balance_flow:
             parent = fragment.balance_flow
         else:
             parent = fragment
         term = parent.termination(scenario)
-        try:
-            term.term_node.check_bg()
-            if include_context:
-                inv = chain(term.term_node.dependencies(ref_flow=term.term_flow),
-                            term.term_node.cutoffs(ref_flow=term.term_flow),
-                            term.term_node.emissions(ref_flow=term.term_flow))
-            else:
-                inv = chain(term.term_node.dependencies(ref_flow=term.term_flow),
-                            term.term_node.cutoffs(ref_flow=term.term_flow))
-        except BackgroundRequired:
-            inv = term.term_node.inventory(term.term_flow)
+        if inventory:
+            inv = term.term_node.inventory(ref_flow=term.term_flow)
+        else:
+            try:
+                term.term_node.check_bg()
+                if include_context:
+                    inv = chain(term.term_node.dependencies(ref_flow=term.term_flow),
+                                term.term_node.cutoffs(ref_flow=term.term_flow),
+                                term.term_node.emissions(ref_flow=term.term_flow))
+                else:
+                    inv = chain(term.term_node.dependencies(ref_flow=term.term_flow),
+                                term.term_node.cutoffs(ref_flow=term.term_flow))
+            except BackgroundRequired:
+                inv = term.term_node.inventory(term.term_flow)
 
         self.fragment_from_exchanges(inv, parent=parent,
                                      scenario=scenario,
