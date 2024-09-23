@@ -1,7 +1,7 @@
 from itertools import chain
 import logging
 
-from antelope import EntityNotFound, comp_dir, BackgroundRequired
+from antelope import EntityNotFound, comp_dir, BackgroundRequired, NoReference
 from ..interfaces.iforeground import AntelopeForegroundInterface  # , ForegroundRequired
 from antelope_core.implementations import BasicImplementation
 from antelope_core.implementations.quantity import UnknownRefQuantity
@@ -675,14 +675,14 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         #                              include_context=include_context, multi_flow=multi_flow)
         return frag
 
-    def extend_process(self, fragment, scenario=None, include_context=False, inventory=False, **kwargs):
+    def extend_process(self, fragment, scenario=None, include_elementary=False, inventory=False, **kwargs):
         """
         Extend a process model, creating a child flow for each entry in a node's dependencies and cutoff flows.
         if include_context is True, emissions are included as well.
 
         :param fragment:
         :param scenario:
-        :param include_context:
+        :param include_elementary:
         :param inventory: [False] if True, use inventory() instead of background routes to build the process.  This
          allows the model to access exchange properties (like comments) but LCI will be computed incorrectly in cases
          where the flow has negative-valued exchanges (i.e. ecoinvent-style 'treatment' exchanges)
@@ -699,7 +699,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         else:
             try:
                 term.term_node.check_bg()
-                if include_context:
+                if include_elementary:
                     inv = chain(term.term_node.dependencies(ref_flow=term.term_flow),
                                 term.term_node.cutoffs(ref_flow=term.term_flow),
                                 term.term_node.emissions(ref_flow=term.term_flow))
@@ -711,7 +711,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         self.fragment_from_exchanges(inv, parent=parent,
                                      scenario=scenario,
-                                     include_context=include_context,
+                                     include_elementary=include_elementary,
                                      **kwargs)
         return fragment
 
@@ -755,6 +755,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
     def fragment_from_exchanges(self, _xg, parent=None, ref=None, scenario=None,
                                 term_dict=None,
                                 set_background=None,
+                                include_elementary=False,
                                 include_context=True):
         """
         If parent is None, first generated exchange is reference flow; and subsequent exchanges are children.
@@ -774,7 +775,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param scenario: [None] specify the scenario under which to terminate child flows
         :param term_dict: [None] a mapping from EITHER existing termination OR flow external ref to target OR (target, term_flow) tuple
         :param set_background: [None] DEPRECATED / background is meaningless
-        :param include_context: [False] whether to model context-terminated flows as child fragments
+        :param include_elementary: [False] whether to model elementary flows as child fragments
+        :param include_context: [None] DEPRECATED and ignored. use include_elementary
         :return:
         """
         if term_dict is None:
@@ -842,8 +844,12 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 term_flow = None
 
             if term is not None and term.entity_type == 'context':
-                if include_context is False:
-                    continue
+                if term.elementary:
+                    if include_elementary is False:
+                        continue
+                else:  # term is a cutoff-  so don't anchor it
+                    term = None
+
             elif term == y.process:
                 # TODO: figure out why tuple(CatalogRef()) hangs
                 term = None  # don't terminate self-term
@@ -936,18 +942,14 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 try:  # go hunting for a term in the local foreground
                     term = next(self.fragments_with_flow(c.flow, c.direction))
                 except StopIteration:
-                    pass
+                    if hasattr(c.flow.context, 'name'):
+                        c['StageName'] = c.flow.context.name
 
             if term is not None:
-                c.terminate(term, scenario=scenario, term_flow=term_flow, descend=False)  # already sets stage name
-                '''
-                if term.entity_type in ('process', 'flow'):  ##?? whaaa? process should terminate to reference, flow should terminate to itself
-                    c.terminate(term, scenario=scenario, term_flow=c.flow)
-                    if set_background:
-                        c.set_background()
-                else:
-                    c.terminate(term, scenario=scenario)
-                '''
+                try:
+                    c.terminate(term, scenario=scenario, term_flow=term_flow, descend=False)  # already sets stage name
+                except NoReference:
+                    logging.warning('NoReference for child flow %5.5s -- cutting off' % c.uuid)
             self.observe(c)  # use cached implicitly via fg interface
 
         return parent
