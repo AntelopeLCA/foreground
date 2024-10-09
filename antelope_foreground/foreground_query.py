@@ -32,6 +32,10 @@ class FragmentBranch(object):
         return self.node.reference_entity
 
     @property
+    def level(self):
+        return self.node.level
+
+    @property
     def name(self):
         return self.anchor.name
 

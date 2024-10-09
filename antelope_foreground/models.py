@@ -376,6 +376,7 @@ class FragmentBranch(ResponseModel):
     """
     parent: Optional[str]
     node: FragmentRef
+    level: int
     name: str
     group: str  # this is the StageName, used for aggregation.. the backend must set / user specify / modeler constrain
     magnitude: Optional[float]
@@ -430,7 +431,7 @@ class FragmentBranch(ResponseModel):
             cutoff = True
         else:
             cutoff = False
-        return cls(parent=parent, node=FragmentRef.from_fragment(fragment), name=term.name,
+        return cls(parent=parent, node=FragmentRef.from_fragment(fragment), name=term.name, level=fragment.level,
                    group=fragment.get(group, ''), scenario=scenario,
                    magnitude=mag, unit=fragment.flow.unit, is_balance_flow=fragment.is_balance,
                    anchor=anchor, is_cutoff=cutoff)
@@ -441,7 +442,7 @@ class FragmentBranch(ResponseModel):
             parent = None
         else:
             parent = n.parent.external_ref
-        return cls(parent=parent, node=FragmentRef.from_fragment(n.node), name=n.name,
+        return cls(parent=parent, node=FragmentRef.from_fragment(n.node), name=n.name, level=n.level,
                    group=n.group, scenario=n.scenario, magnitude=n.magnitude, unit=n.unit,
                    anchor=n.anchor.to_anchor(),
                    is_balance_flow=n.is_balance_flow, is_cutoff=n.is_cutoff)

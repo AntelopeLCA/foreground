@@ -263,6 +263,12 @@ class LcFragment(LcEntity):
         else:
             raise PropertyExists('External Ref already set to %s' % self._external_ref)
 
+    @property
+    def level(self):
+        if self.reference_entity is None:
+            return 0
+        return self.reference_entity.level + 1
+
     def de_name(self):
         """
         Remove a fragment's name
@@ -389,9 +395,9 @@ class LcFragment(LcEntity):
         """
         return self._child_flows[0]
 
-    def children_with_flow(self, flow, direction=None, termination=None, recurse=False):
+    def children_with_flow(self, flow, direction=None, termination=None, recurse=False, match=False):
         for k in self._child_flows:
-            if k.flow == flow:
+            if k.flow == flow or (match and k.flow.match(flow)):
                 if direction is not None:
                     if k.direction != direction:
                         continue
@@ -400,7 +406,7 @@ class LcFragment(LcEntity):
                         continue
                 yield k
             if recurse:  # depth-first
-                for z in k.children_with_flow(flow, direction, recurse=recurse):
+                for z in k.children_with_flow(flow, direction, recurse=recurse, match=match):
                     yield z
 
     @property
@@ -1070,7 +1076,8 @@ class LcFragment(LcEntity):
         if isinstance(scenario, tuple) or isinstance(scenario, set):
             raise ScenarioConflict('Set termination must specify single scenario')
         if scenario is not None and scenario in self._terminations:
-            if not self._terminations[scenario].is_null:
+            _current = self._terminations[scenario]
+            if not (_current.is_null or _current.is_fg):
                 raise CacheAlreadySet('Scenario termination already set. use clear_termination()')
 
         if scenario is None and term_node in self._terminations:
@@ -1097,7 +1104,10 @@ class LcFragment(LcEntity):
         return termination
 
     def clear_termination(self, scenario=None):
-        self._terminations[scenario] = FlowTermination.null(self)
+        if self.is_background:
+            self._terminations[scenario] = FlowTermination.null(self)
+        else:
+            self._terminations[scenario] = FlowTermination(self, self)
 
     '''
     def to_foreground(self, scenario=None):
