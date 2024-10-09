@@ -8,7 +8,6 @@ import logging
 
 from typing import Optional
 
-from collections import defaultdict
 from pydantic import ValidationError
 
 from ..foreground_query import DelayedQuery, ForegroundNotSafe, QueryIsDelayed, MissingResource
@@ -169,7 +168,6 @@ class LcForeground(BasicArchive):
         super(LcForeground, self).__init__(fg_path, **kwargs)
         self._catalog = catalog
         self._ext_ref_mapping = dict()
-        self._frags_with_flow = defaultdict(set)
 
         self._observations = []
 
@@ -348,9 +346,6 @@ class LcForeground(BasicArchive):
             self._add_to_tm(entity)  # , merge_strategy='distinct')  # DWR!!! need to
         except QueryIsDelayed:
             pass
-
-        if entity.entity_type == 'fragment':
-            self._frags_with_flow[entity.flow].add(entity)
 
     def _add_children(self, entity):
         if entity.entity_type == 'fragment':
@@ -647,9 +642,14 @@ class LcForeground(BasicArchive):
                     for k in self._show_frag_children(f):
                         yield k
 
-    def fragments_with_flow(self, flow):
-        for k in self._frags_with_flow[flow]:
-            yield k
+    def fragments_with_flow(self, flow, match=False):
+        for k in self._ents_by_type['fragment']:
+            if match:
+                if k.flow.match(flow):
+                    yield k
+            else:
+                if k.flow == flow:
+                    yield k
 
     def frag(self, string, many=False, strict=True):
         """
@@ -709,7 +709,6 @@ class LcForeground(BasicArchive):
         if self._entities[frag.uuid] is frag:
             self._entities.pop(frag.uuid)
         self._ext_ref_mapping.pop(frag.external_ref, None)
-        self._frags_with_flow[frag.flow].remove(frag)
 
     def _del_f(self, f):
         print('Deleting %s' % f)

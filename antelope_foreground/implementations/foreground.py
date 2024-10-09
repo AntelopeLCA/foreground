@@ -500,18 +500,19 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             else:
                 yield k
 
-    def fragments_with_flow(self, flow, direction=None, reference=True, background=None, **kwargs):
+    def fragments_with_flow(self, flow, direction=None, reference=True, background=None, match=False, **kwargs):
         """
         Requires flow identity
         :param flow:
         :param direction:
         :param reference: {True} | False | None
         :param background:
+        :param match: [False] if True, will return fragments with matching synonyms. If false, equality is required.
         :param kwargs:
         :return:
         """
         flow = self[flow]  # retrieve by external ref
-        for f in self._archive.fragments_with_flow(flow):
+        for f in self._archive.fragments_with_flow(flow, match=match):
             if background is not None:
                 if f.is_background != background:
                     continue

@@ -91,11 +91,15 @@ def _create_fragment(flow, direction, uuid=None, parent=None, name=None, comment
 
 
 def _transfer_evs(frag, new):
+    # don't fuck around
+    new._exchange_values = {k: v for k, v in frag._exchange_values.items()}
+    '''
     if frag.observed_ev != 0 and new.observable():
         new.observed_ev = frag.observed_ev
     for scen in frag.exchange_values():
         if scen != 0 and scen != 1 and new.observable(scen):
             new.set_exchange_value(scen, frag.exchange_value(scen))
+    '''
 
 
 def clone_fragment(frag, tag='copy', comment=None, _parent=None, origin=None):
