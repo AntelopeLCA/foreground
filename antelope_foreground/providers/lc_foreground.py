@@ -16,7 +16,7 @@ from ..implementations import AntelopeForegroundImplementation, AntelopeBasicImp
 from ..models import ForegroundMetadata, ForegroundRelease, Observation
 
 from antelope import PropertyExists, CatalogRef, EntityNotFound
-from antelope_core.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES
+from antelope_core.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES, LD_CONTEXT
 from ..entities.fragments import LcFragment
 
 
@@ -207,7 +207,7 @@ class LcForeground(BasicArchive):
             else:
                 entity_type = 'process'
         '''
-        if origin in self.catalog_names:
+        if origin in self.catalog_names or origin == 'foreground':
             return self.get(external_ref)
         try:
             return self._catalog.internal_ref(self.ref, origin, external_ref)
@@ -275,8 +275,15 @@ class LcForeground(BasicArchive):
 
     def _flow_ref_from_json(self, e, external_ref):
         origin = e.pop('origin')
-        r_q = self[e.pop('referenceQuantity', None)]  # quantity must have been loaded
-        ref = self.catalog_ref(origin, external_ref, entity_type='flow', reference_entity=r_q, **e)
+        r_q = e.pop('referenceQuantity')  # quantity must have been loaded
+        ref_q = self.tm.get_canonical(r_q)
+        if ref_q is None:
+            e['origin'] = origin
+            e['referenceQuantity'] = r_q
+            print(e)
+            print('XXXXXX EntityNotFound %s' % r_q)
+            raise EntityNotFound
+        ref = self.catalog_ref(origin, external_ref, entity_type='flow', reference_entity=ref_q, **e)
         if not ref.resolved and self._frags_loaded:  # not found
             try:
                 ref_q = self._catalog.get_canonical(r_q)
@@ -291,8 +298,11 @@ class LcForeground(BasicArchive):
             if etype == 'flow':
                 return self._flow_ref_from_json(e, ext_ref)
             elif etype == 'quantity':
-                unit = e.pop('referenceUnit', None)
-                return self.catalog_ref(e.pop('origin'), ext_ref, entity_type='quantity', reference_entity=unit, **e)
+                try:
+                    return self.tm.get_canonical(ext_ref)
+                except EntityNotFound:
+                    unit = e.pop('referenceUnit', None)
+                    return self.catalog_ref(e.pop('origin'), ext_ref, entity_type='quantity', reference_entity=unit, **e)
         e.pop('origin', None)  # just go ahead and domesticate anything we make as an entity
         return super(LcForeground, self)._make_entity(e, etype, ext_ref)
 
@@ -523,10 +533,41 @@ class LcForeground(BasicArchive):
             frags.extend(self._recurse_frags(x))
         return frags
 
-    def save_fragments(self, save_unit_scores=False):
+    def _map_frag_org(self, migration_map, json_block):
+        """
+        update a json block according to the map of origin migrations.
+
+        :param migration_map:
+        :param json_block: must contain 'origin'
+        :return:
+        """
+        if isinstance(json_block, str):
+            return
+        o = json_block.get('origin')
+        if o in migration_map:
+            new_org = migration_map[o]
+            if new_org == self.ref or new_org is None:
+                new_org = 'foreground'
+            json_block['origin'] = new_org
+
+    def save_fragments(self, save_unit_scores=False, migration_map=None):
         current_files = os.listdir(self._fragment_dir)
         for r in self._fragments():
             frags = [t.serialize(save_unit_scores=save_unit_scores) for t in self._recurse_frags(r)]
+            if migration_map:
+
+                for frag in frags:
+                    # map flow origin
+                    self._map_frag_org(migration_map, frag['flow'])
+
+                    # map each term's origin
+                    for k, term in frag['terminations'].items():
+                        self._map_frag_org(migration_map, term)
+
+                        # and termFlow if it exists
+                        if 'termFlow' in term:
+                            self._map_frag_org(migration_map, term['termFlow'])
+
             fname = r.uuid + '.json'
             if fname in current_files:
                 current_files.remove(fname)
@@ -547,21 +588,110 @@ class LcForeground(BasicArchive):
         with open(self._metadata_file, 'w') as fp:
             json.dump(self._metadata.model_dump(), fp, indent=2)
 
-    def save(self, save_unit_scores=False):
+    def migrate(self, new_source, migration_map, save_unit_scores=False):
+        """
+        Migrates the foreground to a new location with a new ref.  Removes the existing origin from all entities.
+        This operates by changing origins in the serialized file
+        :param new_source: name of directory to save to
+        :param migration_map: a dict of current origins to new origins. must at least contain {current ref: new ref}
+        :param save_unit_scores: passed on to save
+        :return:
+        """
+        old_ref = self.ref
+        new_source = os.path.abspath(new_source)
+        new_ref = migration_map[old_ref]
+        self._set_source(new_ref, new_source)
+        self.set_origin(new_ref)
+
+        self.save(save_unit_scores=save_unit_scores, migration_map=migration_map)
+
+    def save(self, save_unit_scores=False, migration_map=None):
         if not os.path.isdir(self.source):
             if self._catalog and self._catalog.test:
                 logging.error('Cannot save new foregrounds during tester operation')
                 return False
             os.makedirs(self.source)
 
-        self.write_to_file(self._archive_file, gzip=False, characterizations=True, values=True, domesticate=False)
+        self.write_to_file(self._archive_file, gzip=False, characterizations=True, values=True,
+                           migration_map=migration_map)
 
         self.save_metadata()
 
         if not os.path.isdir(self._fragment_dir):
             os.makedirs(self._fragment_dir)
-        self.save_fragments(save_unit_scores=save_unit_scores)
+        self.save_fragments(save_unit_scores=save_unit_scores, migration_map=migration_map)
         return True
+
+    def serialize(self, characterizations=False, values=False, domesticate=False, migration_map=None):
+        """
+        Serialize flows and quantities.  If characterizations==True, also save Term Manager content
+        (characterizations, contexts, flowables)
+
+        :param characterizations:
+        :param values:
+        :param domesticate: [False] if True, omit entities' origins so that they will appear to be from the new archive
+         upon serialization.
+         If 'domesticate' is a string, entities whose origin matches the string are domesticated.  This is also applied
+         to TermManager content.
+        :param migration_map:
+        :return:
+        """
+        if migration_map is None:
+            return super(LcForeground, self).serialize(characterizations=characterizations, values=values,
+                                                       domesticate=domesticate)
+
+        # first, add synonyms
+        def _add_syn(_ent):
+            if _ent.origin in migration_map:
+                _tgt_org = migration_map[_ent.origin]
+                _new_link = '%s/%s' % (_tgt_org, _ent.external_ref)
+                self.tm.add_synonym(_ent.link, _new_link)
+
+        for f in self.entities_by_type('flow'):
+            _add_syn(f)
+        for q in self.entities_by_type('quantity'):
+            _add_syn(q)
+
+        j = super(BasicArchive, self).serialize()
+        j['@context'] = LD_CONTEXT
+
+        j['flows'] = sorted([f.serialize(domesticate=domesticate, drop_fields=self._drop_fields['flow'])
+                             for f in self.entities_by_type('flow')],
+                            key=lambda x: x['externalId'])
+
+        for flow in j['flows']:
+            if flow['origin'] in migration_map:
+                tgt_org = migration_map[flow['origin']]
+                if tgt_org == self.ref:
+                    flow.pop('origin')  # domesticate
+                else:
+                    flow['origin'] = tgt_org  # migrate
+
+        if characterizations:
+            try:
+                local = next(k for k, v in migration_map.items() if v == self.ref)
+            except StopIteration:
+                local = self.ref
+
+            j['termManager'], qqs, rqs = self.tm.serialize(local, values=values)
+            # we need to add all the quantities that are mentioned in our characterizations
+            for f in qqs:
+                if self[f] is None:
+                    self.add(self.tm.get_canonical(f))
+            for f in rqs:
+                if self[f] is None:
+                    self.add(self.tm.get_canonical(f))
+
+        j['quantities'] = self._serialize_quantities(domesticate=domesticate)
+        for quantity in j['quantities']:
+            if quantity['origin'] in migration_map:
+                tgt_org = migration_map[quantity['origin']]
+                if tgt_org == self.ref:
+                    quantity.pop('origin')  # domesticate
+                else:
+                    quantity['origin'] = tgt_org  # migrate
+
+        return j
 
     def update_metadata(self, release: Optional[ForegroundRelease] = None, bump_version=True):
         """
@@ -643,7 +773,7 @@ class LcForeground(BasicArchive):
                         yield k
 
     def fragments_with_flow(self, flow, match=False):
-        for k in self._ents_by_type['fragment']:
+        for k in self.entities_by_type('fragment'):
             if match:
                 if k.flow.match(flow):
                     yield k

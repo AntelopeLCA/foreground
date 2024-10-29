@@ -230,6 +230,8 @@ class ForegroundCatalog(LcCatalog):
             raise KeyError('Foreground %s already exists' % ref)
 
         assert bool(foreground_origin_regexp.match(ref)), "Foreground reference not valid: %s" % ref
+        if ref == 'foreground':
+            raise ValueError('the origin named "foreground" is reserved for the current foreground')
         if self._test:
             if path is not None and os.path.exists(path):
                 local_path = path
@@ -406,12 +408,12 @@ class ForegroundCatalog(LcCatalog):
         logging.info('Clearing unit scores for %s' % lcia_method.link)
         for f in self.foregrounds:
             if f in self._queries:
-                self.get_archive(f).clear_unit_scores(lcia_method)
+                self.get_archive(f, strict=True).clear_unit_scores(lcia_method)
 
     def write_versioned_fg(self, foreground, target_dir=None, force=False):
         target_dir = self._get_target_abspath(target_dir)
 
-        ar = self.get_archive(foreground)
+        ar = self.get_archive(foreground, strict=True)
         new_ref = '.'.join([foreground, str(ar.metadata.version_major), str(ar.metadata.version_minor)])
         new_path = os.path.join(target_dir, new_ref)
 
@@ -521,7 +523,7 @@ class ForegroundCatalog(LcCatalog):
         """
         self._dependencies.add_dependency(fg_ref, origin)
         try:
-            return self.query(origin).get(external_ref)
+            return self.query(origin, strict=True).get(external_ref)
         except UnknownOrigin:
             self._missing_o.add((origin, 'basic'))
             raise MissingResource(origin, 'basic')

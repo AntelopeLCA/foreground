@@ -457,8 +457,12 @@ class LcFragment(LcEntity):
     def serialize(self, save_unit_scores=False, domesticate=True, **kwargs):
         j = super(LcFragment, self).serialize(domesticate=True, **kwargs)  # once you save a fragment, it's yours
 
+        if self.flow.origin == self.origin:
+            f_org = 'foreground'
+        else:
+            f_org = self.flow.origin
         f_e_r = {
-            'origin': self.flow.origin,
+            'origin': f_org,
             'externalId': self.flow.external_ref,
         }
         j.update({
