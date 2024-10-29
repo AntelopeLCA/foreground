@@ -523,7 +523,7 @@ class FlowTermination(object):
             return 1.0
         parent_q = self._parent.flow.reference_entity
         term_q = self.term_flow.reference_entity
-        if term_q is None:
+        if parent_q is None or term_q is None:
             return 0.0
 
         # first - natural - ask our parent flow if fit can convert to term quantity
