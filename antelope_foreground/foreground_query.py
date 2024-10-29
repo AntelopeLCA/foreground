@@ -47,6 +47,10 @@ class FragmentBranch(object):
     def is_balance_flow(self):
         return self.node.is_balance
 
+    def __str__(self):
+        return '%.5s  %10.3g [%6s] %s %s' % (self.node.uuid, self.magnitude, self.node.direction,
+                                             self.anchor, self.name)
+
 
 class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
     def cascade(self, origin):
