@@ -885,14 +885,16 @@ class LcFragment(LcEntity):
 
         value = float(value)
 
-        if units is not None and len(units) > 0:
-            try:
-                value *= self.flow.reference_entity.convert(units)
-            except ConversionError:
-                print('##!! Flow conversion error setting exchange value: %5.5s: %s (%s)' % (self.uuid,
-                                                                                             self.flow.reference_entity,
-                                                                                             units))
-                value = 0.0
+        if units is not None:
+            units = str(units)
+            if len(units) > 0:
+                try:
+                    value *= self.flow.reference_entity.convert(units)
+                except ConversionError:
+                    print('##!! Flow conversion error setting exchange value: %5.5s: %s (%s)' % (self.uuid,
+                                                                                                 self.flow.reference_entity,
+                                                                                                 units))
+                    value = 0.0
 
         if scenario == 0 or scenario == '0' or scenario == 'cached' or scenario is None:
             self._exchange_values[0] = value
@@ -1108,10 +1110,13 @@ class LcFragment(LcEntity):
         return termination
 
     def clear_termination(self, scenario=None):
-        if self.is_background:
-            self._terminations[scenario] = FlowTermination.null(self)
+        if scenario is not None:
+            self._terminations.pop(scenario, None)
         else:
-            self._terminations[scenario] = FlowTermination(self, self)
+            if self.is_background:
+                self._terminations[None] = FlowTermination.null(self)
+            else:
+                self._terminations[None] = FlowTermination(self, self)
 
     '''
     def to_foreground(self, scenario=None):

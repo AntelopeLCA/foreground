@@ -432,8 +432,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         if name is not None:
             if scenario is None:  #
                 if fragment.external_ref != name:
+                    oldname = fragment.external_ref
                     self._archive.name_fragment(fragment, name, auto=auto, force=force)
-                    print('Naming fragment %s -> %s' % (fragment.external_ref, name))
+                    print('Naming fragment %s -> %s' % (oldname, name))
                 else:
                     # nothing to do
                     pass
@@ -770,6 +771,15 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
         And now we are adding auto-terminate to anything that comes back from fragments_with_flow
 
+        Long Term problem with this function: We have established the convention that the FIRST exchange is always the
+        reference exchange (used to define the top of the fragment/spanner).  EXCEPT: if the 'parent' is provided,
+        then the reference exchange is ASSUMED EXCLUDED from the generator.  It is up to CLIENT CODE to pop() the first
+        (reference) exchange when the fragment is already defined.  This is no good, but it's not clear how to avoid
+        it without requiring the exchange generator to indicate is_reference explicitly (and then do we remove the
+        requirement that the reference exchange be FIRST? do we LIST the exchanges and filter them for references?
+        what if multiple references are provided- which one do we make the fragment top?)  Suffice it to say, I
+        don't have a clean solution.
+
         :param _xg: Generates a list of exchanges or exchange references
         :param parent: if None, create parent from first exchange. If parent is provided, _xg must exclude references
         :param ref: if parent is created, assign it a name
@@ -816,9 +826,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                     flow = y.flow  # groundless flow, better than throwing an exception
             else:
                 flow = self[y.flow]
-                if flow is None:
-                    print('Skipping unknown flow %s' % y.flow)
-                    continue
+
+            if flow is None:
+                print('Skipping unknown flow %s' % y.flow)
+                continue
             """
             Determine / retrieve termination
             """
@@ -828,10 +839,16 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 term = term_dict[y.flow.external_ref]
             else:
                 if y.type == 'context':
-                    term = y.termination
+                    term = self.get_context(y.termination)
                 elif y.type == 'self':
                     term = None  # cutoff self-termination
-                else:
+                elif y.type == 'cutoff':
+                    try:  # go hunting for a term in the local foreground
+                        term = next(self.fragments_with_flow(y.flow, y.direction))
+                        print('found term %s in local foreground' % term.external_ref)
+                    except StopIteration:
+                        term = None
+                else:  # y.type == 'node'
                     try:
                         if hasattr(y.process, 'origin'):
                             term = self._archive.catalog_ref(y.process.origin, y.termination)
@@ -839,7 +856,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                             term = self.get(y.termination)
                     except EntityNotFound:
                         term = None
-            if isinstance(term, tuple):
+
+            if isinstance(term, tuple):  # only if term_dict specifies a tuple
                 term, term_flow = term
             else:
                 term_flow = None
@@ -940,22 +958,23 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             c = self.new_fragment(flow, y.direction, value=y.value, units=y.unit, parent=parent, **y.args)
 
             if term is None:
-                try:  # go hunting for a term in the local foreground
-                    term = next(self.fragments_with_flow(c.flow, c.direction))
-                except StopIteration:
-                    if hasattr(c.flow.context, 'name'):
-                        c['StageName'] = c.flow.context.name
+                if hasattr(c.flow.context, 'name'):
+                    c['StageName'] = c.flow.context.name
 
-            if term is not None:
+            if term is not None and term.entity_type != 'unknown':
                 try:
                     c.terminate(term, scenario=scenario, term_flow=term_flow, descend=False)  # already sets stage name
                 except NoReference:
                     logging.warning('NoReference for child flow %5.5s -- cutting off' % c.uuid)
+                except TypeError as e:
+                    logging.warning('TypeError on %s for child flow %5.5s -- cutting off' % (term, c.uuid))
             self.observe(c)  # use cached implicitly via fg interface
 
         return parent
 
     '''
+    
+    
     def make_fragment_trees(self, exchanges):
         """
         Take in a list of exchanges [that are properly connected] and build fragment trees from them. Return all roots.

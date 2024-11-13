@@ -208,7 +208,11 @@ class LcForeground(BasicArchive):
                 entity_type = 'process'
         '''
         if origin in self.catalog_names or origin == 'foreground':
-            return self.get(external_ref)
+            entity = self.get(external_ref)
+            if entity is None:
+                print('{%s} local entity %s/%s not found' % (self.ref, origin, external_ref))
+                return CatalogRef(origin, external_ref, entity_type=entity_type, **kwargs)
+            return entity
         try:
             return self._catalog.internal_ref(self.ref, origin, external_ref)
         except (ForegroundNotSafe, MissingResource):
@@ -315,7 +319,7 @@ class LcForeground(BasicArchive):
         """
         if entity.origin is None:
             entity.origin = self.ref  # have to do this now in order to have the link properly defined
-        elif entity.is_entity:
+        if entity.is_entity:
             if entity.origin != self.ref:
                 if entity.origin not in self.catalog_names:
                     # TODO: Alert! entity properties are not preserved in the local ref

@@ -185,6 +185,8 @@ class ForegroundCatalog(LcCatalog):
                 res.check(self)
                 self._fg_queue.remove(origin)
                 '''
+                if res.origin not in self.foregrounds:
+                    continue
                 try:
                     self._check_foreground(res)
                     yield res.make_interface(itype)
