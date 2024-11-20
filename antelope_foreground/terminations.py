@@ -19,6 +19,13 @@ from .lcia_dict import LciaResults
 from .models import Anchor, EntityRef, UNRESOLVED_ANCHOR_TYPE
 
 
+class BackReference(Exception):
+    """
+    trying to instantiate a foreground that's currently being loaded
+    """
+    pass
+
+
 # from lcatools.catalog_ref import NoCatalog
 # from lcatools.interact import parse_math
 
@@ -219,7 +226,7 @@ class FlowTermination(object):
             if self._term.entity_type == UNRESOLVED_ANCHOR_TYPE:
                 try:
                     self._term = self._term.resolve()
-                except NoCatalog:
+                except (NoCatalog, BackReference):
                     pass
         return self._term
 

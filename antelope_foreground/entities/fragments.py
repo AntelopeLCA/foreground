@@ -88,7 +88,7 @@ class LcFragment(LcEntity):
                 print('warning: parent %s returned None' % j['parent'])
         flow_block = j['flow']
         if isinstance(flow_block, dict):  # "modern" but still legacy
-            flow = fg.catalog_ref(flow_block['origin'], flow_block['externalId'])
+            flow = fg.catalog_ref(flow_block['origin'], flow_block['externalId'], entity_type='flow')
         else:
             flow = fg[j['flow']]
         if flow is None:
@@ -218,9 +218,8 @@ class LcFragment(LcEntity):
         if balance_flow:
             try:
                 self.set_balance_flow()
-            except RefQuantityRequired:
-                # nothing much to do but notify
-                logging.warning('%s: Balance flow missing reference entity' % self.link)
+            except BalanceAlreadySet:
+                logging.warning('%5.5s: Balance already set for parent flow' % self.uuid)
         else:
             if exchange_value is not None:
                 self.set_exchange_value(0, exchange_value, units=units)
@@ -906,6 +905,13 @@ class LcFragment(LcEntity):
     @property
     def conserved(self):
         return bool(self.balance_magnitude)  # None or 0 -> False
+        """
+        try:
+            return bool(self.balance_magnitude)  # None or 0 -> False
+        except RefQuantityRequired:
+            print('^^^^^^^^^^^^^ %5.5s: Bad Ref Qty' % self.uuid)
+            return False
+        """
 
     @property
     def balance_flow(self):
@@ -936,6 +942,13 @@ class LcFragment(LcEntity):
             raise InvalidParentChild('Reference flow cannot be a balance flow')
         if self.is_balance is False:
             self.reference_entity.set_conservation_child(self)
+            try:
+                if self.balance_magnitude == 0:
+                    self.dbg_print('%.5s Notice: zero balance for conserved quantity %s' % (self.uuid,
+                                                                                            self.conserved_quantity))
+            except RefQuantityRequired:
+                # nothing much to do but notify-- still set balance though
+                logging.warning('%s: Balance flow missing reference entity' % self.link)
             self._is_balance = True
 
     def unset_balance_flow(self):
@@ -950,9 +963,6 @@ class LcFragment(LcEntity):
             print('%.5s conserving %s\nversus %s' % (self.uuid, self._balance_child, child))
             raise BalanceAlreadySet
         self._balance_child = child
-        if self.balance_magnitude == 0:
-            self.dbg_print('%.5s Notice: zero balance for conserved quantity %s' % (self.uuid,
-                                                                                    self.conserved_quantity))
         self.dbg_print('setting balance from %.5s: %s' % (child.uuid, self._balance_child))
 
     @property

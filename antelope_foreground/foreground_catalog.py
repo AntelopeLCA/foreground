@@ -2,6 +2,7 @@ from antelope import UnknownOrigin
 from antelope_core.archives import InterfaceError
 from antelope_core.catalog import LcCatalog
 from .foreground_query import ForegroundQuery, ForegroundNotSafe, MissingResource
+from .terminations import BackReference
 
 from itertools import chain
 import shutil
@@ -12,13 +13,6 @@ import logging
 
 foreground_origin_regexp = re.compile('^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$')
 savefile_regexp = re.compile('^([A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*)\.(\d+)\.(\d+)\.zip$')
-
-
-class BackReference(Exception):
-    """
-    trying to instantiate a foreground that's currently being loaded
-    """
-    pass
 
 
 class NoSuchForeground(Exception):
@@ -216,7 +210,7 @@ class ForegroundCatalog(LcCatalog):
     def test(self):
         return bool(self._test)
 
-    def create_foreground(self, ref, path=None, quiet=True):
+    def create_foreground(self, ref, path=None, quiet=True, **kwargs):
         """
         Creates foreground resource and returns an interface to that resource.
         By default creates in a subdirectory of the catalog root with the ref as the folder
@@ -256,7 +250,7 @@ class ForegroundCatalog(LcCatalog):
 
         res = self.new_resource(ref, local_path, 'LcForeground',
                                 interfaces=['basic', 'index', 'foreground', 'quantity'],
-                                quiet=quiet)
+                                quiet=quiet, **kwargs)
 
         return self._check_foreground(res)
 
@@ -383,6 +377,8 @@ class ForegroundCatalog(LcCatalog):
                 # no save files
                 pass
 
+        if ref in self._fg_queue:
+            raise BackReference(ref)
         self._fg_queue.add(ref)
         res.check(self)
         self._fg_queue.remove(ref)

@@ -154,7 +154,7 @@ class LcForeground(BasicArchive):
     def _fragment_dir(self):
         return os.path.join(self.source, 'fragments')
 
-    def __init__(self, fg_path, catalog=None, **kwargs):
+    def __init__(self, fg_path, catalog=None, debug_load_fragments=False, **kwargs):
         """
 
         :param fg_path:
@@ -176,6 +176,9 @@ class LcForeground(BasicArchive):
         # self._delayed_refs = []
         self._unresolved = set()
 
+        if debug_load_fragments:
+            print('%s: FRAGMENTS NOT LOADED' % self.ref)
+            self._frags_loaded = True
         self.load_all()
 
     def observations(self, fresh=True):
@@ -257,18 +260,21 @@ class LcForeground(BasicArchive):
                                                 dataSource=self.source,
                                                 description='LcForeground',
                                                 author='Antelope')
+        self._iface_check_fragments()
+
+    def _iface_check_fragments(self):
+        if self._frags_loaded is False:
+            self._load_fragments()
+            self.check_counter('fragment')
+            self._frags_loaded = True
 
     def make_interface(self, iface):
 
-        if iface == 'foreground' or iface == 'basic':
-            if self._frags_loaded is False:
-                self._load_fragments()
-                self.check_counter('fragment')
-                self._frags_loaded = True
-            if iface == 'foreground':
-                return AntelopeForegroundImplementation(self)
-            else:
-                return AntelopeBasicImplementation(self)
+        if iface == 'foreground':
+            self._iface_check_fragments()
+            return AntelopeForegroundImplementation(self)
+        elif iface == 'basic':
+            return AntelopeBasicImplementation(self)
         else:
             return super(LcForeground, self).make_interface(iface)
 

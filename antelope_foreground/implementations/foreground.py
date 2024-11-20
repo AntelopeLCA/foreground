@@ -827,7 +827,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             else:
                 flow = self[y.flow]
 
-            if flow is None:
+            if flow is None or (hasattr(flow, 'entity_type') and flow.entity_type != 'flow'):
                 print('Skipping unknown flow %s' % y.flow)
                 continue
             """
