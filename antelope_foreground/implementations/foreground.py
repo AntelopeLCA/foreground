@@ -758,7 +758,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                                 term_dict=None,
                                 set_background=None,
                                 include_elementary=False,
-                                include_context=True):
+                                include_context=True,
+                                auto_anchor=True):
         """
         If parent is None, first generated exchange is reference flow; and subsequent exchanges are children.
         Else, all generated exchanges are children of the given parent, and if a child flow exists, update it.
@@ -788,6 +789,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param set_background: [None] DEPRECATED / background is meaningless
         :param include_elementary: [False] whether to model elementary flows as child fragments
         :param include_context: [None] DEPRECATED and ignored. use include_elementary
+        :param auto_anchor: [True] try to anchor every non-explicitly-terminated child flow using fragments_with_flow()
         :return:
         """
         if term_dict is None:
@@ -843,10 +845,13 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 elif y.type == 'self':
                     term = None  # cutoff self-termination
                 elif y.type == 'cutoff':
-                    try:  # go hunting for a term in the local foreground
-                        term = next(self.fragments_with_flow(y.flow, y.direction))
-                        print('found term %s in local foreground' % term.external_ref)
-                    except StopIteration:
+                    if auto_anchor:
+                        try:  # go hunting for a term in the local foreground
+                            term = next(self.fragments_with_flow(y.flow, y.direction))
+                            print('found term %s in local foreground' % term.external_ref)
+                        except StopIteration:
+                            term = None
+                    else:
                         term = None
                 else:  # y.type == 'node'
                     try:
