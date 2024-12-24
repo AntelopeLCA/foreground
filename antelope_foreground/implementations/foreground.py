@@ -802,6 +802,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 x = next(_xg)
             except TypeError:
                 x = _xg.pop(0)
+            except StopIteration:
+                print('No exchanges')
+                return
+
             if ref is not None:
                 parent = self[ref]
 
@@ -821,6 +825,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             """
             Determine flow specification
             """
+            descend = bool(y.args.pop('descend', False))
             if hasattr(y.flow, 'entity_type') and y.flow.entity_type == 'flow':
                 try:
                     flow = self._grounded_entity(y.flow)
@@ -941,7 +946,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                         if term != c_up.term.term_node:
                             print('Updating %s termination %s' % (c_up, term))
                             c_up.clear_termination(scenario)
-                            c_up.terminate(term, scenario=scenario, term_flow=term_flow, descend=False)  # none unless specified
+                            c_up.terminate(term, scenario=scenario, term_flow=term_flow, descend=descend)  # none unless specified
                             '''
                             if term.entity_type == 'process' and set_background:
                                 c_up.set_background()
@@ -952,6 +957,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                     """
                     for k, v in y.args.items():
                         c_up[k] = v
+                    """
+                    Set descend
+                    """
+                    c_up.termination(scenario).descend = descend
 
                     _children.remove(c_up)
                     continue
@@ -968,7 +977,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
 
             if term is not None and term.entity_type != 'unknown':
                 try:
-                    c.terminate(term, scenario=scenario, term_flow=term_flow, descend=False)  # already sets stage name
+                    c.terminate(term, scenario=scenario, term_flow=term_flow, descend=descend)  # sets stage name
                 except NoReference:
                     logging.warning('NoReference for child flow %5.5s -- cutting off' % c.uuid)
                 except TypeError as e:
