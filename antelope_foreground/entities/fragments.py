@@ -11,6 +11,7 @@ from antelope import (comp_dir, check_direction, PropertyExists, CatalogRef, RxR
                       RefQuantityRequired, ConversionError)
 
 from ..fragment_flows import group_ios, FragmentFlow, ios_exchanges, frag_flow_lcia, FragmentInventoryDeprecated
+from ..frag_flow_lci import frag_flow_lci
 from antelope_core.entities import LcEntity, LcFlow
 # from antelope_core.exchanges import ExchangeValue
 # from lcatools.interact import ifinput, parse_math
@@ -282,12 +283,26 @@ class LcFragment(LcEntity):
         if level < self.__dbg_threshold:
             print('%.3s %s' % (self.uuid, qwer))
 
-    def reference(self, flow=None):
+    def reference(self, flow=None, scenario=None):
         """
-        For process interoperability
+        For process interoperability.
+        This really doesn't make sense for a dependent fragment- or at minimum it's scenario dependent.  The
+        thing to do to report the reference exchange for a dependent fragment is essentially to report the anchor,
+        including its node_weight_multiplier as the exchange value.
+
         :return:
         """
-        rx = RxRef(self, self.flow, comp_dir(self.direction), self.get('Comment', None), value=self.observed_ev)
+        if self.parent is None:
+            if scenario is None:
+                value = self.observed_ev
+            else:
+                value = self.exchange_value(scenario, observed=True)
+            rx = RxRef(self, self.flow, comp_dir(self.direction), self.get('Comment', None), value=value)
+        else:
+            term = self.termination(scenario)
+            rx = RxRef(self, term.term_flow, comp_dir(self.direction), self.get('Comment', None),
+                       value=term.node_weight_multiplier)
+
         if flow is not None:
             if not rx.flow.match(flow):
                 raise ValueError('%.5s: Supplied flow %s does not match fragment' % (self.uuid, flow))
@@ -514,8 +529,10 @@ class LcFragment(LcEntity):
         print('Exchange values: ')
         print('%20.20s: %g' % ('Cached', self.cached_ev))
         print('%20.20s: %g' % ('Observed', self.observed_ev))
-        for k in evs:
+        for k in evs[:15]:
             print('%20.20s: %g' % (k, self.exchange_value(k)))
+        if len(evs) > 15:
+            print('...\n   total of %d observations' % len(evs))
         if self.is_balance:
             print('\nBalance flow: True (%s)' % self.flow.reference_entity)
         else:
@@ -779,6 +796,13 @@ class LcFragment(LcEntity):
             if len(match) == 0:
                 return 1
             elif len(match) > 1:
+                """ we want to permit stochastic simulation entries (i.e. scenarios that are floats/ints) to 
+                take precedence over explicit static scenarios, because the simulation variables most likely
+                incorporate the static values already
+                """
+                match_f = [scen for scen in match if isinstance(scen, (int, float))]
+                if len(match_f) == 1:
+                    return match_f[0]
                 raise ScenarioConflict('fragment: %s\nexchange value matches: %s' % (self, match))
             m = match[0]
             if str(m).startswith('norm') and self.parent is None:
@@ -1328,6 +1352,9 @@ class LcFragment(LcEntity):
             for b in c.tree():
                 yield b
 
+    def fragment_lci(self, scenario=None, observed=True):
+        return frag_flow_lci(self.traverse(scenario=scenario, observed=observed))
+
     def fragment_lcia(self, quantity_ref, scenario=None, observed=True, mode=None, group_by=None, **kwargs):
         """
         Fragments don't have access to a qdb, so this piggybacks on the quantity_ref.
@@ -1464,9 +1491,9 @@ class LcFragment(LcEntity):
 
     def traverse(self, scenario=None, observed=False, frags_seen=None):
         if isinstance(scenario, set):
-            scenarios = set(scenario)
+            scenarios = set(scenario)  # new instance
         elif isinstance(scenario, tuple) or isinstance(scenario, list):
-            scenarios = set(scenario)
+            scenarios = set(scenario)  # collapse to set
         elif scenario is None:
             scenarios = set()
         else:
@@ -1476,6 +1503,11 @@ class LcFragment(LcEntity):
                 scenarios = {1}
             else:
                 scenarios = None
+        elif len(scenarios) > 1:
+            # necessary to handle corner case where 'True' is a standin for "any observation", but also True == 1
+            if True in scenarios:
+                scenarios = {k for k in scenarios if k != True}
+
         ffs, _ = self._traverse_node(1.0, scenarios, frags_seen=frags_seen)
         return ffs
 

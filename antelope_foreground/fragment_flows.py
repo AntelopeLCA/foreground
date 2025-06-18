@@ -580,7 +580,10 @@ class GhostFragment(object):
 
     def get(self, item, default=None):
         try:
-            return self.__getitem__(item)
+            i = self.__getitem__(item)
+            if i is None and default is not None:
+                return default
+            return i
         except KeyError:
             return default
 

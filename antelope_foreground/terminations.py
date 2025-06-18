@@ -258,10 +258,10 @@ class FlowTermination(object):
                     except KeyError:
                         raise e
 
-            elif self.is_frag:
-                self._term_flow = None  # leave unspecified to plug into term's ref flow
+            # elif self.is_frag:  # if the anchor is delayed-- just leave it null
+            #     self._term_flow = None  # leave unspecified to plug into term's ref flow
             else:
-                self._term_flow = self._parent.flow
+                self._term_flow = None
         else:
             if self.is_process:
                 try:

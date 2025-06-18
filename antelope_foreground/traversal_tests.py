@@ -13,7 +13,7 @@ the format '%.*g' % (self.precision, contextual_value).  precision defaults to 8
 """
 
 from pydantic import BaseModel, field_serializer, ConfigDict
-from typing import Set, Tuple, List
+from typing import Set, Tuple, List, Optional
 from antelope import QuantityRef, EntityNotFound, CatalogRef
 from antelope_core.entities import LcQuantity
 from antelope.models import EntityRef
@@ -167,12 +167,13 @@ class LciaContribTest(_LciaTest):
 
 class LciaAggTest(_LciaTest):
     test: str = 'lcia_agg'
+    group_by: Optional[str] = None
 
     def _make_entry(self, obj):
         return obj.entity.name, self.rounding(obj.cumulative_result)
 
     def run(self, model):
-        res = model.fragment_lcia(self.lcia_method, scenario=self.scenarios, mode='stage')
+        res = model.fragment_lcia(self.lcia_method, scenario=self.scenarios, mode='stage', group_by=self.group_by)
         return {self._make_entry(c) for c in res.components()} | \
             {('total', self.rounding(res.total()))}
 
