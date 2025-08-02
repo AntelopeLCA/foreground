@@ -11,7 +11,7 @@ def frag_flow_lci(fragmentflows, scenario=None):
     if the term is a context, we add it directly to the defaultdict
     if it's a cutoff, we skip
     :param fragmentflows:
-    :param scenario:
+    :param scenario: only used for remote calculation of subfragments
     :return:
     """
     lci = defaultdict(float)
@@ -35,11 +35,12 @@ def frag_flow_lci(fragmentflows, scenario=None):
 
         if ff.term.is_subfrag:
             if len(ff.subfragments) == 0:
+                print(' THIS NEVER HAPPENS %s' % ff)
                 sub_lci = ff.term.term_node.fragment_lci(scenario)  # this does not yet exist
             else:
                 sub_lci = frag_flow_lci(ff.subfragments, scenario=ff.subfragment_scenarios)
         else:
-            sub_lci = ff.term.unobserved_exchanges()
+            sub_lci = ff.term.unobserved_exchanges(threshold=1e-9)
 
         for k in sub_lci:
             if k.termination is None:

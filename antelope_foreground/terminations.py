@@ -623,7 +623,7 @@ class FlowTermination(object):
         for cf in self._parent.child_flows:
             yield DirectedFlow.from_observed(cf)
 
-    def unobserved_exchanges(self, refresh=False):
+    def unobserved_exchanges(self, refresh=False, **kwargs):
         """
         Generator which yields exchanges from the term node's inventory that are not found among the child flows, for
           LCIA purposes
@@ -648,10 +648,10 @@ class FlowTermination(object):
         else:
             if self.is_bg:  # or len(list(self._parent.child_flows)) == 0:
                 # ok we're bringing it back but only because it is efficient to cache lci
-                for x in self.term_node.lci(ref_flow=self.term_flow, refresh=refresh):
+                for x in self.term_node.lci(ref_flow=self.term_flow, refresh=refresh, **kwargs):
                     yield x
             else:
-                for x in self.term_node.unobserved_lci(self.observed_flows, ref_flow=self.term_flow):
+                for x in self.term_node.unobserved_lci(self.observed_flows, ref_flow=self.term_flow, **kwargs):
                     yield x  # this should forward out any cutoff exchanges
 
     def _fallback_lcia(self, quantity_ref, locale, **kwargs):

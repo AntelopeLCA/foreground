@@ -1,14 +1,17 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.3.4.1'
+VERSION = '0.3.5.1'
 
 requires = [
-    'antelope_interface>=0.2.7',
-    'antelope_core>0.3.3'
+    'antelope_interface>=0.3.1',
+    'antelope_core>=0.3.5'
 ]
 
 """
 Revision history
+0.3.5.1            - fix bad requirement spec
+0.3.5   2025-06-18 - Fragment LCI; catch-up bugfixes for ISSST workshop
+
 0.3.4.1 ''         - catch NoReference error in fragment_from_exchanges
 
 0.3.4   2024-09-22 - workshop release. re-introduce inventories and expose cutoffs in extend_process
