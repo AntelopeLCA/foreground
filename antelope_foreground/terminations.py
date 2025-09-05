@@ -17,13 +17,7 @@ from antelope_core.lcia_results import LciaResult
 from antelope_core.implementations.quantity import do_lcia
 from .lcia_dict import LciaResults
 from .models import Anchor, EntityRef, UNRESOLVED_ANCHOR_TYPE
-
-
-class BackReference(Exception):
-    """
-    trying to instantiate a foreground that's currently being loaded
-    """
-    pass
+from .exceptions import BackReference
 
 
 # from lcatools.catalog_ref import NoCatalog
@@ -464,7 +458,8 @@ class FlowTermination(object):
                 # if it's not descend, the score gets computed (and not cached) during traversal
             '''
         else:
-            raise ValueError('Descend setting must be True or False')
+            # would it have killed me to just fucking cast it to bool?
+            raise ValueError('Descend setting must be True or False, not %s (%s)' % (value, type(value)))
 
     @property
     def name(self):

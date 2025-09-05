@@ -1,10 +1,9 @@
 from antelope import UnknownOrigin
 from antelope_core.archives import InterfaceError
 from antelope_core.catalog import LcCatalog
-from .foreground_query import ForegroundQuery, ForegroundNotSafe, MissingResource
-from .terminations import BackReference
+from .foreground_query import ForegroundQuery, MissingResource
+from .exceptions import BackReference, ForegroundNotSafe
 
-from itertools import chain
 import shutil
 import os
 import re

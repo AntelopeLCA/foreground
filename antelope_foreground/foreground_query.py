@@ -11,13 +11,6 @@ from .fragment_flows import FragmentFlow
 from .terminations import FlowTermination
 
 
-class ForegroundNotSafe(Exception):
-    """
-    This foreground has not been loaded yet. keep our references unresolved
-    """
-    pass
-
-
 class FragmentBranch(object):
     def __init__(self, node, anchor, group='', scenario=None, magnitude=None, is_cutoff=None):
         self.node = node

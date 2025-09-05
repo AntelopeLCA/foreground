@@ -10,13 +10,14 @@ from typing import Optional
 
 from pydantic import ValidationError
 
-from ..foreground_query import DelayedQuery, ForegroundNotSafe, QueryIsDelayed, MissingResource
+from ..foreground_query import DelayedQuery, QueryIsDelayed, MissingResource
 from ..refs.fragment_ref import FragmentRef
 from ..implementations import AntelopeForegroundImplementation, AntelopeBasicImplementation
 from ..models import ForegroundMetadata, ForegroundRelease, Observation
+from ..exceptions import ForegroundNotSafe, BackReference
 
 from antelope import PropertyExists, CatalogRef, EntityNotFound
-from antelope_core.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES, LD_CONTEXT
+from antelope_core.archives import BasicArchive, EntityExists, BASIC_ENTITY_TYPES, LD_CONTEXT, ContextCollision
 from ..entities.fragments import LcFragment
 
 
@@ -218,7 +219,7 @@ class LcForeground(BasicArchive):
             return entity
         try:
             return self._catalog.internal_ref(self.ref, origin, external_ref)
-        except (ForegroundNotSafe, MissingResource):
+        except (ForegroundNotSafe, MissingResource, BackReference):
             print('{%s} Creating delayed ref %s/%s [%s]' % (self.ref, origin, external_ref, entity_type))
             dq = DelayedQuery(origin, self._catalog, self.ref)
             if entity_type == 'fragment':
@@ -315,6 +316,21 @@ class LcForeground(BasicArchive):
                     return self.catalog_ref(e.pop('origin'), ext_ref, entity_type='quantity', reference_entity=unit, **e)
         e.pop('origin', None)  # just go ahead and domesticate anything we make as an entity
         return super(LcForeground, self)._make_entity(e, etype, ext_ref)
+
+    def _ensure_valid_refs(self, entity):
+        """
+        we don't need to do so much error checking in the foreground
+        :param entity:
+        :return:
+        """
+        if self.tm.is_context(entity.external_ref):
+            raise ContextCollision('Entity external_ref %s is already known as a context identifier' %
+                                   entity.external_ref)
+        if hasattr(entity, 'uuid'):
+            if entity.uuid is None:
+                uu = self._ref_to_uuid(entity.external_ref)
+                if uu is not None:
+                    entity.uuid = uu
 
     def add(self, entity):
         """
