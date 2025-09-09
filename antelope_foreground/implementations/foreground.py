@@ -682,6 +682,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         Extend a process model, creating a child flow for each entry in a node's dependencies and cutoff flows.
         if include_context is True, emissions are included as well.
 
+        If no scenario is specified, the process is extended for all anchors.  If a scenario is specified, only
+        the child flows for the specified scenario are built.
+
         :param fragment:
         :param scenario:
         :param include_elementary:
@@ -695,6 +698,14 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             parent = fragment.balance_flow
         else:
             parent = fragment
+        if scenario is None:
+            for k, v in parent.terminations():
+                self._extend_process_for_scenario(parent, k, inventory, include_elementary, **kwargs)
+        else:
+            self._extend_process_for_scenario(parent, scenario, inventory, include_elementary, **kwargs)
+        return fragment
+
+    def _extend_process_for_scenario(self, parent, scenario, inventory, include_elementary, **kwargs):
         term = parent.termination(scenario)
         if inventory:
             inv = term.term_node.inventory(ref_flow=term.term_flow)
@@ -715,7 +726,6 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                                      scenario=scenario,
                                      include_elementary=include_elementary,
                                      **kwargs)
-        return fragment
 
     '''
     def extend_process_model(self, fragment, include_elementary=False, terminate=True, **kwargs):
@@ -763,7 +773,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         """
         If parent is None, first generated exchange is reference flow; and subsequent exchanges are children.
         Else, all generated exchanges are children of the given parent, and if a child flow exists, update it.
-        The generated exchanges are assumed to be ordered, and are matched to child flows in the order originally created.
+        The generated exchanges are assumed to be ordered, and are matched to child flows in the order originally
+        created.
+
+        Child flows that are not encountered in the exchange list are observed to 0 under the designated scenario.
 
         This is all tricky if we expect it to work with both ExchangeRefs and actual exchanges (which, obviously, we
         should) because: ExchangeRefs may have only a string for process and flow, but Exchanges will have entities
@@ -817,7 +830,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                     self.observe(parent, name=ref)
 
             else:
-                self.observe(parent, exchange_value=x.value, units=x.unit)
+                self.observe(parent, exchange_value=x.value, units=x.unit, scenario=scenario)
 
         _children = list(parent.child_flows)
 
@@ -983,6 +996,14 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 except TypeError as e:
                     logging.warning('TypeError on %s for child flow %5.5s -- cutting off' % (term, c.uuid))
             self.observe(c)  # use cached implicitly via fg interface
+
+        '''
+        # fix for multi-scenario terminations:
+        Any entries remaining in _children were *not* observed from the inventory. They must therefore be observed
+        to zero.
+        '''
+        for c in _children:
+            self.observe(c, exchange_value=0.0, scenario=scenario)
 
         return parent
 
