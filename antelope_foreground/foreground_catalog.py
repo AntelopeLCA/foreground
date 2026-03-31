@@ -87,7 +87,7 @@ class ForegroundCatalog(LcCatalog):
     '''
     def __init__(self, *args, **kwargs):
         self._fg_queue = set()  # fgs we are *currently* opening
-        self._missing_o = set()  # references we have encountered that we cannot resolve
+        self._missing_o = dict()  # references we have encountered that we cannot resolve
         self._dependencies = OriginDependencies()
         super(ForegroundCatalog, self).__init__(*args, **kwargs)
 
@@ -100,7 +100,7 @@ class ForegroundCatalog(LcCatalog):
         for iface in res.interfaces:
             key = (res.origin, iface)
             if key in self._missing_o:
-                self._missing_o.remove(key)
+                self._missing_o.pop(key)
 
     def new_resource(self, reference, source, ds_type, store=True, **kwargs):
         res = super(ForegroundCatalog, self).new_resource(reference, source, ds_type, store=store, **kwargs)
@@ -130,8 +130,8 @@ class ForegroundCatalog(LcCatalog):
 
     @property
     def missing_resources(self):
-        for k in self._missing_o:
-            yield k
+        for k, e in self._missing_o.items():
+            yield k, e
 
     '''
     def delete_foreground(self, ref):
@@ -191,18 +191,19 @@ class ForegroundCatalog(LcCatalog):
                 # try locally first
                 for k in super(ForegroundCatalog, self).gen_interfaces(self._qdb.ref, itype=itype):
                     yield k
-            raise MissingResource(origin, itype)
+            e = self._missing_o[(origin, itype)]
+            raise MissingResource(origin, itype, e.args)
 
         else:
             try:
                 for k in super(ForegroundCatalog, self).gen_interfaces(origin, itype=itype, strict=strict):
                     yield k
-            except (UnknownOrigin, InterfaceError):
+            except (UnknownOrigin, InterfaceError) as e:
                 if itype == 'quantity':
                     # try locally first
                     for k in super(ForegroundCatalog, self).gen_interfaces(self._qdb.ref, itype=itype):
                         yield k
-                self._missing_o.add((origin, itype))
+                self._missing_o[(origin, itype)] = e
                 raise MissingResource(origin, itype)
 
     @property
@@ -392,6 +393,11 @@ class ForegroundCatalog(LcCatalog):
         if origin in self._fg_queue:
             self._fg_queue.remove(origin)
 
+    def show_interfaces(self):
+        super(ForegroundCatalog, self).show_interfaces()
+        for k, e in self.missing_resources:
+            print('MISSING %s:%s (%s)' % (k[0], k[1], e))
+
     @property
     def foregrounds(self):
         f = set()
@@ -521,9 +527,9 @@ class ForegroundCatalog(LcCatalog):
         self._dependencies.add_dependency(fg_ref, origin)
         try:
             return self.query(origin, strict=True).get(external_ref)
-        except UnknownOrigin:
-            self._missing_o.add((origin, 'basic'))
-            raise MissingResource(origin, 'basic')
+        except UnknownOrigin as e:
+            self._missing_o[(origin, 'basic')] = e
+            raise MissingResource(origin, 'basic', e.args)
         # don't catch EntityNotFound
 
     '''
