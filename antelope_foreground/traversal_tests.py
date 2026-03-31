@@ -270,10 +270,10 @@ class LcaTestSuite(BaseModel):
                     print('entity %s/%s not found - skipping' % (org, test.external_ref))
                     continue
                 if apply_scenarios:
-                    hold = model.scenarios
-                    model.scenarios = apply_scenarios
+                    hold = test.scenarios
+                    test.scenarios = apply_scenarios
                     o = test.check(model)
-                    model.scenarios = hold
+                    test.scenarios = hold
                 else:
                     o = test.check(model)
                 results[group].append(o)
