@@ -1,14 +1,15 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.3.7'
+VERSION = '0.3.8'
 
 requires = [
-    'antelope_interface>=0.3.3',
-    'antelope_core>=0.3.7'
+    'antelope_interface>=0.3.4',
+    'antelope_core>=0.3.8'
 ]
 
 """
 Revision history
+0.3.8   2026-03-30 - store exceptions on missing resources; truncate noisy exchanges (1e-10), serialization errors
 0.3.7   2025-09-09 - correct extend_process for multi-scenario
 0.3.6              - catch BackReference and supply delayed query 
 0.3.5.1            - fix bad requirement spec
