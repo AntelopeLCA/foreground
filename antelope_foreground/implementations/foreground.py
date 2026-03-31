@@ -1,5 +1,6 @@
 from itertools import chain
 import logging
+from math import log10, ceil
 
 from antelope import EntityNotFound, comp_dir, BackgroundRequired, NoReference
 from ..interfaces.iforeground import AntelopeForegroundInterface  # , ForegroundRequired
@@ -441,6 +442,13 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
             else:
                 print('Ignoring fragment name under a scenario specification')
         if fragment.observable(scenario):
+
+            # truncate noisy values. assume 10 s.f. is sufficient for all purposes.
+            if exchange_value:
+                scale = ceil(log10(abs(exchange_value)))
+                trunc = max([1, (10 - scale)])  # allow a 10-decimal point dynamic range
+                exchange_value = round(exchange_value, ndigits=trunc)
+
             self._archive.observe_ev(fragment, scenario=scenario, value=exchange_value, units=units)
 
         else:
