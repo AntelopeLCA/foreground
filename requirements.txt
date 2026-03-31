@@ -1,2 +1,2 @@
-antelope_interface>=0.3.1
-antelope_core>=0.3.5
+antelope_interface>=0.3.3
+antelope_core>=0.3.7
