@@ -514,6 +514,10 @@ class GhostFragment(object):
         return self.flow.origin
 
     @property
+    def level(self):
+        return self._parent.level + 1
+
+    @property
     def external_ref(self):
         return self.uuid
 

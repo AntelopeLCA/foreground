@@ -249,7 +249,14 @@ class DescendSpec(ResponseModel):
     descend_all: Optional[bool] = None
 
     def __init__(self, descend=None, nondescend=None, descend_all=None):
-        super(DescendSpec, self).__init__(descend=_to_set(descend), nondescend=_to_set(nondescend),
+        to_descend = _to_set(descend)
+        to_nondescend = _to_set(nondescend)
+        intsc = to_descend.intersection(to_nondescend)
+        for i in intsc:
+            print('warning: %s included in both sets; favoring nondescend' % i)
+            to_descend.remove(i)
+
+        super(DescendSpec, self).__init__(descend=to_descend, nondescend=to_nondescend,
                                           descend_all=descend_all)
 
     def descend_ff(self, ff):
@@ -470,7 +477,7 @@ class FragmentFlow(FragmentBranch):
     flow_conversion: float
     scenario: Optional[str]
     node_weight: float
-    anchor_scenario: Optional[str]
+    anchor_scenario: Optional[str] = None
     is_conserved: bool
     subfragments: List = []
 
@@ -513,7 +520,7 @@ class FragmentFlow(FragmentBranch):
             group = 'StageName'
         node = FragmentRef.from_fragment(ff.fragment)
         anchor = ff.term.to_anchor(save_unit_scores=save_unit_scores)
-        ff_m = cls(parent=parent, node=node, name=ff.name,
+        ff_m = cls(parent=parent, node=node, name=ff.name, level=ff.fragment.level,
                    group=ff.fragment.get(group, ''),
                    magnitude=ff.magnitude, scenario=scen, unit=ff.fragment.flow.unit, node_weight=ff.node_weight,
                    flow_conversion=ff.flow_conversion,

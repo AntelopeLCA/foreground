@@ -488,7 +488,7 @@ class LcFragment(LcEntity):
             'isBalanceFlow': self.is_balance,
             'exchangeValues': self._serialize_evs(),
             'terminations': self._serialize_terms(save_unit_scores=save_unit_scores),
-            'tags': self._d
+            'tags': {str(k): self.get(k) for k in self._d}
         })
         for k in self._d.keys():
             j.pop(k, None)  # we put these together in tags
@@ -565,7 +565,7 @@ class LcFragment(LcEntity):
         delim = '()'
         if self.observed_ev != 0.0:
             delim = '[]'
-        if not(observed and self.observed_ev == 0.0):
+        if not(observed and self.observed_ev == 0.0) or self.is_balance:
             # when doing the observed mode, don't print zero results
             print('   %s%s%s %.5s %s%s%7.3g %s%s %s' % (prefix, self.dirn, term, self.uuid,
                                                         delim[0],
@@ -581,7 +581,7 @@ class LcFragment(LcEntity):
             prefix += '    | '
             for c in sorted(children, key=lambda x: (x['StageName'], not x.term.is_null,
                                                      x.term.is_bg or x.term.term_is_bg)):
-                if not c.balance_flow:
+                if not c.is_balance:
                     if observed and c.exchange_value(scenario, observed=observed) == 0:
                         continue
                 if c['StageName'] != latest_stage:
