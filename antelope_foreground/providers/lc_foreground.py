@@ -348,7 +348,8 @@ class LcForeground(BasicArchive):
                     entity = self.catalog_ref(entity.origin, entity.external_ref, entity_type=entity.entity_type)
             elif entity.entity_type == 'quantity':
                 q_ref = entity.make_ref(self.query)
-                self._catalog.register_entity_ref(q_ref)
+                if self._catalog:
+                    self._catalog.register_entity_ref(q_ref)
 
             # for p in entity.properties:
             #     enew[p] = entity[p]  ...
@@ -373,7 +374,7 @@ class LcForeground(BasicArchive):
             self._add_ext_ref_mapping(entity)
 
         # it's up to the other foregrounds (local or not) to add their own quantities to the TM
-        if entity.entity_type == 'quantity':
+        if entity.entity_type == 'quantity' and self._catalog is not None:
             if entity.origin != self.ref and entity.origin in self._catalog.foregrounds:
                 # do not add to tm
                 return

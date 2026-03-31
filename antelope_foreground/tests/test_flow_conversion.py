@@ -54,7 +54,8 @@ class TestFlowConversions(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls.cat.__del__()
+        if hasattr(cls.cat, '__del__'):
+            cls.cat.__del__()
 
     def test_gasoline_flow(self):
         self.assertEqual(self.gasoline.cf(self.mass), 750.0)

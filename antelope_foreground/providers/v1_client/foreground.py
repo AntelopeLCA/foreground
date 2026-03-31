@@ -2,6 +2,8 @@
 from ...implementations import AntelopeForegroundImplementation
 from antelope_core.lcia_results import LciaResult
 from ...refs.fragment_ref import ParentFragment
+from antelope.refs import RxRef
+from antelope import comp_dir
 
 
 class AntelopeV1ForegroundImplementation(AntelopeForegroundImplementation):
@@ -35,6 +37,17 @@ class AntelopeV1ForegroundImplementation(AntelopeForegroundImplementation):
 
     def get_reference(self, key):
         raise ParentFragment
+
+    def cutoff_flows(self, fragment, scenario=None, **kwargs):
+        """
+        just return the fragment's reference flow-- i.e. the fragment it
+        :param fragment:
+        :param scenario:
+        :param kwargs:
+        :return:
+        """
+        ffs = self.traverse(fragment, scenario=scenario, **kwargs)
+        return [ffs[0]]
 
     def traverse(self, fragment, scenario=None, **kwargs):
         if hasattr(fragment, 'external_ref'):
