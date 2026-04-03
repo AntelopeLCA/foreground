@@ -491,7 +491,9 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                         continue
                 if t.is_null or t.is_context:
                     continue
-                if (origin is None and t.term_node.origin != self.origin) or t.term_node.origin == origin:
+                if t.term_node is f:
+                    continue
+                if (origin is None) or t.term_node.origin == origin:
                     ev = f.exchange_value(sc)
                     yield FragmentBranch(f, t, grp, scenario=sc, magnitude=ev, is_cutoff=False)
 
