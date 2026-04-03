@@ -181,6 +181,8 @@ class LcFragment(LcEntity):
         self._is_balance = False
         self._child_flows = list()
 
+        self._backlinks = set()  # fragments that anchor to this one
+
         super(LcFragment, self).__init__('fragment', external_ref, entity_uuid=the_uuid, **kwargs)
         if self._external_ref == self._uuid:
             self._external_ref = None  # reset this
@@ -226,6 +228,25 @@ class LcFragment(LcEntity):
                 self.set_exchange_value(0, exchange_value, units=units)
             if observe:
                 self.observed_ev = self.cached_ev
+
+    def add_backlink(self, referrer, scenario):
+        if referrer is self:
+            return
+        self._backlinks.add((referrer, scenario))
+
+    def remove_backlink(self, referrer, scenario):
+        if referrer is self:
+            return
+        self._backlinks.remove((referrer, scenario))
+
+    @property
+    def backlinks(self):
+        return len(self._backlinks)
+
+    def get_backlinks(self, origin=None):
+        for referrer, scenario in self._backlinks:
+            if origin is None or referrer.origin.startswith(origin):
+                yield referrer, scenario
 
     def __hash__(self):
         """
@@ -775,7 +796,9 @@ class LcFragment(LcEntity):
         if terminations:
             sc = [k for k in self._terminations.keys() if k is not None]
             for s in sc:
-                self._terminations.pop(s)
+                t = self._terminations.pop(s)
+                if t.is_frag:
+                    t.term_node.remove_backlink(self, s)
 
     def _match_scenario_ev(self, scenario):
         """
@@ -817,7 +840,7 @@ class LcFragment(LcEntity):
     def _match_scenario_term(self, scenario):
         if scenario == 0 or scenario == '0' or scenario is None:
             return None
-        if isinstance(scenario, set):
+        if isinstance(scenario, set) or isinstance(scenario, tuple) or isinstance(scenario, list):
             match = [scen for scen in filter(None, scenario) if scen in self._terminations.keys()]
             if len(match) == 0:
                 return None
@@ -1129,6 +1152,8 @@ class LcFragment(LcEntity):
 
         termination = FlowTermination(self, term_node, **kwargs)
         self._terminations[scenario] = termination
+        if termination.is_frag:
+            termination.term_node.add_backlink(self, scenario)
         if scenario is None:
             if self['StageName'] == '' and not termination.is_null:
                 if termination.is_frag:
@@ -1144,9 +1169,11 @@ class LcFragment(LcEntity):
         return termination
 
     def clear_termination(self, scenario=None):
-        if scenario is not None:
-            self._terminations.pop(scenario, None)
-        else:
+        t = self._terminations.pop(scenario, None)
+        if t:
+            if t.is_frag:
+                t.term_node.remove_backlink(self, scenario)
+        if scenario is None:
             if self.is_background:
                 self._terminations[None] = FlowTermination.null(self)
             else:
@@ -1189,7 +1216,10 @@ class LcFragment(LcEntity):
     def term_from_json(self, fg, scenario, j):
         if isinstance(scenario, tuple):
             raise ScenarioConflict('Set termination must specify single scenario')
-        self._terminations[scenario] = FlowTermination.from_json(self, fg, scenario, j)
+        term = FlowTermination.from_json(self, fg, scenario, j)
+        self._terminations[scenario] = term
+        if term.is_frag:
+            term.term_node.add_backlink(self, scenario)
 
     def termination(self, scenario=None):
         match = self._match_scenario_term(scenario)

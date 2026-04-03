@@ -42,6 +42,26 @@ class FragmentRef(EntityRef):
             self._exch_vals.update(exchange_values)
 
         self._anchors = dict()
+        self._backlinks = set()  # fragments that anchor to this one
+
+    def add_backlink(self, referrer, scenario):
+        if referrer == self:
+            return
+        self._backlinks.add((referrer, scenario))
+
+    def remove_backlink(self, referrer, scenario):
+        if referrer == self:
+            return
+        self._backlinks.remove((referrer, scenario))
+
+    @property
+    def backlinks(self):
+        return len(self._backlinks)
+
+    def get_backlinks(self, origin=None):
+        for referrer, scenario in self._backlinks:
+            if origin is None or referrer.origin.startswith(origin):
+                yield referrer, scenario
 
     @property
     def direction(self):

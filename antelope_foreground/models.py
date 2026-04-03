@@ -170,6 +170,8 @@ class FragmentRef(Entity):
     flow: FlowEntity
     direction: str
 
+    num_backlinks: int
+
     is_balance_flow: bool = False
 
     entity_uuid: str
@@ -203,7 +205,7 @@ class FragmentRef(Entity):
             parent = fragment.parent.external_ref
 
         obj = cls(origin=fragment.origin, entity_id=fragment.external_ref, entity_uuid=fragment.uuid,
-                  is_balance_flow=fragment.is_balance,
+                  is_balance_flow=fragment.is_balance, backlinks=fragment.backlinks,
                   flow=FlowEntity.from_flow(fragment.flow), direction=dirn, parent=parent, properties=dict())
         obj.properties['name'] = fragment['name']
 
@@ -291,6 +293,8 @@ class FragmentEntity(Entity):
     parent: Optional[str]
     is_balance_flow: bool = False
 
+    backlinks: List[EntityRef]
+
     entity_uuid: str  # we need uuid for consistency since we are running the same LcForeground on the backend
 
     exchange_values: Dict[str, float]
@@ -324,9 +328,14 @@ class FragmentEntity(Entity):
             terms[k] = a
         return cls(origin=fragment.origin, entity_id=fragment.external_ref, properties=j.pop('tags'),
                    entity_uuid=fragment.uuid,
+                   backlinks=list(EntityRef.from_entity(k) for k, _ in fragment.get_backlinks()),
                    flow=FlowEntity.from_flow(fragment.flow), direction=dirn,
                    parent=j.pop('parent'), is_balance_flow=j.pop('isBalanceFlow'),
                    exchange_values=evs, anchors=terms)
+
+    @property
+    def num_backlinks(self):
+        return len(self.backlinks)
 
     def _serialize_evs(self):
         d = dict(**self.exchange_values)

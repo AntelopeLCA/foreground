@@ -318,7 +318,7 @@ class FragmentTests(unittest.TestCase):
         self._check_fragmentflows(self.a1.traverse(None), f7, 'Input', a1_ancillary)
 
     def test_missing_flow(self):
-        k = create_fragment(f6, 'Output')
+        k = new_fragment(f6, 'Output')
         with self.assertRaises(MissingFlow):
             k.terminate(self.a1, term_flow=f6)
         with self.assertRaises(FlowConversionError):

@@ -135,6 +135,8 @@ class ForegroundQuery(CatalogQuery, AntelopeForegroundInterface):
             logging.warning('make_term_from_anchor called by fragment entity %s' % parent.link)
         else:
             parent._anchors[scenario] = term  # just deal with it
+            if term.is_frag:
+                term.term_node.add_backlink(parent, scenario)
         return term
 
     def _make_fragment_branch(self, n):
