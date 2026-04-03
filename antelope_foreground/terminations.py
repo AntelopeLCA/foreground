@@ -871,6 +871,9 @@ class FlowTermination(object):
             d['node'] = EntityRef.from_entity(self.term_node)
             return Anchor(**d)
 
+    def __hash__(self):
+        return hash((self.term_node.external_ref, self.term_flow.external_ref, self._direction))
+
     def __eq__(self, other):
         """
         Terminations are equal if they are both null, both fg, or if term_node, term_flow, direction and descend match
@@ -891,8 +894,7 @@ class FlowTermination(object):
             return False
         return (self.term_node.external_ref == other.term_node.external_ref and
                 self.term_flow == other.term_flow and
-                self.direction == other.direction and
-                self.descend == other.descend)  # probably want to remove this
+                self.direction == other.direction)
 
     def __str__(self):
         """
