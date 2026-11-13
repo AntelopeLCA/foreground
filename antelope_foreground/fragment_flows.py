@@ -514,6 +514,14 @@ class GhostFragment(object):
         return self.flow.origin
 
     @property
+    def backlinks(self):
+        return 0
+
+    @staticmethod
+    def gen_backlinks(*args, **kwargs):
+        yield from ()
+
+    @property
     def level(self):
         return self._parent.level + 1
 

@@ -205,7 +205,7 @@ class FragmentRef(Entity):
             parent = fragment.parent.external_ref
 
         obj = cls(origin=fragment.origin, entity_id=fragment.external_ref, entity_uuid=fragment.uuid,
-                  is_balance_flow=fragment.is_balance, backlinks=fragment.backlinks,
+                  is_balance_flow=fragment.is_balance, num_backlinks=fragment.backlinks,
                   flow=FlowEntity.from_flow(fragment.flow), direction=dirn, parent=parent, properties=dict())
         obj.properties['name'] = fragment['name']
 
@@ -223,6 +223,11 @@ class FragmentRef(Entity):
             self.flow.origin = masq[self.flow.origin]
 
 
+class _ToKeyAttributeError(Exception):
+    """ we don't want AttributeErrors all willy-nilly """
+    pass
+
+
 def _to_key(thing):
     if isinstance(thing, str):
         return thing
@@ -230,7 +235,7 @@ def _to_key(thing):
         return thing.uuid
     elif hasattr(thing, 'link'):
         return thing.link
-    raise AttributeError(thing)
+    raise _ToKeyAttributeError(thing)
 
 
 def _to_set(thing_or_things):
@@ -238,7 +243,7 @@ def _to_set(thing_or_things):
         return set()
     try:
         return {_to_key(thing_or_things)}
-    except AttributeError:
+    except _ToKeyAttributeError:
         return {_to_key(k) for k in thing_or_things}
 
 
