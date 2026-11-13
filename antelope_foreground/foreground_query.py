@@ -240,7 +240,7 @@ class DelayedQuery(ForegroundQuery):
     def get_item(self, external_ref, item):
         try:
             return super(DelayedQuery, self).get_item(external_ref, item)
-        except MissingResource:
+        except (MissingResource, QueryIsDelayed):
             raise ItemNotFound
 
     def is_lcia_engine(self, **kwargs):
