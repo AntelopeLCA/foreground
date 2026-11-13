@@ -9,9 +9,8 @@ import os
 import re
 import logging
 
-
-foreground_origin_regexp = re.compile('^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$')
-savefile_regexp = re.compile('^([A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*)\.(\d+)\.(\d+)\.zip$')
+foreground_origin_regexp = re.compile(r'^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$')
+savefile_regexp = re.compile(r'^([A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*)\.(\d+)\.(\d+)\.zip$')
 
 
 class NoSuchForeground(Exception):
@@ -26,6 +25,7 @@ class OriginDependencies(object):
     This class stores records of references made from one origin (host) to another (dependency), detected
     whenever an LcForeground
     """
+
     def __init__(self):
         self._deps = set()  #
 
@@ -85,6 +85,7 @@ class ForegroundCatalog(LcCatalog):
     '''
     ForegroundCatalog
     '''
+
     def __init__(self, *args, **kwargs):
         self._fg_queue = set()  # fgs we are *currently* opening
         self._missing_o = dict()  # references we have encountered that we cannot resolve
@@ -102,8 +103,8 @@ class ForegroundCatalog(LcCatalog):
             if key in self._missing_o:
                 self._missing_o.pop(key)
 
-    def new_resource(self, reference, source, ds_type, store=True, **kwargs):
-        res = super(ForegroundCatalog, self).new_resource(reference, source, ds_type, store=store, **kwargs)
+    def new_resource(self, reference, source, ds_type, interfaces='basic', **kwargs):
+        res = super(ForegroundCatalog, self).new_resource(reference, source, ds_type, interfaces=interfaces, **kwargs)
         self._check_missing_o(res)
         return res
 
@@ -302,6 +303,7 @@ class ForegroundCatalog(LcCatalog):
         :param target_dir: specify where to look for saved versions (default cat.root)
         :return:
         """
+
         def _make_sortable(filename):
             """
             here we have to take something that says "my.origin.[majorversion].[minorversion]" and make it so that
