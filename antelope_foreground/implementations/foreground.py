@@ -233,7 +233,7 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         """
         return self._archive.add_entity_and_children(*args, **kwargs)  # this is a hack
 
-    def add_or_retrieve(self, external_ref, reference, name, group=None, strict=False, **kwargs):
+    def add_or_retrieve(self, external_ref, reference, name, group=None, strict=False, overwrite=False, **kwargs):
         """
         Gets an entity with the given external_ref if it exists, , and creates it if it doesn't exist from the args.
 
@@ -245,6 +245,8 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
         :param group: used as context for flow
         :param strict: [False] if True it will raise a TypeError (ref) or ValueError (name) if an entity exists but
         does not match the spec.  n.b. I think I should check the reference entity even if strict is False but.. nah
+        :param overwrite: [False] if True, then the specified name+group overwrites an existing name/group. Subordinate
+          to strict. (if strict=True, we will get an error instead of overwriting)
         :return:
         """
         try:
@@ -260,8 +262,10 @@ class AntelopeForegroundImplementation(BasicImplementation, AntelopeForegroundIn
                 if t['Name'] != name:
                     raise ValueError("Name (%s) doesn't match supplied(%s)" % (t['Name'], name))
             else:
-                if t['Name'] != name:
+                if overwrite:
                     t['Name'] = name
+                    if group:
+                        t['group'] = group
             for k, v in kwargs.items():
                 if v is not None:
                     t[k] = v
